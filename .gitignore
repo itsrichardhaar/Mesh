@@ -1,0 +1,38 @@
+# macOS
+.DS_Store
+
+# Node / build artifacts (when code lands)
+node_modules/
+dist/
+out/
+build/
+*.tsbuildinfo
+
+# Electron / electron-vite
+.vite/
+out/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+
+# Editors
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+.idea/
+
+# Coverage / test artifacts
+coverage/
+.nyc_output/
+
+# OS
+Thumbs.db
