@@ -145,7 +145,7 @@ describe('session reader', () => {
     })
   })
 
-  describe('readTranscript', () => {
+  describe('readTranscript — entry kinds', () => {
     it('returns an empty array when the session file does not exist', async () => {
       const dir = await mkProjectDir('no-session')
       const result = await readTranscript(dir, 'missing')
@@ -166,88 +166,21 @@ describe('session reader', () => {
       )
       const result = await readTranscript(dir, 's')
       expect(result).toEqual([
-        { uuid: 'u1', role: 'user', timestamp: '2026-06-25T10:00:00.000Z', markdown: 'Hello there' },
         {
+          kind: 'message',
+          uuid: 'u1',
+          role: 'user',
+          timestamp: '2026-06-25T10:00:00.000Z',
+          markdown: 'Hello there'
+        },
+        {
+          kind: 'message',
           uuid: 'a1',
           role: 'assistant',
           timestamp: '2026-06-25T10:00:01.000Z',
           markdown: 'Hi! How can I help?'
         }
       ])
-    })
-
-    it('drops sidechain rows', async () => {
-      const dir = await mkProjectDir('sidechain')
-      await writeFile(
-        join(dir, 's.jsonl'),
-        [
-          userLine('main user prompt', '2026-06-25T10:00:00.000Z', { uuid: 'u1' }),
-          assistantTextLine('sub-agent reply', '2026-06-25T10:00:01.000Z', {
-            uuid: 'a1',
-            isSidechain: true
-          }),
-          assistantTextLine('main reply', '2026-06-25T10:00:02.000Z', { uuid: 'a2' })
-        ].join('\n') + '\n',
-        'utf-8'
-      )
-      const result = await readTranscript(dir, 's')
-      expect(result.map((m) => m.uuid)).toEqual(['u1', 'a2'])
-    })
-
-    it('skips assistant thinking and tool_use blocks at this fidelity', async () => {
-      const dir = await mkProjectDir('mixed-blocks')
-      const assistant = {
-        parentUuid: null,
-        isSidechain: false,
-        type: 'assistant',
-        uuid: 'a1',
-        timestamp: '2026-06-25T10:00:01.000Z',
-        message: {
-          role: 'assistant',
-          content: [
-            { type: 'thinking', thinking: 'should not surface' },
-            { type: 'text', text: 'Here is the plan:' },
-            { type: 'tool_use', id: 'tu_1', name: 'Read', input: { file_path: '/x' } },
-            { type: 'text', text: 'I just read x.' }
-          ]
-        }
-      }
-      await writeFile(
-        join(dir, 's.jsonl'),
-        [userLine('go', '2026-06-25T10:00:00.000Z', { uuid: 'u1' }), JSON.stringify(assistant)].join(
-          '\n'
-        ) + '\n',
-        'utf-8'
-      )
-      const result = await readTranscript(dir, 's')
-      expect(result.find((m) => m.uuid === 'a1')!.markdown).toBe(
-        'Here is the plan:\n\nI just read x.'
-      )
-    })
-
-    it('drops user lines whose only content is tool_result blocks (no rendered text)', async () => {
-      const dir = await mkProjectDir('tool-result')
-      const toolResultOnly = {
-        parentUuid: 'u1',
-        isSidechain: false,
-        type: 'user',
-        uuid: 'u2',
-        timestamp: '2026-06-25T10:00:02.000Z',
-        message: {
-          role: 'user',
-          content: [{ type: 'tool_result', tool_use_id: 't1', content: 'ok' }]
-        }
-      }
-      await writeFile(
-        join(dir, 's.jsonl'),
-        [
-          userLine('first prompt', '2026-06-25T10:00:00.000Z', { uuid: 'u1' }),
-          JSON.stringify(toolResultOnly)
-        ].join('\n') + '\n',
-        'utf-8'
-      )
-      const result = await readTranscript(dir, 's')
-      expect(result.map((m) => m.uuid)).toEqual(['u1'])
     })
 
     it('tolerates malformed JSON lines without aborting the file', async () => {
@@ -263,7 +196,198 @@ describe('session reader', () => {
         'utf-8'
       )
       const result = await readTranscript(dir, 's')
-      expect(result.map((m) => m.uuid)).toEqual(['u1', 'a1'])
+      expect(result.map((m) => 'uuid' in m && m.uuid)).toEqual(['u1', 'a1'])
+    })
+  })
+
+  describe('readTranscript — fixture snapshots', () => {
+    it('renders tool calls as one-liner entries with concise result summaries', async () => {
+      const dir = await mkProjectDir('tool-calls')
+      const assistantToolCall = assistantBlocksLine(
+        '2026-06-25T10:00:01.000Z',
+        'a1',
+        [
+          { type: 'text', text: 'Looking at the file.' },
+          { type: 'tool_use', id: 'toolu_read1', name: 'Read', input: { file_path: '/repo/a.ts' } },
+          {
+            type: 'tool_use',
+            id: 'toolu_bash1',
+            name: 'Bash',
+            input: { command: 'pnpm test --silent' }
+          },
+          {
+            type: 'tool_use',
+            id: 'toolu_glob1',
+            name: 'Glob',
+            input: { pattern: 'src/**/*.tsx' }
+          }
+        ]
+      )
+      const toolResults = toolResultsLine('2026-06-25T10:00:02.000Z', 'u2', [
+        { tool_use_id: 'toolu_read1', content: 'file body line 1\nfile body line 2\n' },
+        {
+          tool_use_id: 'toolu_bash1',
+          content: 'PASS  tests/example.test.ts (1.2s)\n'
+        },
+        {
+          tool_use_id: 'toolu_glob1',
+          content: 'src/foo.tsx\nsrc/bar.tsx\nsrc/baz.tsx\n'
+        }
+      ])
+      await writeFile(
+        join(dir, 's.jsonl'),
+        [
+          userLine('Run the tests and check src.', '2026-06-25T10:00:00.000Z', { uuid: 'u1' }),
+          assistantToolCall,
+          toolResults,
+          assistantTextLine('All green.', '2026-06-25T10:00:03.000Z', { uuid: 'a2' })
+        ].join('\n') + '\n',
+        'utf-8'
+      )
+
+      const result = await readTranscript(dir, 's')
+      expect(result).toMatchInlineSnapshot(`
+        [
+          {
+            "kind": "message",
+            "markdown": "Run the tests and check src.",
+            "role": "user",
+            "timestamp": "2026-06-25T10:00:00.000Z",
+            "uuid": "u1",
+          },
+          {
+            "kind": "message",
+            "markdown": "Looking at the file.",
+            "role": "assistant",
+            "timestamp": "2026-06-25T10:00:01.000Z",
+            "uuid": "a1",
+          },
+          {
+            "keyArg": "/repo/a.ts",
+            "kind": "tool",
+            "resultSummary": null,
+            "timestamp": "2026-06-25T10:00:01.000Z",
+            "tool": "Read",
+            "uuid": "toolu_read1",
+          },
+          {
+            "keyArg": "pnpm test --silent",
+            "kind": "tool",
+            "resultSummary": "PASS  tests/example.test.ts (1.2s)",
+            "timestamp": "2026-06-25T10:00:01.000Z",
+            "tool": "Bash",
+            "uuid": "toolu_bash1",
+          },
+          {
+            "keyArg": "src/**/*.tsx",
+            "kind": "tool",
+            "resultSummary": "3 matches",
+            "timestamp": "2026-06-25T10:00:01.000Z",
+            "tool": "Glob",
+            "uuid": "toolu_glob1",
+          },
+          {
+            "kind": "message",
+            "markdown": "All green.",
+            "role": "assistant",
+            "timestamp": "2026-06-25T10:00:03.000Z",
+            "uuid": "a2",
+          },
+        ]
+      `)
+    })
+
+    it('skips oversized tool_result content at parse time (no result summary surfaces)', async () => {
+      const dir = await mkProjectDir('oversized')
+      const big = 'x'.repeat(10_000)
+      const assistantCall = assistantBlocksLine('2026-06-25T10:00:01.000Z', 'a1', [
+        {
+          type: 'tool_use',
+          id: 'toolu_read_big',
+          name: 'Read',
+          input: { file_path: '/repo/huge.txt' }
+        },
+        {
+          type: 'tool_use',
+          id: 'toolu_bash_big',
+          name: 'Bash',
+          input: { command: 'cat huge.txt' }
+        }
+      ])
+      const bigResults = toolResultsLine('2026-06-25T10:00:02.000Z', 'u2', [
+        { tool_use_id: 'toolu_read_big', content: big },
+        // array-form content that also exceeds the cap when accumulated
+        {
+          tool_use_id: 'toolu_bash_big',
+          content: [
+            { type: 'text', text: big.slice(0, 5000) },
+            { type: 'text', text: big.slice(0, 5000) }
+          ]
+        }
+      ])
+      await writeFile(
+        join(dir, 's.jsonl'),
+        [
+          userLine('read it', '2026-06-25T10:00:00.000Z', { uuid: 'u1' }),
+          assistantCall,
+          bigResults
+        ].join('\n') + '\n',
+        'utf-8'
+      )
+
+      const result = await readTranscript(dir, 's')
+      // Both tool entries are present, but neither carries a result
+      // summary — the oversized payload never makes it past the cap.
+      const tools = result.filter((e) => e.kind === 'tool')
+      expect(tools).toHaveLength(2)
+      for (const t of tools) {
+        expect(t.kind === 'tool' && t.resultSummary).toBeNull()
+      }
+    })
+
+    it('collapses sidechain runs into a single ↳ sub-agent indicator', async () => {
+      const dir = await mkProjectDir('sidechain-group')
+      const sub1 = userLine('sub thought 1', '2026-06-25T10:00:01.000Z', {
+        uuid: 'sc1',
+        isSidechain: true
+      })
+      const sub2 = assistantTextLine('sub reply 1', '2026-06-25T10:00:02.000Z', {
+        uuid: 'sc2',
+        isSidechain: true
+      })
+      const sub3 = userLine('sub thought 2', '2026-06-25T10:00:03.000Z', {
+        uuid: 'sc3',
+        isSidechain: true
+      })
+      await writeFile(
+        join(dir, 's.jsonl'),
+        [
+          userLine('main user', '2026-06-25T10:00:00.000Z', { uuid: 'u1' }),
+          sub1,
+          sub2,
+          sub3,
+          assistantTextLine('back in main', '2026-06-25T10:00:04.000Z', { uuid: 'a1' })
+        ].join('\n') + '\n',
+        'utf-8'
+      )
+      const result = await readTranscript(dir, 's')
+      expect(result).toEqual([
+        {
+          kind: 'message',
+          uuid: 'u1',
+          role: 'user',
+          timestamp: '2026-06-25T10:00:00.000Z',
+          markdown: 'main user'
+        },
+        { kind: 'sidechain', id: 'sc-0', messageCount: 3 },
+        {
+          kind: 'message',
+          uuid: 'a1',
+          role: 'assistant',
+          timestamp: '2026-06-25T10:00:04.000Z',
+          markdown: 'back in main'
+        }
+      ])
     })
   })
 
@@ -305,6 +429,43 @@ function assistantTextLine(
     message: {
       role: 'assistant',
       content: [{ type: 'text', text }]
+    }
+  })
+}
+
+function assistantBlocksLine(
+  timestamp: string,
+  uuid: string,
+  content: unknown[]
+): string {
+  return JSON.stringify({
+    parentUuid: null,
+    isSidechain: false,
+    type: 'assistant',
+    uuid,
+    timestamp,
+    message: { role: 'assistant', content }
+  })
+}
+
+function toolResultsLine(
+  timestamp: string,
+  uuid: string,
+  results: Array<{ tool_use_id: string; content: unknown }>
+): string {
+  return JSON.stringify({
+    parentUuid: null,
+    isSidechain: false,
+    type: 'user',
+    uuid,
+    timestamp,
+    message: {
+      role: 'user',
+      content: results.map((r) => ({
+        type: 'tool_result',
+        tool_use_id: r.tool_use_id,
+        content: r.content
+      }))
     }
   })
 }

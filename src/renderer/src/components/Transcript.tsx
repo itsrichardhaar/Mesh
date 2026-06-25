@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Virtuoso } from 'react-virtuoso'
-import type { TranscriptMessage } from '@shared/sessions'
+import type {
+  TranscriptEntry,
+  TranscriptMessage,
+  TranscriptSidechain,
+  TranscriptToolEvent
+} from '@shared/sessions'
+import { CodeBlock } from './CodeBlock'
 
 interface Props {
   encodedPath: string
@@ -11,13 +17,15 @@ interface Props {
 /**
  * Workspace right pane when a Session is selected. Streams the
  * transcript via the `sessions:read-transcript` IPC and renders one
- * row per user/assistant text message — `react-markdown` for prose,
- * `react-virtuoso` for the virtualized scroll container so long
- * Sessions don't lock up the renderer. The "Resume in terminal →"
- * button is intentionally disabled here; Slice 16 wires it up.
+ * row per entry — message bubbles use `react-markdown` with a
+ * shiki-backed code renderer; tool entries render as a `● Tool · arg`
+ * one-liner; sidechains render as a `↳ sub-agent (N messages)` line.
+ * `react-virtuoso` virtualizes the scroll container so long Sessions
+ * don't lock up the renderer. The "Resume in terminal →" button is
+ * intentionally disabled here; Slice 16 wires it up.
  */
 export function Transcript({ encodedPath, sessionId }: Props): JSX.Element {
-  const [messages, setMessages] = useState<TranscriptMessage[] | null>(null)
+  const [entries, setEntries] = useState<TranscriptEntry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -26,14 +34,14 @@ export function Transcript({ encodedPath, sessionId }: Props): JSX.Element {
       try {
         const next = await window.api.sessions.readTranscript(encodedPath, sessionId)
         if (!cancelled) {
-          setMessages(next)
+          setEntries(next)
           setError(null)
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err))
       }
     }
-    setMessages(null)
+    setEntries(null)
     setError(null)
     void load()
 
@@ -63,29 +71,92 @@ export function Transcript({ encodedPath, sessionId }: Props): JSX.Element {
           {error}
         </p>
       )}
-      {!error && messages === null && <p className="transcript-loading">Loading…</p>}
-      {!error && messages && messages.length === 0 && (
+      {!error && entries === null && <p className="transcript-loading">Loading…</p>}
+      {!error && entries && entries.length === 0 && (
         <p className="transcript-empty">No rendered messages in this Session yet.</p>
       )}
-      {!error && messages && messages.length > 0 && (
+      {!error && entries && entries.length > 0 && (
         <Virtuoso
           className="transcript-scroll"
-          data={messages}
-          computeItemKey={(_, item) => item.uuid}
-          itemContent={(_, message) => <TranscriptRow message={message} />}
+          data={entries}
+          computeItemKey={(_, item) => keyFor(item)}
+          itemContent={(_, entry) => <EntryRow entry={entry} />}
         />
       )}
     </div>
   )
 }
 
-function TranscriptRow({ message }: { message: TranscriptMessage }): JSX.Element {
+function keyFor(entry: TranscriptEntry): string {
+  if (entry.kind === 'sidechain') return `sc:${entry.id}`
+  return `${entry.kind}:${entry.uuid}`
+}
+
+function EntryRow({ entry }: { entry: TranscriptEntry }): JSX.Element {
+  if (entry.kind === 'message') return <MessageRow message={entry} />
+  if (entry.kind === 'tool') return <ToolRow tool={entry} />
+  return <SidechainRow sidechain={entry} />
+}
+
+function MessageRow({ message }: { message: TranscriptMessage }): JSX.Element {
   return (
     <div className={`transcript-row transcript-row-${message.role}`}>
       <div className="transcript-row-role">{message.role}</div>
       <div className="transcript-row-body">
-        <ReactMarkdown>{message.markdown}</ReactMarkdown>
+        <ReactMarkdown
+          components={{
+            code(props) {
+              const { className, children, node: _node, ref: _ref, ...rest } = props
+              const text = String(children ?? '').replace(/\n$/, '')
+              const inline = !text.includes('\n')
+              if (inline) {
+                return (
+                  <code className={className} {...rest}>
+                    {children}
+                  </code>
+                )
+              }
+              const langMatch = /language-([\w-]+)/.exec(className ?? '')
+              return <CodeBlock code={text} lang={langMatch?.[1]} />
+            }
+          }}
+        >
+          {message.markdown}
+        </ReactMarkdown>
       </div>
+    </div>
+  )
+}
+
+function ToolRow({ tool }: { tool: TranscriptToolEvent }): JSX.Element {
+  return (
+    <div className="transcript-tool-row">
+      <span className="transcript-tool-bullet" aria-hidden="true">
+        ●
+      </span>
+      <span className="transcript-tool-name">{tool.tool}</span>
+      {tool.keyArg && (
+        <>
+          <span className="transcript-tool-sep" aria-hidden="true">
+            ·
+          </span>
+          <span className="transcript-tool-arg" title={tool.keyArg}>
+            {tool.keyArg}
+          </span>
+        </>
+      )}
+      {tool.resultSummary && (
+        <span className="transcript-tool-summary">({tool.resultSummary})</span>
+      )}
+    </div>
+  )
+}
+
+function SidechainRow({ sidechain }: { sidechain: TranscriptSidechain }): JSX.Element {
+  const noun = sidechain.messageCount === 1 ? 'message' : 'messages'
+  return (
+    <div className="transcript-sidechain-row" role="note">
+      <span aria-hidden="true">↳</span> sub-agent ({sidechain.messageCount} {noun})
     </div>
   )
 }

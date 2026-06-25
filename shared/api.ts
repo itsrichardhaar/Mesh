@@ -2,7 +2,7 @@
 // Every method here corresponds to a registered `ipcMain.handle` in src/main.
 
 import type { FilesTreeRequest, FilesTreeResponse } from './files'
-import type { SessionSummary, TranscriptMessage } from './sessions'
+import type { SessionSummary, TranscriptEntry } from './sessions'
 import type {
   Project,
   ProjectPatch,
@@ -107,7 +107,7 @@ export interface MeshApi {
    */
   sessions: {
     list(encodedPath: string): Promise<SessionSummary[]>
-    readTranscript(encodedPath: string, sessionId: string): Promise<TranscriptMessage[]>
+    readTranscript(encodedPath: string, sessionId: string): Promise<TranscriptEntry[]>
     onChanged(cb: (encodedPath: string) => void): () => void
   }
 }

@@ -2,10 +2,29 @@ import { createReadStream } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { createInterface } from 'node:readline'
-import type { SessionSummary, TranscriptMessage } from '@shared/sessions'
+import type {
+  SessionSummary,
+  TranscriptEntry,
+  TranscriptMessage,
+  TranscriptToolEvent
+} from '@shared/sessions'
 
 const TITLE_MAX_CHARS = 60
 const PREVIEW_MAX_LINES = 3
+
+/**
+ * Hard cap on a single `tool_result.content` payload before we drop
+ * it. Read tool calls (`Read`, large `Bash` stdout) routinely cross
+ * tens of KB; the transcript renderer doesn't show that body at this
+ * fidelity, so we never need to retain it past parse time.
+ */
+const TOOL_RESULT_MAX_CHARS = 4096
+
+/** Hard cap on the formatted one-liner key arg (e.g. shell command). */
+const KEY_ARG_MAX_CHARS = 80
+
+/** Hard cap on the formatted result-summary trailer. */
+const RESULT_SUMMARY_MAX_CHARS = 60
 
 /**
  * List every `<uuid>.jsonl` Session in `projectDir`, sorted by newest
@@ -46,57 +65,324 @@ export async function listSessions(projectDir: string): Promise<SessionSummary[]
 }
 
 /**
- * Stream a single Session's JSONL and return the user/assistant text
- * messages in file order. System events (`mode`, `permission-mode`,
- * `file-history-snapshot`, etc.) and sidechain events are dropped.
- * For user messages we accept either a string content or an array of
- * content blocks (taking only `text` blocks; `tool_result` blocks are
- * skipped — they land in Slice 15). Assistant messages contribute the
- * concatenation of their `text` blocks; `thinking` and `tool_use` are
- * skipped at this fidelity. Messages with empty text after extraction
- * are dropped so the renderer never has to render blank rows.
+ * Stream a single Session's JSONL and return the renderable transcript
+ * entries in file order. Message entries hold user/assistant text;
+ * tool entries hold one-liner descriptions of `tool_use` events
+ * (annotated with a concise summary of their matching `tool_result`
+ * when small enough to be useful); sidechain entries collapse runs of
+ * `isSidechain: true` events into a single `↳ sub-agent (N messages)`
+ * indicator. System events (`mode`, `permission-mode`,
+ * `file-history-snapshot`, etc.) are dropped.
+ *
+ * `tool_result.content` larger than `TOOL_RESULT_MAX_CHARS` is dropped
+ * at parse time so the renderer never carries the bytes — Read-tool
+ * results and verbose Bash stdouts would otherwise dominate memory.
  */
 export async function readTranscript(
   projectDir: string,
   sessionId: string
-): Promise<TranscriptMessage[]> {
+): Promise<TranscriptEntry[]> {
   const jsonlPath = join(projectDir, `${sessionId}.jsonl`)
-  let s
   try {
-    s = await stat(jsonlPath)
+    const s = await stat(jsonlPath)
     if (!s.isFile()) return []
   } catch {
     return []
   }
 
-  const messages: TranscriptMessage[] = []
+  const entries: TranscriptEntry[] = []
+  const toolResultByUseId = new Map<string, string>()
+  // Two-pass approach: collect raw shaped lines in file order, build
+  // the lookup of tool_use_id → trimmed result, then emit entries with
+  // the result summary already attached. The cap keeps each retained
+  // result under 4 KB; we never need the full result body.
+  const buffered = await streamSession(jsonlPath, toolResultByUseId)
+
+  let sidechainRun = 0
+  let sidechainCounter = 0
+
+  for (const line of buffered) {
+    if (line.isSidechain) {
+      sidechainRun += 1
+      continue
+    }
+    if (sidechainRun > 0) {
+      entries.push({
+        kind: 'sidechain',
+        id: `sc-${sidechainCounter++}`,
+        messageCount: sidechainRun
+      })
+      sidechainRun = 0
+    }
+
+    if (line.role === 'user') {
+      const markdown = userTextOf(line.content)
+      if (markdown.length > 0) {
+        entries.push(messageEntry(line.uuid, 'user', line.timestamp, markdown))
+      }
+      continue
+    }
+
+    // Assistant: walk content blocks in order so tool calls slot
+    // between the text bubbles that surround them.
+    let textBuffer: string[] = []
+    let textIndex = 0
+    const flushText = (): void => {
+      if (textBuffer.length === 0) return
+      const md = textBuffer.join('\n\n').trim()
+      textBuffer = []
+      if (md.length === 0) return
+      entries.push(
+        messageEntry(
+          line.uuid + (textIndex > 0 ? `-t${textIndex}` : ''),
+          'assistant',
+          line.timestamp,
+          md
+        )
+      )
+      textIndex += 1
+    }
+    for (const block of asArray(line.content)) {
+      if (!isObject(block)) continue
+      const type = block['type']
+      if (type === 'text') {
+        const text = block['text']
+        if (typeof text === 'string' && text.length > 0) textBuffer.push(text)
+      } else if (type === 'tool_use') {
+        flushText()
+        const entry = toolEntry(block, line.timestamp, toolResultByUseId)
+        if (entry) entries.push(entry)
+      }
+      // thinking and any other block types: skipped at this fidelity.
+    }
+    flushText()
+  }
+
+  if (sidechainRun > 0) {
+    entries.push({
+      kind: 'sidechain',
+      id: `sc-${sidechainCounter++}`,
+      messageCount: sidechainRun
+    })
+  }
+
+  return entries
+}
+
+// --- Streaming pass -------------------------------------------------------
+
+interface BufferedLine {
+  uuid: string
+  role: 'user' | 'assistant'
+  isSidechain: boolean
+  timestamp: string | null
+  /** Either a string (user with plain prompt) or the JSONL content array. */
+  content: unknown
+}
+
+async function streamSession(
+  jsonlPath: string,
+  toolResultByUseId: Map<string, string>
+): Promise<BufferedLine[]> {
+  const lines: BufferedLine[] = []
+  let syntheticId = 0
   const stream = createReadStream(jsonlPath, { encoding: 'utf-8' })
   const rl = createInterface({ input: stream, crlfDelay: Infinity })
   try {
-    for await (const line of rl) {
-      const obj = parseLine(line)
+    for await (const raw of rl) {
+      const obj = parseLine(raw)
       if (!obj) continue
-      if (obj['isSidechain'] === true) continue
       const type = obj['type']
       if (type !== 'user' && type !== 'assistant') continue
 
-      const uuid = typeof obj['uuid'] === 'string' ? (obj['uuid'] as string) : ''
-      const timestamp = typeof obj['timestamp'] === 'string' ? (obj['timestamp'] as string) : null
-      const markdown = extractText(obj)
-      if (!markdown) continue
+      const message = obj['message']
+      const content = isObject(message)
+        ? (message as Record<string, unknown>)['content']
+        : undefined
 
-      messages.push({
-        uuid,
-        role: type,
-        timestamp,
-        markdown
-      })
+      // Harvest tool_result lookups; cap or drop oversized.
+      if (type === 'user' && Array.isArray(content)) {
+        for (const block of content) {
+          if (!isObject(block)) continue
+          if (block['type'] !== 'tool_result') continue
+          const id = block['tool_use_id']
+          if (typeof id !== 'string') continue
+          const text = stringifyToolResult(block['content'])
+          if (text !== null) toolResultByUseId.set(id, text)
+        }
+      }
+
+      const uuid =
+        typeof obj['uuid'] === 'string' && (obj['uuid'] as string).length > 0
+          ? (obj['uuid'] as string)
+          : `synthetic-${syntheticId++}`
+      const timestamp = typeof obj['timestamp'] === 'string' ? (obj['timestamp'] as string) : null
+      const isSidechain = obj['isSidechain'] === true
+
+      lines.push({ uuid, role: type, isSidechain, timestamp, content })
     }
   } finally {
     rl.close()
     stream.close()
   }
-  return messages
+  return lines
+}
+
+/**
+ * Coerce a `tool_result.content` field to a single string, dropping
+ * results that exceed the cap entirely so the bytes never leave this
+ * function. The content field can be:
+ *   - a string (most tools)
+ *   - an array of `{type:'text', text:string}` blocks (some tools)
+ * Returns `null` when the content was oversized, empty, or unparseable.
+ */
+function stringifyToolResult(content: unknown): string | null {
+  let raw: string
+  if (typeof content === 'string') {
+    raw = content
+  } else if (Array.isArray(content)) {
+    const parts: string[] = []
+    let used = 0
+    for (const item of content) {
+      if (!isObject(item)) continue
+      if (item['type'] !== 'text') continue
+      const text = item['text']
+      if (typeof text !== 'string') continue
+      used += text.length
+      if (used > TOOL_RESULT_MAX_CHARS) return null
+      parts.push(text)
+    }
+    raw = parts.join('\n')
+  } else {
+    return null
+  }
+  if (raw.length === 0) return null
+  if (raw.length > TOOL_RESULT_MAX_CHARS) return null
+  return raw
+}
+
+// --- Entry construction ---------------------------------------------------
+
+function messageEntry(
+  uuid: string,
+  role: 'user' | 'assistant',
+  timestamp: string | null,
+  markdown: string
+): TranscriptMessage {
+  return { kind: 'message', uuid, role, timestamp, markdown }
+}
+
+function toolEntry(
+  block: Record<string, unknown>,
+  timestamp: string | null,
+  toolResultByUseId: Map<string, string>
+): TranscriptToolEvent | null {
+  const id = block['id']
+  const name = block['name']
+  if (typeof name !== 'string' || name.length === 0) return null
+  const input = isObject(block['input']) ? (block['input'] as Record<string, unknown>) : {}
+  const keyArg = keyArgFor(name, input)
+  const resultRaw =
+    typeof id === 'string' ? toolResultByUseId.get(id) ?? null : null
+  const resultSummary = resultRaw !== null ? summarizeResult(name, resultRaw) : null
+
+  return {
+    kind: 'tool',
+    uuid: typeof id === 'string' && id.length > 0 ? id : `tool-${name}-${timestamp ?? ''}`,
+    timestamp,
+    tool: name,
+    keyArg,
+    resultSummary
+  }
+}
+
+function keyArgFor(tool: string, input: Record<string, unknown>): string {
+  let raw: unknown
+  switch (tool) {
+    case 'Edit':
+    case 'Write':
+    case 'Read':
+    case 'NotebookEdit':
+      raw = input['file_path'] ?? input['notebook_path']
+      break
+    case 'Bash':
+      raw = input['command']
+      break
+    case 'Glob':
+    case 'Grep':
+      raw = input['pattern']
+      break
+    case 'WebFetch':
+      raw = input['url']
+      break
+    case 'WebSearch':
+      raw = input['query']
+      break
+    default:
+      raw = ''
+  }
+  if (typeof raw !== 'string') return ''
+  const collapsed = raw.split(/\r?\n/, 1)[0]!.trim()
+  if (collapsed.length <= KEY_ARG_MAX_CHARS) return collapsed
+  return collapsed.slice(0, KEY_ARG_MAX_CHARS - 1).trimEnd() + '…'
+}
+
+function summarizeResult(tool: string, raw: string): string | null {
+  if (raw.length === 0) return null
+  switch (tool) {
+    case 'Read':
+    case 'Write':
+    case 'Edit':
+      // Tool already says exactly what it did; the result body is
+      // either the file contents (huge) or a confirmation we already
+      // imply with the verb.
+      return null
+    case 'Glob':
+    case 'Grep': {
+      const lines = raw.split(/\r?\n/).filter((l) => l.trim().length > 0)
+      if (lines.length === 0) return 'no matches'
+      // Glob results are typically a list of paths; if the first line
+      // looks like one, give a match count.
+      const looksLikeList = lines.length > 1 || /[\/.]/.test(lines[0]!)
+      if (looksLikeList) return `${lines.length} match${lines.length === 1 ? '' : 'es'}`
+      return truncateForSummary(lines[0]!)
+    }
+    case 'Bash': {
+      const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0)
+      if (lines.length === 0) return 'no output'
+      return truncateForSummary(lines[0]!)
+    }
+    default: {
+      const firstLine = raw.split(/\r?\n/, 1)[0]!.trim()
+      if (firstLine.length === 0) return null
+      return truncateForSummary(firstLine)
+    }
+  }
+}
+
+function truncateForSummary(s: string): string {
+  if (s.length <= RESULT_SUMMARY_MAX_CHARS) return s
+  return s.slice(0, RESULT_SUMMARY_MAX_CHARS - 1).trimEnd() + '…'
+}
+
+// --- Helpers --------------------------------------------------------------
+
+function userTextOf(content: unknown): string {
+  if (typeof content === 'string') return content.trim()
+  if (!Array.isArray(content)) return ''
+  const parts: string[] = []
+  for (const item of content) {
+    if (!isObject(item)) continue
+    if ((item as Record<string, unknown>)['type'] !== 'text') continue
+    const text = (item as Record<string, unknown>)['text']
+    if (typeof text === 'string' && text.length > 0) parts.push(text)
+  }
+  return parts.join('\n\n').trim()
+}
+
+function asArray(content: unknown): unknown[] {
+  if (Array.isArray(content)) return content
+  return []
 }
 
 async function summarizeSession(jsonlPath: string, sessionId: string): Promise<SessionSummary> {
@@ -132,34 +418,13 @@ async function summarizeSession(jsonlPath: string, sessionId: string): Promise<S
   return { sessionId, title, preview, lastActivityAt }
 }
 
-/**
- * Pull a usable user-prompt string out of one line. Returns `null`
- * unless the line is a non-sidechain user message whose extracted text
- * is non-empty.
- */
 function extractFirstUserText(obj: Record<string, unknown>): string | null {
   if (obj['isSidechain'] === true) return null
   if (obj['type'] !== 'user') return null
-  const text = extractText(obj)
-  return text.length > 0 ? text : null
-}
-
-/** Concatenate the text-bearing blocks of a user/assistant message. */
-function extractText(obj: Record<string, unknown>): string {
   const message = obj['message']
-  if (!isObject(message)) return ''
-  const content = (message as Record<string, unknown>)['content']
-  if (typeof content === 'string') return content.trim()
-  if (!Array.isArray(content)) return ''
-  const parts: string[] = []
-  for (const item of content) {
-    if (!isObject(item)) continue
-    const block = item as Record<string, unknown>
-    if (block['type'] !== 'text') continue
-    const text = block['text']
-    if (typeof text === 'string' && text.length > 0) parts.push(text)
-  }
-  return parts.join('\n\n').trim()
+  if (!isObject(message)) return null
+  const text = userTextOf((message as Record<string, unknown>)['content'])
+  return text.length > 0 ? text : null
 }
 
 function titleOf(raw: string): string {
@@ -171,7 +436,6 @@ function titleOf(raw: string): string {
 
 function previewOf(raw: string): string {
   const lines = raw.split(/\r?\n/).map((l) => l.trimEnd())
-  // Drop fully-blank leading lines so the preview always carries signal.
   while (lines.length > 0 && lines[0]!.length === 0) lines.shift()
   return lines.slice(0, PREVIEW_MAX_LINES).join('\n')
 }

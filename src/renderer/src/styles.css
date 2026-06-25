@@ -1219,3 +1219,78 @@ button {
   color: var(--accent);
   text-decoration: underline;
 }
+
+/* Shiki replaces the default <pre> block with its own <pre class="shiki">
+   wrapper carrying the theme background as an inline style. Override
+   font and padding only; let shiki own the colors. */
+.code-block-shiki {
+  margin: 8px 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.code-block-shiki pre.shiki {
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  margin: 0;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+}
+
+.code-block-plain {
+  margin: 8px 0;
+}
+
+/* --- Transcript tool one-liners ------------------------------------------ */
+
+.transcript-tool-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 20px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+}
+
+.transcript-tool-bullet {
+  color: var(--accent);
+  font-size: 8px;
+}
+
+.transcript-tool-name {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.transcript-tool-sep {
+  color: var(--text-muted);
+}
+
+.transcript-tool-arg {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.transcript-tool-summary {
+  color: var(--text-muted);
+  font-style: italic;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* --- Transcript sidechain indicator -------------------------------------- */
+
+.transcript-sidechain-row {
+  padding: 8px 20px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  border-bottom: 1px solid var(--border-subtle);
+}

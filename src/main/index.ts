@@ -3,7 +3,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { FilesTreeRequest, FilesTreeResponse } from '@shared/files'
-import type { SessionSummary, TranscriptMessage } from '@shared/sessions'
+import type { SessionSummary, TranscriptEntry } from '@shared/sessions'
 import type {
   Project,
   ProjectPatch,
@@ -284,7 +284,7 @@ function registerIpc(): void {
       _event,
       encodedPath: unknown,
       sessionId: unknown
-    ): Promise<TranscriptMessage[]> => {
+    ): Promise<TranscriptEntry[]> => {
       if (typeof encodedPath !== 'string' || encodedPath.length === 0) {
         throw new Error('sessions:read-transcript: encodedPath must be a non-empty string')
       }
