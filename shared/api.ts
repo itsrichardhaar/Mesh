@@ -6,6 +6,7 @@ import type {
   ProjectPatch,
   ProjectStats,
   ProviderId,
+  StoredAnalysis,
   ThemePreference
 } from './types'
 
@@ -69,5 +70,15 @@ export interface MeshApi {
     set(provider: ProviderId, plaintext: string): Promise<void>
     getMask(provider: ProviderId): Promise<string | null>
     clear(provider: ProviderId): Promise<void>
+  }
+
+  /**
+   * Persistent history of LLM-generated Analyses. Slice 10's
+   * orchestrator writes rows; the renderer reads `latest` on Project
+   * selection so existing Analyses render without requiring a fresh
+   * Analyze click.
+   */
+  analyses: {
+    latest(encodedPath: string): Promise<StoredAnalysis | null>
   }
 }

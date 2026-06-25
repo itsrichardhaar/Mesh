@@ -33,6 +33,9 @@ const api: MeshApi = {
     set: (provider, plaintext) => ipcRenderer.invoke('secrets:set', provider, plaintext),
     getMask: (provider) => ipcRenderer.invoke('secrets:get-mask', provider),
     clear: (provider) => ipcRenderer.invoke('secrets:clear', provider)
+  },
+  analyses: {
+    latest: (encodedPath) => ipcRenderer.invoke('analyses:latest', encodedPath)
   }
 }
 

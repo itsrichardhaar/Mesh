@@ -69,6 +69,26 @@ export interface AnalysisOutput {
   suggestedImprovements: ReadonlyArray<{ text: string }>
 }
 
+/**
+ * The renderer-facing view of one stored Analysis. Slice 11 writes / reads
+ * rows of this shape; failed Analyses carry the same envelope with
+ * `status: 'failed'` and the `content` fields nulled out — the renderer
+ * decides whether to show the failure (Slice 12).
+ */
+export interface StoredAnalysis {
+  encodedPath: string
+  /** ISO 8601 timestamp. Together with `encodedPath`, forms the primary key. */
+  generatedAt: string
+  status: 'ok' | 'failed'
+  errorMessage: string | null
+  provider: ProviderId
+  model: string
+  sourceSessionCount: number | null
+  lastAnalyzedSha: string | null
+  /** Three-section content, populated only when `status === 'ok'`. */
+  content: AnalysisOutput | null
+}
+
 export interface AnalyzeProjectInput {
   /** Caller passes whatever context the prompt template needs. */
   systemPrompt: string

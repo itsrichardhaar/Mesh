@@ -16,6 +16,10 @@ The stable `1.0.0` release ships once every item in the
 ## [Unreleased]
 
 ### Added
+- **Slice 11: Analysis persistence + history.** Adds the `analyses` table and the write/read path for persisting LLM-generated Analyses. Every Analyze call (Slice 10) appends a row keyed by `(encoded_path, generated_at)`, preserving history; `analyses:latest(encodedPath)` IPC returns the newest one and the right-pane detail now renders it (Summary of Recent Sessions, Next Steps, Suggested Improvements, plus a provider/model attribution footer). Failed Analyses render with their error message (no Analyze button surfaces them yet — that lands in Slice 12). The read path is in place but dormant until Slice 10 fires its first write.
+- `0003_analyses.sql` migration with the composite primary key plus a `(encoded_path, generated_at DESC)` index for newest-first lookups.
+- `src/main/analyses/repository.ts` — `insertAnalysis` and `latestForProject` with full status/content/attribution coverage, plus 8 round-trip tests including history retention and JSON-malformed defaults.
+- `StoredAnalysis` shared type and `MeshApi.analyses.latest` IPC bridge.
 - **Slice 9: Provider pills + Model dropdown.** Settings → Model now shows three Provider pills (Claude active; OpenAI and Local disabled with a `Coming in v1.1` tooltip) and a Model dropdown for Claude with `Haiku 4.5`, `Sonnet 4.6`, and `Opus 4.7`. Each row carries an approximate per-Analysis cost and Haiku 4.5 is flagged Recommended. The selected Model persists in the `settings` table under `model:claude`.
 - `shared/models.ts` — `PROVIDERS` catalog, `ModelDescriptor` / `ProviderDescriptor` shapes, recommended lookup, and the `selectedModelSettingKey(providerId)` helper.
 - `ModelClient` interface in `shared/types.ts` with `AnalysisOutput`, `AnalyzeProjectInput`, `ValidationResult`.

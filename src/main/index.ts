@@ -2,8 +2,15 @@ import { app, BrowserWindow, ipcMain, nativeTheme, safeStorage } from 'electron'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { Project, ProjectPatch, ProjectStats, ProviderId } from '@shared/types'
+import type {
+  Project,
+  ProjectPatch,
+  ProjectStats,
+  ProviderId,
+  StoredAnalysis
+} from '@shared/types'
 import { isProviderId, isThemePreference } from '@shared/types'
+import { latestForProject } from './analyses/repository'
 import { getDatabase, initDatabase } from './db'
 import { runMigrations } from './db/migrations'
 import { buildApplicationMenu } from './menu'
@@ -231,6 +238,16 @@ function registerIpc(): void {
     }
     clearSecret(getDatabase(), secretKey(provider))
   })
+
+  ipcMain.handle(
+    'analyses:latest',
+    (_event, encodedPath: unknown): StoredAnalysis | null => {
+      if (typeof encodedPath !== 'string' || encodedPath.length === 0) {
+        throw new Error('analyses:latest: encodedPath must be a non-empty string')
+      }
+      return latestForProject(getDatabase(), encodedPath)
+    }
+  )
 }
 
 /** Stable SQLite key shape for per-Provider secrets. */
