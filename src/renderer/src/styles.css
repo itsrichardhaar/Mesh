@@ -59,6 +59,8 @@ button {
   background: var(--bg-canvas);
   overflow-y: auto;
   padding-top: 40px;
+  display: flex;
+  flex-direction: column;
   -webkit-app-region: no-drag;
 }
 
@@ -73,6 +75,31 @@ button {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-muted);
+}
+
+.sidebar-search {
+  padding: 0 16px 8px;
+}
+
+.sidebar-search input {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  -webkit-app-region: no-drag;
+}
+
+.sidebar-search input::placeholder {
+  color: var(--text-muted);
+}
+
+.sidebar-search input:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 .sidebar-status,
@@ -119,6 +146,18 @@ button {
   background: var(--accent-soft);
 }
 
+.project-row-missing {
+  opacity: 0.55;
+}
+
+.project-row-missing .project-name {
+  font-style: italic;
+}
+
+.project-row-hidden {
+  opacity: 0.6;
+}
+
 .project-name {
   font-weight: 500;
   color: var(--text-primary);
@@ -131,6 +170,57 @@ button {
 .project-activity {
   font-size: 11px;
   color: var(--text-muted);
+}
+
+/* --- Sidebar footer + Show Hidden toggle ---------------------------------- */
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.sidebar-footer-toggle {
+  width: 100%;
+  padding: 6px 10px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  border-radius: 6px;
+}
+
+.sidebar-footer-toggle:hover {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
+/* --- Context menu --------------------------------------------------------- */
+
+.context-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 140px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+  padding: 4px;
+}
+
+.context-menu-item {
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text-primary);
+  border-radius: 4px;
+}
+
+.context-menu-item:hover {
+  background: var(--bg-elevated);
 }
 
 /* --- Detail pane ---------------------------------------------------------- */

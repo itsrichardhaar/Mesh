@@ -2,9 +2,11 @@ import { app, BrowserWindow, ipcMain, safeStorage } from 'electron'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { initDatabase } from './db'
+import type { Project, ProjectPatch } from '@shared/types'
+import { getDatabase, initDatabase } from './db'
 import { runMigrations } from './db/migrations'
 import { listProjects } from './projects/enumerator'
+import { readAugmentation, updateProject, upsertDiscovered } from './projects/repository'
 
 const CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects')
 
@@ -67,7 +69,30 @@ function smokeTestSafeStorage(): void {
 
 function registerIpc(): void {
   ipcMain.handle('ping', () => 'pong')
-  ipcMain.handle('projects:list', () => listProjects(CLAUDE_PROJECTS_DIR))
+
+  ipcMain.handle('projects:list', async (): Promise<Project[]> => {
+    const discovered = await listProjects(CLAUDE_PROJECTS_DIR)
+    const db = getDatabase()
+    upsertDiscovered(db, discovered)
+    const augmentation = readAugmentation(db)
+    return discovered.map((p) => ({
+      ...p,
+      hidden: augmentation.get(p.encodedPath)?.hidden ?? false
+    }))
+  })
+
+  ipcMain.handle(
+    'projects:update',
+    (_event, encodedPath: unknown, patch: unknown): void => {
+      if (typeof encodedPath !== 'string' || encodedPath.length === 0) {
+        throw new Error('projects:update: encodedPath must be a non-empty string')
+      }
+      if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) {
+        throw new Error('projects:update: patch must be an object')
+      }
+      updateProject(getDatabase(), encodedPath, patch as ProjectPatch)
+    }
+  )
 }
 
 app.whenReady().then(() => {

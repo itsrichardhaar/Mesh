@@ -114,6 +114,34 @@ describe('listProjects', () => {
       new Date('2026-01-01').getTime()
     ])
   })
+
+  it('marks Source-Missing when the resolved Source Path does not exist', async () => {
+    await createProject(tmpRoot, '-Users-test-Gone', '/Users/test/Gone', 1000)
+    const projects = await listProjects(tmpRoot)
+    expect(projects).toHaveLength(1)
+    expect(projects[0]?.sourceMissing).toBe(true)
+  })
+
+  it('marks Source-Missing as false when the resolved Source Path exists and is a directory', async () => {
+    // Use tmpRoot itself as a path we know exists during the test.
+    const realDir = join(tmpRoot, 'real-source')
+    await mkdir(realDir, { recursive: true })
+    await createProject(tmpRoot, '-real-encoded', realDir, 2000)
+    const projects = await listProjects(tmpRoot)
+    const real = projects.find((p) => p.encodedPath === '-real-encoded')
+    expect(real).toBeDefined()
+    expect(real?.sourceMissing).toBe(false)
+  })
+
+  it('marks Source-Missing when the path exists but is a file rather than a directory', async () => {
+    const filePath = join(tmpRoot, 'not-a-directory.txt')
+    await writeFile(filePath, 'hello\n', 'utf-8')
+    await createProject(tmpRoot, '-encoded-file', filePath, 3000)
+    const projects = await listProjects(tmpRoot)
+    const p = projects.find((x) => x.encodedPath === '-encoded-file')
+    expect(p).toBeDefined()
+    expect(p?.sourceMissing).toBe(true)
+  })
 })
 
 // --- Test helpers -----------------------------------------------------------

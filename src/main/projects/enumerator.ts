@@ -2,7 +2,20 @@ import { createReadStream } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { createInterface } from 'node:readline'
-import type { Project } from '@shared/types'
+
+/**
+ * The raw filesystem-discovered view of a Project — what the enumerator
+ * can determine from `~/.claude/projects/` alone. Augmentation fields
+ * like `hidden` and `name_override` live in SQLite and are joined on
+ * top of this in the projects repository.
+ */
+export interface DiscoveredProject {
+  encodedPath: string
+  sourcePath: string
+  name: string
+  activity: string
+  sourceMissing: boolean
+}
 
 /**
  * Read `~/.claude/projects/` and return a Project per subdirectory,
@@ -17,7 +30,7 @@ import type { Project } from '@shared/types'
  * Returns `[]` if `rootDir` doesn't exist. Subdirectories that can't
  * be read, or that contain no `.jsonl` files, are skipped.
  */
-export async function listProjects(rootDir: string): Promise<Project[]> {
+export async function listProjects(rootDir: string): Promise<DiscoveredProject[]> {
   let entries: string[]
   try {
     entries = await readdir(rootDir)
@@ -26,7 +39,7 @@ export async function listProjects(rootDir: string): Promise<Project[]> {
     throw err
   }
 
-  const projects: Project[] = []
+  const projects: DiscoveredProject[] = []
 
   for (const encodedPath of entries) {
     const projectDir = join(rootDir, encodedPath)
@@ -45,17 +58,28 @@ export async function listProjects(rootDir: string): Promise<Project[]> {
     const sourcePath =
       (await readCwdFromJsonl(newest.path)) ?? lossyDecode(encodedPath)
     const name = basename(sourcePath)
+    const sourceMissing = await isSourceMissing(sourcePath)
 
     projects.push({
       encodedPath,
       sourcePath,
       name,
-      activity: new Date(newest.mtimeMs).toISOString()
+      activity: new Date(newest.mtimeMs).toISOString(),
+      sourceMissing
     })
   }
 
   projects.sort((a, b) => (a.activity < b.activity ? 1 : a.activity > b.activity ? -1 : 0))
   return projects
+}
+
+async function isSourceMissing(sourcePath: string): Promise<boolean> {
+  try {
+    const s = await stat(sourcePath)
+    return !s.isDirectory()
+  } catch {
+    return true
+  }
 }
 
 interface NewestJsonl {
