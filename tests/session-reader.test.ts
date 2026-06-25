@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { listSessions, readTranscript } from '@main/sessions/session-reader'
+import {
+  listSessions,
+  readLatestAwaySummary,
+  readTranscript
+} from '@main/sessions/session-reader'
 
 describe('session reader', () => {
   let tmpRoot: string
@@ -388,6 +392,55 @@ describe('session reader', () => {
           markdown: 'back in main'
         }
       ])
+    })
+  })
+
+  describe('readLatestAwaySummary', () => {
+    it('returns null when the session file does not exist', async () => {
+      const dir = await mkProjectDir('no-session')
+      const result = await readLatestAwaySummary(dir, 'missing')
+      expect(result).toBeNull()
+    })
+
+    it('returns null when no away_summary row is present', async () => {
+      const dir = await mkProjectDir('no-summary')
+      await writeFile(
+        join(dir, 's.jsonl'),
+        [
+          systemLine('mode'),
+          userLine('Hello', '2026-06-25T10:00:00.000Z', { uuid: 'u1' })
+        ].join('\n') + '\n',
+        'utf-8'
+      )
+      expect(await readLatestAwaySummary(dir, 's')).toBeNull()
+    })
+
+    it('returns the latest away_summary content when multiple are present', async () => {
+      const dir = await mkProjectDir('away')
+      const earlier = JSON.stringify({
+        type: 'system',
+        subtype: 'away_summary',
+        content: 'Earlier checkpoint.',
+        timestamp: '2026-06-25T10:00:00.000Z'
+      })
+      const later = JSON.stringify({
+        type: 'system',
+        subtype: 'away_summary',
+        content: 'Latest checkpoint — picked up RAG work.',
+        timestamp: '2026-06-25T18:00:00.000Z'
+      })
+      await writeFile(
+        join(dir, 's.jsonl'),
+        [
+          userLine('hi', '2026-06-25T09:59:00.000Z'),
+          earlier,
+          assistantTextLine('ok', '2026-06-25T15:00:00.000Z'),
+          later
+        ].join('\n') + '\n',
+        'utf-8'
+      )
+      const result = await readLatestAwaySummary(dir, 's')
+      expect(result).toBe('Latest checkpoint — picked up RAG work.')
     })
   })
 

@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { z } from 'zod'
 import type {
   AnalysisOutput,
   AnalyzeProjectInput,
@@ -6,6 +7,49 @@ import type {
   ValidationResult
 } from '@shared/types'
 import type { ModelId } from '@shared/models'
+
+/**
+ * Three-section schema Mesh expects back from the LLM, validated with
+ * Zod before we hand the result downstream. Lives next to the client
+ * because the tool's `input_schema` (the request side) mirrors it.
+ */
+const analysisOutputSchema = z.object({
+  summaryMarkdown: z.string().min(1),
+  nextSteps: z.array(z.object({ text: z.string().min(1) })),
+  suggestedImprovements: z.array(z.object({ text: z.string().min(1) }))
+})
+
+export const ANALYZE_TOOL_NAME = 'emit_daily_summary' as const
+
+/**
+ * JSON Schema-shaped object handed to the Anthropic Messages API in
+ * `tools[].input_schema`. Kept in lock-step with `analysisOutputSchema`
+ * so the response can't pass the LLM-side schema check but fail Zod
+ * (modulo bugs Zod catches that JSON Schema misses).
+ */
+export const ANALYZE_TOOL_INPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    summaryMarkdown: { type: 'string' },
+    nextSteps: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { text: { type: 'string' } },
+        required: ['text']
+      }
+    },
+    suggestedImprovements: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { text: { type: 'string' } },
+        required: ['text']
+      }
+    }
+  },
+  required: ['summaryMarkdown', 'nextSteps', 'suggestedImprovements']
+} as const
 
 /**
  * Narrow SDK seam so tests can inject a fake without pulling in the
@@ -65,9 +109,72 @@ export class ClaudeClient implements ModelClient {
     }
   }
 
-  async analyzeProject(_input: AnalyzeProjectInput): Promise<AnalysisOutput> {
-    throw new Error('ClaudeClient.analyzeProject: implementation lands in Slice 10')
+  async analyzeProject(input: AnalyzeProjectInput): Promise<AnalysisOutput> {
+    const response = (await this.client.messages.create({
+      model: this.model,
+      max_tokens: 2048,
+      system: [
+        {
+          type: 'text',
+          text: input.systemPrompt,
+          cache_control: { type: 'ephemeral' }
+        }
+      ],
+      tools: [
+        {
+          name: ANALYZE_TOOL_NAME,
+          description:
+            "Emit Mesh's three-section daily summary as structured output.",
+          input_schema: ANALYZE_TOOL_INPUT_SCHEMA
+        }
+      ],
+      tool_choice: { type: 'tool', name: ANALYZE_TOOL_NAME },
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: input.userPrompt,
+              cache_control: { type: 'ephemeral' }
+            }
+          ]
+        }
+      ]
+    })) as MessagesResponse
+
+    const toolUse = response.content.find(isToolUseBlock)
+    if (!toolUse) {
+      throw new Error('ClaudeClient.analyzeProject: response carried no tool_use block')
+    }
+    if (toolUse.name !== ANALYZE_TOOL_NAME) {
+      throw new Error(
+        `ClaudeClient.analyzeProject: unexpected tool_use ${toolUse.name}`
+      )
+    }
+    const parsed = analysisOutputSchema.safeParse(toolUse.input)
+    if (!parsed.success) {
+      throw new Error(
+        `ClaudeClient.analyzeProject: schema validation failed — ${parsed.error.message}`
+      )
+    }
+    return parsed.data
   }
+}
+
+interface MessagesResponse {
+  content: Array<ContentBlock>
+}
+
+type ContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'tool_use'; name: string; input: unknown }
+  | { type: string }
+
+function isToolUseBlock(
+  block: ContentBlock
+): block is { type: 'tool_use'; name: string; input: unknown } {
+  return block.type === 'tool_use'
 }
 
 /**

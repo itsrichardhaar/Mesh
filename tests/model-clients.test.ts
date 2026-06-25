@@ -24,13 +24,88 @@ describe('ClaudeClient', () => {
     expect(() => new ClaudeClient('claude-haiku-4-5', '')).toThrow(/apiKey is required/)
   })
 
-  it('analyzeProject() throws a Slice-10 marker', async () => {
-    const c = new ClaudeClient('claude-haiku-4-5', 'sk-ant-test', () =>
-      makeFake(async () => ({}))
-    )
-    await expect(
-      c.analyzeProject({ systemPrompt: '', userPrompt: '' })
-    ).rejects.toThrow(/Slice 10/)
+  describe('analyzeProject()', () => {
+    const okResponse = {
+      content: [
+        {
+          type: 'tool_use',
+          name: 'emit_daily_summary',
+          input: {
+            summaryMarkdown: 'It works.',
+            nextSteps: [{ text: 'Ship it.' }],
+            suggestedImprovements: [{ text: 'Add docs.' }]
+          }
+        }
+      ]
+    }
+
+    it('sends tool_use + tool_choice + cache_control and returns the validated output', async () => {
+      const create = vi.fn(async (_params: unknown) => okResponse)
+      const c = new ClaudeClient('claude-haiku-4-5', 'sk-ant-test', () =>
+        makeFake(create)
+      )
+      const output = await c.analyzeProject({
+        systemPrompt: 'sys',
+        userPrompt: 'usr'
+      })
+      expect(output).toEqual(okResponse.content[0]!.input)
+
+      const params = create.mock.calls[0]![0] as Record<string, unknown>
+      expect(params.model).toBe('claude-haiku-4-5')
+      expect(Array.isArray(params.tools)).toBe(true)
+      const tool = (params.tools as Array<{ name: string }>)[0]!
+      expect(tool.name).toBe('emit_daily_summary')
+      expect(params.tool_choice).toEqual({ type: 'tool', name: 'emit_daily_summary' })
+
+      // cache_control: ephemeral on system + first user content block.
+      const sys = (params.system as Array<{ cache_control: unknown }>)[0]!
+      expect(sys.cache_control).toEqual({ type: 'ephemeral' })
+      const userBlocks = ((params.messages as Array<{ content: unknown }>)[0]!
+        .content as Array<{ cache_control: unknown }>)
+      expect(userBlocks[0]!.cache_control).toEqual({ type: 'ephemeral' })
+    })
+
+    it('throws when the response carries no tool_use block', async () => {
+      const create = vi.fn(async () => ({ content: [{ type: 'text', text: 'oops' }] }))
+      const c = new ClaudeClient('claude-haiku-4-5', 'sk-ant-test', () =>
+        makeFake(create)
+      )
+      await expect(
+        c.analyzeProject({ systemPrompt: '', userPrompt: '' })
+      ).rejects.toThrow(/no tool_use block/)
+    })
+
+    it('throws when tool_use input fails schema validation', async () => {
+      const create = vi.fn(async () => ({
+        content: [
+          {
+            type: 'tool_use',
+            name: 'emit_daily_summary',
+            input: { summaryMarkdown: 'ok', nextSteps: 'not-an-array' }
+          }
+        ]
+      }))
+      const c = new ClaudeClient('claude-haiku-4-5', 'sk-ant-test', () =>
+        makeFake(create)
+      )
+      await expect(
+        c.analyzeProject({ systemPrompt: '', userPrompt: '' })
+      ).rejects.toThrow(/schema validation failed/)
+    })
+
+    it('throws when the wrong tool was called', async () => {
+      const create = vi.fn(async () => ({
+        content: [
+          { type: 'tool_use', name: 'other_tool', input: {} }
+        ]
+      }))
+      const c = new ClaudeClient('claude-haiku-4-5', 'sk-ant-test', () =>
+        makeFake(create)
+      )
+      await expect(
+        c.analyzeProject({ systemPrompt: '', userPrompt: '' })
+      ).rejects.toThrow(/unexpected tool_use other_tool/)
+    })
   })
 
   describe('validate()', () => {

@@ -419,9 +419,41 @@ button {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
-  margin: 0 0 32px;
+  margin: 0 0 20px;
   padding: 0;
   list-style: none;
+}
+
+.analyze-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 24px;
+}
+
+.analyze-button {
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 18px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: 1px solid var(--accent);
+}
+
+.analyze-button:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.analyze-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.analyze-error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-error);
 }
 
 .stat {

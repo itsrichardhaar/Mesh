@@ -16,7 +16,8 @@ import type {
 import { isProviderId, isThemePreference } from '@shared/types'
 import { isModelId, selectedModelSettingKey } from '@shared/models'
 import { ClaudeClient } from './models/claude-client'
-import { latestForProject } from './analyses/repository'
+import { AnalysisOrchestrator } from './analyses/orchestrator'
+import { insertAnalysis, latestForProject } from './analyses/repository'
 import { getDatabase, initDatabase } from './db'
 import { runMigrations } from './db/migrations'
 import { FileReadError, readProjectFile } from './files/file-reader'
@@ -345,6 +346,83 @@ function registerIpc(): void {
         throw new Error('analyses:latest: encodedPath must be a non-empty string')
       }
       return latestForProject(getDatabase(), encodedPath)
+    }
+  )
+
+  ipcMain.handle(
+    'analyses:run',
+    async (_event, encodedPath: unknown): Promise<StoredAnalysis> => {
+      if (typeof encodedPath !== 'string' || encodedPath.length === 0) {
+        throw new Error('analyses:run: encodedPath must be a non-empty string')
+      }
+      const db = getDatabase()
+
+      // Resolve the Project shape from current enumerator state — we
+      // need name, source path, and source-missing flag for the
+      // orchestrator. Cheaper than re-listing the whole tree.
+      const sourcePath = getSourcePath(db, encodedPath)
+      if (!sourcePath) {
+        throw new Error(`analyses:run: unknown encodedPath ${encodedPath}`)
+      }
+      const all = await listProjects(CLAUDE_PROJECTS_DIR)
+      const base = all.find((p) => p.encodedPath === encodedPath)
+      if (!base) {
+        throw new Error(`analyses:run: project ${encodedPath} no longer enumerated`)
+      }
+      const aug = readAugmentation(db).get(encodedPath)
+      const project = {
+        ...base,
+        name: aug?.autoName ?? base.name,
+        autoSubtitle: aug?.autoSubtitle ?? null,
+        hidden: aug?.hidden ?? false
+      }
+
+      // Load the user's selected model + decrypted key.
+      let plaintextKey: string | null
+      try {
+        plaintextKey = getSecret(db, encryptionBackend, secretKey('claude'))
+      } catch (err) {
+        if (err instanceof SecretsVaultUnavailableError) {
+          throw new Error('Encryption unavailable; cannot read stored key')
+        }
+        throw err
+      }
+      if (!plaintextKey) {
+        throw new Error('No Anthropic API key saved. Add one in Settings → Model.')
+      }
+      const modelSetting = getSetting(db, selectedModelSettingKey('claude'))
+      const model = isModelId(modelSetting) ? modelSetting : 'claude-haiku-4-5'
+      const client = new ClaudeClient(model, plaintextKey)
+
+      const orchestrator = new AnalysisOrchestrator({
+        claudeProjectsDir: CLAUDE_PROJECTS_DIR,
+        loadPriorAnalysis: async (key) => latestForProject(db, key)
+      })
+
+      const generatedAt = new Date().toISOString()
+      try {
+        const result = await orchestrator.run(project, client)
+        insertAnalysis(db, {
+          encodedPath,
+          generatedAt,
+          status: 'ok',
+          provider: 'claude',
+          model,
+          sourceSessionCount: result.sourceSessionCount,
+          lastAnalyzedSha: result.lastAnalyzedSha,
+          content: result.output
+        })
+      } catch (err) {
+        // Slice 12 will surface the failure state in the UI; for now
+        // we re-throw so the renderer's click handler sees the error.
+        throw err
+      }
+
+      const stored = latestForProject(db, encodedPath)
+      if (!stored) {
+        throw new Error('analyses:run: persisted analysis disappeared')
+      }
+      return stored
     }
   )
 

@@ -12,6 +12,11 @@ type AnalysisState =
   | { status: 'ok'; analysis: StoredAnalysis | null }
   | { status: 'error'; message: string }
 
+type RunState =
+  | { status: 'idle' }
+  | { status: 'running' }
+  | { status: 'error'; message: string }
+
 interface Props {
   project: Project
 }
@@ -19,6 +24,7 @@ interface Props {
 export function ProjectDetail({ project }: Props): JSX.Element {
   const [stats, setStats] = useState<StatsState>({ status: 'loading' })
   const [analysis, setAnalysis] = useState<AnalysisState>({ status: 'loading' })
+  const [run, setRun] = useState<RunState>({ status: 'idle' })
 
   useEffect(() => {
     let cancelled = false
@@ -62,6 +68,26 @@ export function ProjectDetail({ project }: Props): JSX.Element {
     }
   }, [project.encodedPath])
 
+  // Reset run state when the user switches projects so an error from
+  // the previous one doesn't bleed onto the new detail pane.
+  useEffect(() => {
+    setRun({ status: 'idle' })
+  }, [project.encodedPath])
+
+  const analyze = async (): Promise<void> => {
+    setRun({ status: 'running' })
+    try {
+      const next = await window.api.analyses.run(project.encodedPath)
+      setAnalysis({ status: 'ok', analysis: next })
+      setRun({ status: 'idle' })
+    } catch (err) {
+      setRun({
+        status: 'error',
+        message: err instanceof Error ? err.message : String(err)
+      })
+    }
+  }
+
   return (
     <div className="project-detail">
       <header className="project-detail-header">
@@ -72,6 +98,27 @@ export function ProjectDetail({ project }: Props): JSX.Element {
       </header>
 
       <StatsRow project={project} state={stats} />
+
+      <div className="analyze-bar">
+        <button
+          type="button"
+          className="analyze-button"
+          disabled={run.status === 'running' || project.sourceMissing}
+          onClick={() => void analyze()}
+          title={
+            project.sourceMissing
+              ? 'Source path is missing on disk — can’t analyze.'
+              : undefined
+          }
+        >
+          {run.status === 'running' ? 'Analyzing…' : 'Analyze'}
+        </button>
+        {run.status === 'error' && (
+          <p className="analyze-error" role="alert">
+            {run.message}
+          </p>
+        )}
+      </div>
 
       <AnalysisPanel state={analysis} />
     </div>

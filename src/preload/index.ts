@@ -49,7 +49,8 @@ const api: MeshApi = {
     openExternal: (url) => ipcRenderer.invoke('shell:open-external', url)
   },
   analyses: {
-    latest: (encodedPath) => ipcRenderer.invoke('analyses:latest', encodedPath)
+    latest: (encodedPath) => ipcRenderer.invoke('analyses:latest', encodedPath),
+    run: (encodedPath) => ipcRenderer.invoke('analyses:run', encodedPath)
   },
   files: {
     tree: (encodedPath, request) =>

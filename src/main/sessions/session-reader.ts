@@ -65,6 +65,52 @@ export async function listSessions(projectDir: string): Promise<SessionSummary[]
 }
 
 /**
+ * Stream a Session's JSONL and return the latest `away_summary`
+ * payload (Claude Code emits these as `type:'system', subtype:
+ * 'away_summary'` rows whenever the user pauses and asks Claude for
+ * a checkpoint). When a session has been idle for a while these
+ * digest the work-so-far into a paragraph; the analyzer prefers them
+ * over the raw transcript for older sessions to keep the prompt
+ * tight. Returns `null` if no row carries an away_summary.
+ */
+export async function readLatestAwaySummary(
+  projectDir: string,
+  sessionId: string
+): Promise<string | null> {
+  const jsonlPath = join(projectDir, `${sessionId}.jsonl`)
+  try {
+    const s = await stat(jsonlPath)
+    if (!s.isFile()) return null
+  } catch {
+    return null
+  }
+
+  let latest: string | null = null
+  let latestAt = ''
+  const stream = createReadStream(jsonlPath, { encoding: 'utf-8' })
+  const rl = createInterface({ input: stream, crlfDelay: Infinity })
+  try {
+    for await (const line of rl) {
+      const obj = parseLine(line)
+      if (!obj) continue
+      if (obj['type'] !== 'system') continue
+      if (obj['subtype'] !== 'away_summary') continue
+      const content = obj['content']
+      if (typeof content !== 'string' || content.length === 0) continue
+      const ts = typeof obj['timestamp'] === 'string' ? (obj['timestamp'] as string) : ''
+      if (ts >= latestAt) {
+        latest = content
+        latestAt = ts
+      }
+    }
+  } finally {
+    rl.close()
+    stream.close()
+  }
+  return latest
+}
+
+/**
  * Stream a single Session's JSONL and return the renderable transcript
  * entries in file order. Message entries hold user/assistant text;
  * tool entries hold one-liner descriptions of `tool_use` events

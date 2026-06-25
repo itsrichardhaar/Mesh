@@ -110,6 +110,14 @@ export interface MeshApi {
    */
   analyses: {
     latest(encodedPath: string): Promise<StoredAnalysis | null>
+    /**
+     * Build the prompt, call the active Provider's Model, validate the
+     * three-section schema, and persist the row. Rejects when no key
+     * is saved, the chosen Provider isn't available, or the LLM
+     * response fails schema validation — error UX is Slice 12's
+     * concern. Returns the freshly-stored Analysis on success.
+     */
+    run(encodedPath: string): Promise<StoredAnalysis>
   }
 
   /**
