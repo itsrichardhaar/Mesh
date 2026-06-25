@@ -1,8 +1,12 @@
 import { app, BrowserWindow, ipcMain, safeStorage } from 'electron'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { initDatabase } from './db'
 import { runMigrations } from './db/migrations'
+import { listProjects } from './projects/enumerator'
+
+const CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects')
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
@@ -63,6 +67,7 @@ function smokeTestSafeStorage(): void {
 
 function registerIpc(): void {
   ipcMain.handle('ping', () => 'pong')
+  ipcMain.handle('projects:list', () => listProjects(CLAUDE_PROJECTS_DIR))
 }
 
 app.whenReady().then(() => {

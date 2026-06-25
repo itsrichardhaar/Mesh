@@ -9,14 +9,16 @@
   "main": "out/main/index.js",
   "packageManager": "pnpm@11.9.0",
   "scripts": {
-    "dev": "electron-vite dev",
+    "dev": "pnpm rebuild:electron && electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "package": "pnpm run build && electron-builder --mac --dir",
     "dist": "pnpm run build && electron-builder --mac",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "pnpm rebuild:node && vitest run",
+    "test:watch": "pnpm rebuild:node && vitest",
     "typecheck": "tsc --noEmit",
+    "rebuild:electron": "electron-rebuild -f -w better-sqlite3",
+    "rebuild:node": "pnpm rebuild better-sqlite3",
     "postinstall": "electron-rebuild -f -w better-sqlite3"
   },
   "dependencies": {

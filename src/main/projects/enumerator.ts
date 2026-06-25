@@ -1,0 +1,122 @@
+import { createReadStream } from 'node:fs'
+import { readdir, stat } from 'node:fs/promises'
+import { basename, join } from 'node:path'
+import { createInterface } from 'node:readline'
+import type { Project } from '@shared/types'
+
+/**
+ * Read `~/.claude/projects/` and return a Project per subdirectory,
+ * sorted by Activity (newest event timestamp) descending.
+ *
+ * The Source Path is resolved by reading the `cwd` field from the
+ * newest session JSONL — Claude Code's encoded directory name is
+ * lossy (it collapses `/`, ` `, and literal `-` all into `-`), so
+ * round-tripping the string isn't reliable. We fall back to a lossy
+ * decode only if no JSONL records a `cwd`.
+ *
+ * Returns `[]` if `rootDir` doesn't exist. Subdirectories that can't
+ * be read, or that contain no `.jsonl` files, are skipped.
+ */
+export async function listProjects(rootDir: string): Promise<Project[]> {
+  let entries: string[]
+  try {
+    entries = await readdir(rootDir)
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return []
+    throw err
+  }
+
+  const projects: Project[] = []
+
+  for (const encodedPath of entries) {
+    const projectDir = join(rootDir, encodedPath)
+
+    let dirStat
+    try {
+      dirStat = await stat(projectDir)
+    } catch {
+      continue
+    }
+    if (!dirStat.isDirectory()) continue
+
+    const newest = await findNewestJsonl(projectDir)
+    if (!newest) continue
+
+    const sourcePath =
+      (await readCwdFromJsonl(newest.path)) ?? lossyDecode(encodedPath)
+    const name = basename(sourcePath)
+
+    projects.push({
+      encodedPath,
+      sourcePath,
+      name,
+      activity: new Date(newest.mtimeMs).toISOString()
+    })
+  }
+
+  projects.sort((a, b) => (a.activity < b.activity ? 1 : a.activity > b.activity ? -1 : 0))
+  return projects
+}
+
+interface NewestJsonl {
+  path: string
+  mtimeMs: number
+}
+
+async function findNewestJsonl(projectDir: string): Promise<NewestJsonl | null> {
+  let files: string[]
+  try {
+    files = await readdir(projectDir)
+  } catch {
+    return null
+  }
+
+  let newest: NewestJsonl | null = null
+  for (const file of files) {
+    if (!file.endsWith('.jsonl')) continue
+    const filePath = join(projectDir, file)
+    try {
+      const s = await stat(filePath)
+      if (!s.isFile()) continue
+      if (!newest || s.mtimeMs > newest.mtimeMs) {
+        newest = { path: filePath, mtimeMs: s.mtimeMs }
+      }
+    } catch {
+      // skip unreadable
+    }
+  }
+  return newest
+}
+
+async function readCwdFromJsonl(jsonlPath: string): Promise<string | null> {
+  const stream = createReadStream(jsonlPath, { encoding: 'utf-8' })
+  const rl = createInterface({ input: stream, crlfDelay: Infinity })
+  try {
+    for await (const line of rl) {
+      const trimmed = line.trim()
+      if (!trimmed) continue
+      try {
+        const obj = JSON.parse(trimmed) as { cwd?: unknown }
+        if (typeof obj.cwd === 'string' && obj.cwd.length > 0) {
+          return obj.cwd
+        }
+      } catch {
+        // malformed JSON line; skip
+      }
+    }
+  } finally {
+    rl.close()
+    stream.close()
+  }
+  return null
+}
+
+/**
+ * Last-resort decode when no JSONL records a `cwd`. Replaces dashes
+ * with slashes, which is correct for the path-separator dashes but
+ * wrong for any dash inside an original directory or file name.
+ * Use sparingly; the `cwd` path is always preferred when available.
+ */
+function lossyDecode(encodedPath: string): string {
+  return encodedPath.replace(/-/g, '/')
+}

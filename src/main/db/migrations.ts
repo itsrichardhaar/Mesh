@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3'
 import init0000 from './migrations/0000_init.sql?raw'
+import projects0001 from './migrations/0001_projects.sql?raw'
 
 export interface Migration {
   id: string
@@ -7,7 +8,8 @@ export interface Migration {
 }
 
 export const MIGRATIONS: readonly Migration[] = [
-  { id: '0000_init', sql: init0000 }
+  { id: '0000_init', sql: init0000 },
+  { id: '0001_projects', sql: projects0001 }
 ]
 
 const TRACKING_TABLE_SQL = `
