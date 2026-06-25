@@ -88,6 +88,22 @@ export function readAugmentation(
 }
 
 /**
+ * Look up just the Source Path for an encoded path. Returns null when
+ * the Project hasn't been seen yet (renderer should never call into
+ * dependent IPC before the sidebar list has hydrated, but we guard
+ * anyway).
+ */
+export function getSourcePath(
+  db: Database.Database,
+  encodedPath: string
+): string | null {
+  const row = db
+    .prepare('SELECT source_path AS sourcePath FROM projects WHERE encoded_path = ?')
+    .get(encodedPath) as { sourcePath: string } | undefined
+  return row?.sourcePath ?? null
+}
+
+/**
  * Persist detector output against a Project. `auto_name` is overwritten
  * because detection produces the canonical humanized form; `auto_subtitle`
  * is set even when `null` so a previously-detected subtitle is cleared if

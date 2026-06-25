@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, nativeTheme, safeStorage } from 'electron'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import type { FilesTreeRequest, FilesTreeResponse } from '@shared/files'
 import type {
   Project,
   ProjectPatch,
@@ -13,10 +14,16 @@ import { isProviderId, isThemePreference } from '@shared/types'
 import { latestForProject } from './analyses/repository'
 import { getDatabase, initDatabase } from './db'
 import { runMigrations } from './db/migrations'
+import {
+  closeAll as closeAllWatchers,
+  listDirectory,
+  watchProject
+} from './files/file-tree-service'
 import { buildApplicationMenu } from './menu'
 import { listProjects } from './projects/enumerator'
 import { detect } from './projects/metadata-detector'
 import {
+  getSourcePath,
   readAugmentation,
   updateProject,
   upsertDetectedMetadata,
@@ -248,6 +255,37 @@ function registerIpc(): void {
       return latestForProject(getDatabase(), encodedPath)
     }
   )
+
+  ipcMain.handle(
+    'files:tree',
+    async (
+      _event,
+      encodedPath: unknown,
+      request: unknown
+    ): Promise<FilesTreeResponse> => {
+      if (typeof encodedPath !== 'string' || encodedPath.length === 0) {
+        throw new Error('files:tree: encodedPath must be a non-empty string')
+      }
+      const req = (request ?? {}) as FilesTreeRequest
+      const relPath = typeof req.relPath === 'string' ? req.relPath : ''
+      const showHidden = req.showHidden === true
+
+      const sourcePath = getSourcePath(getDatabase(), encodedPath)
+      if (!sourcePath) {
+        throw new Error(`files:tree: unknown encodedPath ${encodedPath}`)
+      }
+
+      // Subscribe chokidar on first access so the renderer gets live
+      // events without an explicit "open project" call; the existing-
+      // watcher path inside watchProject is idempotent under repeat.
+      watchProject(encodedPath, sourcePath, () => {
+        mainWindow?.webContents.send('files:tree-changed', encodedPath)
+      })
+
+      const entries = await listDirectory(sourcePath, relPath, showHidden)
+      return { sourcePath, relPath, entries }
+    }
+  )
 }
 
 /** Stable SQLite key shape for per-Provider secrets. */
@@ -299,4 +337,5 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   isQuitting = true
+  void closeAllWatchers()
 })

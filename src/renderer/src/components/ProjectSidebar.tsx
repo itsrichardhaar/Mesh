@@ -14,13 +14,15 @@ interface Props {
   refresh: () => void
   selectedEncodedPath: string | null
   onSelect: (encodedPath: string) => void
+  onOpen: (project: Project) => void
 }
 
 export function ProjectSidebar({
   state,
   refresh,
   selectedEncodedPath,
-  onSelect
+  onSelect,
+  onOpen
 }: Props): JSX.Element {
   const [query, setQuery] = useState('')
   const [showHidden, setShowHidden] = useState(false)
@@ -58,6 +60,7 @@ export function ProjectSidebar({
         showHidden={showHidden}
         selectedEncodedPath={selectedEncodedPath}
         onSelect={onSelect}
+        onOpen={onOpen}
         onContextMenu={(e, p) => {
           e.preventDefault()
           e.stopPropagation()
@@ -92,6 +95,7 @@ function SidebarBody({
   showHidden,
   selectedEncodedPath,
   onSelect,
+  onOpen,
   onContextMenu
 }: {
   state: ProjectListState
@@ -99,6 +103,7 @@ function SidebarBody({
   showHidden: boolean
   selectedEncodedPath: string | null
   onSelect: (encodedPath: string) => void
+  onOpen: (project: Project) => void
   onContextMenu: (e: React.MouseEvent, project: Project) => void
 }): JSX.Element {
   const visible = useMemo(() => {
@@ -148,6 +153,15 @@ function SidebarBody({
               type="button"
               className={classes.join(' ')}
               onClick={() => onSelect(p.encodedPath)}
+              onDoubleClick={() => {
+                if (!p.sourceMissing) onOpen(p)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !p.sourceMissing) {
+                  e.preventDefault()
+                  onOpen(p)
+                }
+              }}
               onContextMenu={(e) => onContextMenu(e, p)}
               title={p.sourceMissing ? 'Source folder no longer exists on disk' : undefined}
             >

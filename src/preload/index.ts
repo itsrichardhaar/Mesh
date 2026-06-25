@@ -1,8 +1,14 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { MeshApi } from '@shared/api'
 
 function subscribe(channel: string, cb: () => void): () => void {
   const handler = (): void => cb()
+  ipcRenderer.on(channel, handler)
+  return () => ipcRenderer.removeListener(channel, handler)
+}
+
+function subscribeArg<T>(channel: string, cb: (arg: T) => void): () => void {
+  const handler = (_event: IpcRendererEvent, arg: T): void => cb(arg)
   ipcRenderer.on(channel, handler)
   return () => ipcRenderer.removeListener(channel, handler)
 }
@@ -16,7 +22,9 @@ const api: MeshApi = {
   },
   menu: {
     onOpenSettings: (cb) => subscribe('menu:open-settings', cb),
-    onCloseRequested: (cb) => subscribe('menu:close-requested', cb)
+    onCloseRequested: (cb) => subscribe('menu:close-requested', cb),
+    onBack: (cb) => subscribe('menu:back', cb),
+    onToggleHidden: (cb) => subscribe('menu:toggle-hidden', cb)
   },
   window: {
     close: () => ipcRenderer.send('window:close')
@@ -36,6 +44,11 @@ const api: MeshApi = {
   },
   analyses: {
     latest: (encodedPath) => ipcRenderer.invoke('analyses:latest', encodedPath)
+  },
+  files: {
+    tree: (encodedPath, request) =>
+      ipcRenderer.invoke('files:tree', encodedPath, request ?? {}),
+    onTreeChanged: (cb) => subscribeArg<string>('files:tree-changed', cb)
   }
 }
 

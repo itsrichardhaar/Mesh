@@ -23,6 +23,14 @@ export function buildApplicationMenu(getWindow: () => BrowserWindow | null): voi
     getWindow()?.webContents.send('menu:close-requested')
   }
 
+  const goBack = (): void => {
+    getWindow()?.webContents.send('menu:back')
+  }
+
+  const toggleHidden = (): void => {
+    getWindow()?.webContents.send('menu:toggle-hidden')
+  }
+
   const template: MenuItemConstructorOptions[] = [
     ...(isMac
       ? [
@@ -68,7 +76,24 @@ export function buildApplicationMenu(getWindow: () => BrowserWindow | null): voi
       ]
     },
     { role: 'editMenu' },
-    { role: 'viewMenu' }
+    {
+      label: 'View',
+      submenu: [
+        {
+          label: 'Back',
+          accelerator: 'CommandOrControl+[',
+          click: goBack
+        },
+        {
+          label: 'Toggle Hidden Files',
+          accelerator: 'CommandOrControl+.',
+          click: toggleHidden
+        },
+        { type: 'separator' },
+        { role: 'reload' },
+        { role: 'toggleDevTools' }
+      ]
+    }
   ]
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))

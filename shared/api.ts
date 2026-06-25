@@ -1,6 +1,7 @@
 // IPC contract surface exposed to the renderer via the preload bridge.
 // Every method here corresponds to a registered `ipcMain.handle` in src/main.
 
+import type { FilesTreeRequest, FilesTreeResponse } from './files'
 import type {
   Project,
   ProjectPatch,
@@ -33,6 +34,8 @@ export interface MeshApi {
   menu: {
     onOpenSettings(cb: () => void): () => void
     onCloseRequested(cb: () => void): () => void
+    onBack(cb: () => void): () => void
+    onToggleHidden(cb: () => void): () => void
   }
 
   window: {
@@ -80,5 +83,17 @@ export interface MeshApi {
    */
   analyses: {
     latest(encodedPath: string): Promise<StoredAnalysis | null>
+  }
+
+  /**
+   * Live, gitignore-aware file tree rooted at a Project's Source Path.
+   * `tree` returns immediate children of `request.relPath` (default
+   * root). `onTreeChanged` fires whenever chokidar reports any
+   * filesystem activity inside the watched Project — the renderer
+   * re-queries `tree` for whatever it has expanded.
+   */
+  files: {
+    tree(encodedPath: string, request?: FilesTreeRequest): Promise<FilesTreeResponse>
+    onTreeChanged(cb: (encodedPath: string) => void): () => void
   }
 }

@@ -1,9 +1,14 @@
 import { useState } from 'react'
+import type { Project } from '@shared/types'
 import { ProjectDetail } from '../components/ProjectDetail'
 import { ProjectSidebar } from '../components/ProjectSidebar'
 import { useProjectList } from '../hooks/useProjectList'
 
-export function HomeScreen(): JSX.Element {
+interface Props {
+  onOpenWorkspace: (project: Project) => void
+}
+
+export function HomeScreen({ onOpenWorkspace }: Props): JSX.Element {
   const { state, refresh } = useProjectList()
   const [selectedEncodedPath, setSelectedEncodedPath] = useState<string | null>(null)
 
@@ -19,6 +24,7 @@ export function HomeScreen(): JSX.Element {
         refresh={refresh}
         selectedEncodedPath={selectedEncodedPath}
         onSelect={setSelectedEncodedPath}
+        onOpen={onOpenWorkspace}
       />
       <main className="detail-pane" aria-label="Project detail">
         {selected ? <ProjectDetail project={selected} /> : <EmptyDetail />}
