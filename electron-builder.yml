@@ -1,0 +1,23 @@
+appId: com.itsrichardhaar.mesh
+productName: Mesh
+copyright: Copyright © 2026 Richard Haar
+directories:
+  buildResources: build
+  output: dist
+files:
+  - "out/**/*"
+  - "package.json"
+  - "!**/node_modules/**/{CHANGELOG.md,README.md,readme.md,changelog.md,.bin,.cache,test,tests,docs,doc,.github,.eslintrc*}"
+asarUnpack:
+  - "**/node_modules/better-sqlite3/**/*"
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - target: dir
+      arch:
+        - arm64
+  identity: null
+  hardenedRuntime: false
+  gatekeeperAssess: false
+extraMetadata:
+  main: out/main/index.js
