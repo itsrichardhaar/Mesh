@@ -424,14 +424,15 @@ button {
   list-style: none;
 }
 
-.analyze-bar {
+.analyze-area {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
   margin: 0 0 24px;
 }
 
 .analyze-button {
+  align-self: flex-start;
   font-size: 13px;
   font-weight: 500;
   padding: 8px 18px;
@@ -450,10 +451,82 @@ button {
   cursor: not-allowed;
 }
 
-.analyze-error {
-  margin: 0;
-  font-size: 12px;
+.analyze-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+
+.analyze-banner-message {
+  flex: 1;
+  min-width: 0;
+}
+
+.analyze-banner-info {
+  color: var(--text-primary);
+  background: rgba(80, 130, 200, 0.10);
+  border-color: rgba(80, 130, 200, 0.35);
+}
+
+[data-theme='dark'] .analyze-banner-info {
+  background: rgba(120, 160, 220, 0.14);
+  border-color: rgba(120, 160, 220, 0.40);
+}
+
+.analyze-banner-success {
+  color: var(--text-primary);
+  background: rgba(80, 160, 110, 0.12);
+  border-color: rgba(80, 160, 110, 0.40);
+}
+
+[data-theme='dark'] .analyze-banner-success {
+  background: rgba(110, 190, 140, 0.14);
+  border-color: rgba(110, 190, 140, 0.40);
+}
+
+.analyze-banner-error {
   color: var(--text-error);
+  background: rgba(196, 92, 92, 0.10);
+  border-color: rgba(196, 92, 92, 0.35);
+}
+
+[data-theme='dark'] .analyze-banner-error {
+  background: rgba(232, 138, 138, 0.12);
+  border-color: rgba(232, 138, 138, 0.45);
+}
+
+.analyze-banner-retry {
+  font-size: 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.analyze-banner-retry:hover {
+  background: var(--bg-elevated);
+}
+
+.analyze-banner-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--border-subtle);
+  border-top-color: var(--accent);
+  animation: mesh-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes mesh-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .stat {

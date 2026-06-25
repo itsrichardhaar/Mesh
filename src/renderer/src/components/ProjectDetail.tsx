@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Project, ProjectStats, StoredAnalysis } from '@shared/types'
 import { findModel } from '@shared/models'
+import { relativeTime } from '../util/relativeTime'
 
 type StatsState =
   | { status: 'loading' }
@@ -12,10 +13,21 @@ type AnalysisState =
   | { status: 'ok'; analysis: StoredAnalysis | null }
   | { status: 'error'; message: string }
 
+/**
+ * Three distinct error sources for the Analyze action:
+ *  - `preflight`: the click never reached the LLM (no key, project
+ *    can't be enumerated, etc.). Renderer shows the message; latest
+ *    stored row is untouched.
+ *  - `persisted-failed`: latest row in the DB carries `status: 'failed'`
+ *    — the IPC layer wrote it after the orchestrator or model threw.
+ *    Renderer hides any stale content and renders the row's
+ *    `errorMessage` instead.
+ *  - The `ok` branch covers the happy path / no-row-yet.
+ */
 type RunState =
   | { status: 'idle' }
   | { status: 'running' }
-  | { status: 'error'; message: string }
+  | { status: 'preflight-error'; message: string }
 
 interface Props {
   project: Project
@@ -68,8 +80,8 @@ export function ProjectDetail({ project }: Props): JSX.Element {
     }
   }, [project.encodedPath])
 
-  // Reset run state when the user switches projects so an error from
-  // the previous one doesn't bleed onto the new detail pane.
+  // Drop any in-flight error when the user navigates to a different
+  // Project so it doesn't bleed across.
   useEffect(() => {
     setRun({ status: 'idle' })
   }, [project.encodedPath])
@@ -81,9 +93,14 @@ export function ProjectDetail({ project }: Props): JSX.Element {
       setAnalysis({ status: 'ok', analysis: next })
       setRun({ status: 'idle' })
     } catch (err) {
+      // Pre-flight: the IPC threw rather than persisting a row.
+      // Surface a friendly message; log the original to the console
+      // so the full stack is recoverable when debugging.
+      // eslint-disable-next-line no-console
+      console.error('[mesh] analyses.run preflight error:', err)
       setRun({
-        status: 'error',
-        message: err instanceof Error ? err.message : String(err)
+        status: 'preflight-error',
+        message: friendly(err)
       })
     }
   }
@@ -99,26 +116,12 @@ export function ProjectDetail({ project }: Props): JSX.Element {
 
       <StatsRow project={project} state={stats} />
 
-      <div className="analyze-bar">
-        <button
-          type="button"
-          className="analyze-button"
-          disabled={run.status === 'running' || project.sourceMissing}
-          onClick={() => void analyze()}
-          title={
-            project.sourceMissing
-              ? 'Source path is missing on disk — can’t analyze.'
-              : undefined
-          }
-        >
-          {run.status === 'running' ? 'Analyzing…' : 'Analyze'}
-        </button>
-        {run.status === 'error' && (
-          <p className="analyze-error" role="alert">
-            {run.message}
-          </p>
-        )}
-      </div>
+      <AnalyzeArea
+        project={project}
+        analysis={analysis}
+        run={run}
+        onAnalyze={() => void analyze()}
+      />
 
       <AnalysisPanel state={analysis} />
     </div>
@@ -151,6 +154,99 @@ function Stat({ label, value }: { label: string; value: string }): JSX.Element {
   )
 }
 
+function AnalyzeArea({
+  project,
+  analysis,
+  run,
+  onAnalyze
+}: {
+  project: Project
+  analysis: AnalysisState
+  run: RunState
+  onAnalyze: () => void
+}): JSX.Element {
+  const banner = pickBanner(analysis, run)
+  return (
+    <div className="analyze-area">
+      {banner && <AnalyzeBanner banner={banner} onRetry={onAnalyze} />}
+      <button
+        type="button"
+        className="analyze-button"
+        disabled={run.status === 'running' || project.sourceMissing}
+        onClick={onAnalyze}
+        title={
+          project.sourceMissing
+            ? 'Source path is missing on disk — can’t analyze.'
+            : undefined
+        }
+      >
+        {run.status === 'running' ? 'Analyzing…' : 'Analyze'}
+      </button>
+    </div>
+  )
+}
+
+type Banner =
+  | { tone: 'info'; message: string }
+  | { tone: 'success'; message: string }
+  | { tone: 'error'; message: string; retry: true }
+
+function pickBanner(analysis: AnalysisState, run: RunState): Banner | null {
+  if (run.status === 'running') {
+    return { tone: 'info', message: 'Analyzing…' }
+  }
+  if (run.status === 'preflight-error') {
+    return { tone: 'error', message: run.message, retry: true }
+  }
+  if (analysis.status !== 'ok' || analysis.analysis === null) {
+    return null
+  }
+  const row = analysis.analysis
+  if (row.status === 'failed') {
+    return {
+      tone: 'error',
+      message: row.errorMessage ?? 'Analysis failed.',
+      retry: true
+    }
+  }
+  const count = row.sourceSessionCount ?? 0
+  const word = count === 1 ? 'session' : 'sessions'
+  return {
+    tone: 'success',
+    message: `Analyzed from ${count} ${word} (last 14 days) · ${relativeTime(row.generatedAt)}`
+  }
+}
+
+function AnalyzeBanner({
+  banner,
+  onRetry
+}: {
+  banner: Banner
+  onRetry: () => void
+}): JSX.Element {
+  const isError = banner.tone === 'error'
+  return (
+    <div
+      className={`analyze-banner analyze-banner-${banner.tone}`}
+      role={isError ? 'alert' : 'status'}
+    >
+      {banner.tone === 'info' && (
+        <span className="analyze-banner-spinner" aria-hidden="true" />
+      )}
+      <span className="analyze-banner-message">{banner.message}</span>
+      {isError && 'retry' in banner && (
+        <button
+          type="button"
+          className="analyze-banner-retry"
+          onClick={onRetry}
+        >
+          Try again
+        </button>
+      )}
+    </div>
+  )
+}
+
 function AnalysisPanel({ state }: { state: AnalysisState }): JSX.Element {
   if (state.status === 'loading') {
     return (
@@ -159,7 +255,6 @@ function AnalysisPanel({ state }: { state: AnalysisState }): JSX.Element {
       </section>
     )
   }
-
   if (state.status === 'error') {
     return (
       <section className="analysis-empty" aria-label="Latest analysis" role="alert">
@@ -167,7 +262,6 @@ function AnalysisPanel({ state }: { state: AnalysisState }): JSX.Element {
       </section>
     )
   }
-
   if (state.analysis === null) {
     return (
       <section className="analysis-empty" aria-label="Latest analysis">
@@ -175,21 +269,16 @@ function AnalysisPanel({ state }: { state: AnalysisState }): JSX.Element {
       </section>
     )
   }
-
+  // Failed rows are represented entirely by the banner above — we
+  // suppress the content section here so the user isn't reading stale
+  // analysis pulled from a row that pre-dates the failure.
+  if (state.analysis.status === 'failed') {
+    return <></>
+  }
   return <AnalysisView analysis={state.analysis} />
 }
 
 function AnalysisView({ analysis }: { analysis: StoredAnalysis }): JSX.Element {
-  if (analysis.status === 'failed') {
-    return (
-      <section className="analysis-failed" aria-label="Latest analysis" role="alert">
-        <h2>Analysis failed</h2>
-        <p>{analysis.errorMessage ?? 'Unknown error'}</p>
-        <AttributionFooter analysis={analysis} />
-      </section>
-    )
-  }
-
   const content = analysis.content
   if (!content) {
     return (
@@ -240,7 +329,7 @@ function AttributionFooter({ analysis }: { analysis: StoredAnalysis }): JSX.Elem
       <span>
         via {providerLabel} · {modelLabel}
       </span>
-      <span>· {formatGeneratedAt(analysis.generatedAt)}</span>
+      <span>· {relativeTime(analysis.generatedAt)}</span>
     </footer>
   )
 }
@@ -249,17 +338,21 @@ function capitalize(value: string): string {
   return value.length > 0 ? value[0]!.toUpperCase() + value.slice(1) : value
 }
 
-function formatGeneratedAt(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime()
-  if (Number.isNaN(ms) || ms < 0) return 'just now'
-  const s = Math.floor(ms / 1000)
-  if (s < 60) return 'just now'
-  const m = Math.floor(s / 60)
-  if (m < 60) return `${m}m ago`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  const d = Math.floor(h / 24)
-  return `${d}d ago`
+/**
+ * Strip raw HTTP-ish noise from a pre-flight error before showing it
+ * to the user. The full error is logged to the console, so debugging
+ * isn't impaired; we just don't want "Error invoking remote method
+ * 'analyses:run': Error: 401 …" surfacing as a user-facing banner.
+ */
+function friendly(err: unknown): string {
+  if (err instanceof Error) {
+    let m = err.message
+    m = m.replace(/^Error invoking remote method '[^']+': Error: /, '')
+    m = m.replace(/^Error invoking remote method '[^']+': /, '')
+    m = m.replace(/^\d{3}\s+/, '')
+    return m
+  }
+  return String(err)
 }
 
 function formatLastActivity(iso: string): string {

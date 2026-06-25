@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import {
   ClaudeClient,
   humanizeAnthropicError,
+  SchemaViolationError,
   type AnthropicLike
 } from '@main/models/claude-client'
 import { LocalClient } from '@main/models/local-client'
@@ -75,8 +76,8 @@ describe('ClaudeClient', () => {
       ).rejects.toThrow(/no tool_use block/)
     })
 
-    it('throws when tool_use input fails schema validation', async () => {
-      const create = vi.fn(async () => ({
+    it('retries once when the first response fails schema validation, then returns the retry output', async () => {
+      const bad = {
         content: [
           {
             type: 'tool_use',
@@ -84,13 +85,57 @@ describe('ClaudeClient', () => {
             input: { summaryMarkdown: 'ok', nextSteps: 'not-an-array' }
           }
         ]
-      }))
+      }
+      const good = okResponse
+      const create = vi
+        .fn<(_p: unknown) => Promise<unknown>>()
+        .mockResolvedValueOnce(bad)
+        .mockResolvedValueOnce(good)
+      const c = new ClaudeClient('claude-haiku-4-5', 'sk-ant-test', () =>
+        makeFake(create)
+      )
+      const output = await c.analyzeProject({ systemPrompt: 'sys', userPrompt: 'usr' })
+      expect(output).toEqual(good.content[0]!.input)
+      expect(create).toHaveBeenCalledTimes(2)
+      const retryParams = create.mock.calls[1]![0] as { messages: Array<{ content: Array<{ text: string }> }> }
+      const retryUserText = retryParams.messages[0]!.content[0]!.text
+      expect(retryUserText).toMatch(/Previous attempt failed validation/)
+    })
+
+    it('throws SchemaViolationError when both the first response and the retry fail validation', async () => {
+      const bad = {
+        content: [
+          {
+            type: 'tool_use',
+            name: 'emit_daily_summary',
+            input: { summaryMarkdown: 'ok', nextSteps: 'not-an-array' }
+          }
+        ]
+      }
+      const create = vi
+        .fn<(_p: unknown) => Promise<unknown>>()
+        .mockResolvedValue(bad)
       const c = new ClaudeClient('claude-haiku-4-5', 'sk-ant-test', () =>
         makeFake(create)
       )
       await expect(
         c.analyzeProject({ systemPrompt: '', userPrompt: '' })
-      ).rejects.toThrow(/schema validation failed/)
+      ).rejects.toBeInstanceOf(SchemaViolationError)
+      expect(create).toHaveBeenCalledTimes(2)
+    })
+
+    it('does not retry on network / non-schema errors', async () => {
+      const err = Object.assign(new Error('Unauthorized'), { status: 401 })
+      const create = vi.fn(async () => {
+        throw err
+      })
+      const c = new ClaudeClient('claude-haiku-4-5', 'sk-ant-test', () =>
+        makeFake(create)
+      )
+      await expect(
+        c.analyzeProject({ systemPrompt: '', userPrompt: '' })
+      ).rejects.toMatchObject({ status: 401 })
+      expect(create).toHaveBeenCalledTimes(1)
     })
 
     it('throws when the wrong tool was called', async () => {

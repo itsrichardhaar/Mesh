@@ -15,7 +15,11 @@ import type {
 } from '@shared/types'
 import { isProviderId, isThemePreference } from '@shared/types'
 import { isModelId, selectedModelSettingKey } from '@shared/models'
-import { ClaudeClient } from './models/claude-client'
+import {
+  ClaudeClient,
+  humanizeAnthropicError,
+  SchemaViolationError
+} from './models/claude-client'
 import { AnalysisOrchestrator } from './analyses/orchestrator'
 import { insertAnalysis, latestForProject } from './analyses/repository'
 import { getDatabase, initDatabase } from './db'
@@ -413,9 +417,20 @@ function registerIpc(): void {
           content: result.output
         })
       } catch (err) {
-        // Slice 12 will surface the failure state in the UI; for now
-        // we re-throw so the renderer's click handler sees the error.
-        throw err
+        // Orchestrator / model failures persist as a status='failed'
+        // row so the renderer can render the error banner via the
+        // same `analyses:latest` read path used by ok rows. The full
+        // error is logged to the main-process console for debugging;
+        // only the humanized message reaches the user.
+        console.error('[mesh] analyses:run failed:', err)
+        insertAnalysis(db, {
+          encodedPath,
+          generatedAt,
+          status: 'failed',
+          errorMessage: humanizeAnalyzeError(err),
+          provider: 'claude',
+          model
+        })
       }
 
       const stored = latestForProject(db, encodedPath)
@@ -524,6 +539,25 @@ function secretKey(provider: ProviderId): string {
 /** Stable SQLite key shape for the cached validation outcome per Provider. */
 function validationKey(provider: ProviderId): string {
   return `model:${provider}:validation`
+}
+
+/**
+ * Translate any orchestrator/model failure into a short, human-facing
+ * string for the `error_message` column. Anthropic SDK errors route
+ * through the existing humanizer; schema-violation failures get a
+ * dedicated, actionable message instead of leaking Zod's path string.
+ */
+function humanizeAnalyzeError(err: unknown): string {
+  if (err instanceof SchemaViolationError) {
+    return 'The model returned an invalid format after one retry. Try again, or pick a different Model in Settings.'
+  }
+  if (err && typeof err === 'object' && 'status' in (err as Record<string, unknown>)) {
+    return humanizeAnthropicError(err)
+  }
+  if (err instanceof Error && err.message.length > 0) {
+    return err.message.length > 200 ? err.message.slice(0, 197) + '…' : err.message
+  }
+  return 'Analysis failed for an unknown reason.'
 }
 
 const encryptionBackend: EncryptionBackend = {

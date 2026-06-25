@@ -27,6 +27,20 @@ export const ANALYZE_TOOL_NAME = 'emit_daily_summary' as const
  * so the response can't pass the LLM-side schema check but fail Zod
  * (modulo bugs Zod catches that JSON Schema misses).
  */
+/**
+ * Thrown when the LLM's tool-use response fails Zod validation.
+ * The retry path in `analyzeProject` catches this once and re-prompts
+ * with the validation message appended; if the retry also fails, the
+ * error is re-thrown and the IPC layer writes a `status: 'failed'`
+ * row per Slice 12's recovery flow.
+ */
+export class SchemaViolationError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'SchemaViolationError'
+  }
+}
+
 export const ANALYZE_TOOL_INPUT_SCHEMA = {
   type: 'object',
   properties: {
@@ -110,6 +124,28 @@ export class ClaudeClient implements ModelClient {
   }
 
   async analyzeProject(input: AnalyzeProjectInput): Promise<AnalysisOutput> {
+    try {
+      return await this.tryAnalyze(input)
+    } catch (err) {
+      if (err instanceof SchemaViolationError) {
+        // One auto-retry with the validation error appended to the
+        // prompt — gives the model a concrete signal about which
+        // field went wrong without escalating to a `status: 'failed'`
+        // row on every transient mismatch.
+        return await this.tryAnalyze({
+          systemPrompt: input.systemPrompt,
+          userPrompt:
+            input.userPrompt +
+            '\n\n## Previous attempt failed validation\n' +
+            err.message +
+            '\nReturn output that exactly matches the emit_daily_summary input_schema.'
+        })
+      }
+      throw err
+    }
+  }
+
+  private async tryAnalyze(input: AnalyzeProjectInput): Promise<AnalysisOutput> {
     const response = (await this.client.messages.create({
       model: this.model,
       max_tokens: 2048,
@@ -154,9 +190,7 @@ export class ClaudeClient implements ModelClient {
     }
     const parsed = analysisOutputSchema.safeParse(toolUse.input)
     if (!parsed.success) {
-      throw new Error(
-        `ClaudeClient.analyzeProject: schema validation failed — ${parsed.error.message}`
-      )
+      throw new SchemaViolationError(parsed.error.message)
     }
     return parsed.data
   }
