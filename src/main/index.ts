@@ -3,6 +3,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { FilesTreeRequest, FilesTreeResponse } from '@shared/files'
+import type { SessionSummary, TranscriptMessage } from '@shared/sessions'
 import type {
   Project,
   ProjectPatch,
@@ -30,6 +31,11 @@ import {
   upsertDiscovered
 } from './projects/repository'
 import { compute as computeStats } from './projects/stats-computer'
+import { listSessions, readTranscript } from './sessions/session-reader'
+import {
+  closeAllSessionWatchers,
+  watchSessions
+} from './sessions/session-watcher'
 import {
   clearSecret,
   EncryptionBackend,
@@ -257,6 +263,39 @@ function registerIpc(): void {
   )
 
   ipcMain.handle(
+    'sessions:list',
+    async (_event, encodedPath: unknown): Promise<SessionSummary[]> => {
+      if (typeof encodedPath !== 'string' || encodedPath.length === 0) {
+        throw new Error('sessions:list: encodedPath must be a non-empty string')
+      }
+      const projectDir = join(CLAUDE_PROJECTS_DIR, encodedPath)
+      // First touch subscribes the watcher so subsequent jsonl writes
+      // surface in the renderer; idempotent under repeat.
+      watchSessions(encodedPath, projectDir, () => {
+        mainWindow?.webContents.send('sessions:changed', encodedPath)
+      })
+      return listSessions(projectDir)
+    }
+  )
+
+  ipcMain.handle(
+    'sessions:read-transcript',
+    async (
+      _event,
+      encodedPath: unknown,
+      sessionId: unknown
+    ): Promise<TranscriptMessage[]> => {
+      if (typeof encodedPath !== 'string' || encodedPath.length === 0) {
+        throw new Error('sessions:read-transcript: encodedPath must be a non-empty string')
+      }
+      if (typeof sessionId !== 'string' || sessionId.length === 0) {
+        throw new Error('sessions:read-transcript: sessionId must be a non-empty string')
+      }
+      return readTranscript(join(CLAUDE_PROJECTS_DIR, encodedPath), sessionId)
+    }
+  )
+
+  ipcMain.handle(
     'files:tree',
     async (
       _event,
@@ -338,4 +377,5 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   isQuitting = true
   void closeAllWatchers()
+  void closeAllSessionWatchers()
 })

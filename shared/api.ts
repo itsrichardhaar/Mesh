@@ -2,6 +2,7 @@
 // Every method here corresponds to a registered `ipcMain.handle` in src/main.
 
 import type { FilesTreeRequest, FilesTreeResponse } from './files'
+import type { SessionSummary, TranscriptMessage } from './sessions'
 import type {
   Project,
   ProjectPatch,
@@ -95,5 +96,18 @@ export interface MeshApi {
   files: {
     tree(encodedPath: string, request?: FilesTreeRequest): Promise<FilesTreeResponse>
     onTreeChanged(cb: (encodedPath: string) => void): () => void
+  }
+
+  /**
+   * Per-Project Sessions list + transcript reader. `list` returns
+   * card summaries sorted newest-first; `readTranscript` streams one
+   * Session's JSONL into user/assistant text rows. `onChanged` fires
+   * whenever a `.jsonl` file under `~/.claude/projects/<encoded>/`
+   * is added, removed, or modified.
+   */
+  sessions: {
+    list(encodedPath: string): Promise<SessionSummary[]>
+    readTranscript(encodedPath: string, sessionId: string): Promise<TranscriptMessage[]>
+    onChanged(cb: (encodedPath: string) => void): () => void
   }
 }

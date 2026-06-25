@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { Project } from '@shared/types'
 import { FileTree } from '../components/FileTree'
+import { SessionsList } from '../components/SessionsList'
+import { Transcript } from '../components/Transcript'
 
 interface Props {
   project: Project
@@ -9,15 +11,24 @@ interface Props {
 }
 
 /**
- * Slice 13's three-column shell. File tree on the left, Sessions list
- * stub in the middle (Slice 14 fills it), content pane stub on the
- * right (Slices 14–18 fill it). Visibility is driven by the parent so
- * the Workspace can stay mounted (display:none) when the user goes
- * back to Home — that's how scroll position and tree expand state
- * survive the round-trip per PRD.
+ * Three-column Workspace: file tree (left), Sessions list (middle),
+ * content pane (right). The right column shows the transcript of the
+ * selected Session via `react-markdown` + `react-virtuoso`. Visibility
+ * is driven by the parent so the Workspace can stay mounted
+ * (display:none) when the user goes back to Home — that's how scroll
+ * position, tree expand state, and the selected Session survive the
+ * round-trip per PRD.
  */
 export function WorkspaceScreen({ project, visible, onBack }: Props): JSX.Element {
   const [showHidden, setShowHidden] = useState(false)
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+
+  // Reset the selected session when the user opens a different
+  // Project's Workspace so we don't try to read a sessionId that
+  // doesn't belong to this Project.
+  useEffect(() => {
+    setSelectedSessionId(null)
+  }, [project.encodedPath])
 
   // ⌘. routes through the application menu so the accelerator is
   // standard across screens; here we only act on it when the Workspace
@@ -68,11 +79,23 @@ export function WorkspaceScreen({ project, visible, onBack }: Props): JSX.Elemen
           <div className="workspace-column-header">
             <span>Sessions</span>
           </div>
-          <p className="workspace-stub">Sessions list lands in Slice 14.</p>
+          <SessionsList
+            encodedPath={project.encodedPath}
+            selectedSessionId={selectedSessionId}
+            onSelect={setSelectedSessionId}
+          />
         </section>
 
         <section className="workspace-content-column" aria-label="Content pane">
-          <p className="workspace-stub">Select a Session or file.</p>
+          {selectedSessionId ? (
+            <Transcript
+              key={`${project.encodedPath}:${selectedSessionId}`}
+              encodedPath={project.encodedPath}
+              sessionId={selectedSessionId}
+            />
+          ) : (
+            <p className="workspace-stub">Select a Session.</p>
+          )}
         </section>
       </div>
     </div>
