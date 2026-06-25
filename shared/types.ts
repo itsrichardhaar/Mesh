@@ -44,6 +44,19 @@ export function isThemePreference(value: unknown): value is ThemePreference {
 }
 
 /**
+ * Identifier for the three Provider slots Mesh ships with. Only `claude`
+ * is functional in v1; the others exist so the secrets/settings shape
+ * doesn't change when Slice 9 turns them on.
+ */
+export type ProviderId = 'claude' | 'openai' | 'local'
+
+export const PROVIDER_IDS: readonly ProviderId[] = ['claude', 'openai', 'local']
+
+export function isProviderId(value: unknown): value is ProviderId {
+  return typeof value === 'string' && (PROVIDER_IDS as readonly string[]).includes(value)
+}
+
+/**
  * Patch shape accepted by the `projects.update` IPC. Each key maps to a
  * single column on the `projects` table. Slice 3 exposes `hidden`; later
  * slices add more updatable fields here.

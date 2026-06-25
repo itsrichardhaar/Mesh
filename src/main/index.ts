@@ -2,8 +2,8 @@ import { app, BrowserWindow, ipcMain, nativeTheme, safeStorage } from 'electron'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { Project, ProjectPatch, ProjectStats } from '@shared/types'
-import { isThemePreference } from '@shared/types'
+import type { Project, ProjectPatch, ProjectStats, ProviderId } from '@shared/types'
+import { isProviderId, isThemePreference } from '@shared/types'
 import { getDatabase, initDatabase } from './db'
 import { runMigrations } from './db/migrations'
 import { buildApplicationMenu } from './menu'
@@ -16,6 +16,13 @@ import {
   upsertDiscovered
 } from './projects/repository'
 import { compute as computeStats } from './projects/stats-computer'
+import {
+  clearSecret,
+  EncryptionBackend,
+  getMaskedSecret,
+  SecretsVaultUnavailableError,
+  setSecret
+} from './secrets/vault'
 import { getSetting, setSetting } from './settings/repository'
 
 const CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects')
@@ -174,6 +181,67 @@ function registerIpc(): void {
       nativeTheme.themeSource = source
     }
   })
+
+  ipcMain.handle('secrets:available', (): boolean => {
+    return safeStorage.isEncryptionAvailable()
+  })
+
+  ipcMain.handle(
+    'secrets:set',
+    (_event, provider: unknown, plaintext: unknown): void => {
+      if (!isProviderId(provider)) {
+        throw new Error('secrets:set: provider must be a known ProviderId')
+      }
+      if (typeof plaintext !== 'string' || plaintext.length === 0) {
+        throw new Error('secrets:set: plaintext must be a non-empty string')
+      }
+      try {
+        setSecret(getDatabase(), encryptionBackend, secretKey(provider), plaintext)
+      } catch (err) {
+        if (err instanceof SecretsVaultUnavailableError) {
+          throw new Error('Encryption is unavailable on this system; secret not saved')
+        }
+        throw err
+      }
+    }
+  )
+
+  ipcMain.handle(
+    'secrets:get-mask',
+    (_event, provider: unknown): string | null => {
+      if (!isProviderId(provider)) {
+        throw new Error('secrets:get-mask: provider must be a known ProviderId')
+      }
+      try {
+        return getMaskedSecret(getDatabase(), encryptionBackend, secretKey(provider))
+      } catch (err) {
+        if (err instanceof SecretsVaultUnavailableError) {
+          // A stored blob exists but we can't decrypt it — surface a
+          // distinct, recoverable error rather than silently hiding it.
+          throw new Error('Encryption is unavailable on this system; cannot read stored secret')
+        }
+        throw err
+      }
+    }
+  )
+
+  ipcMain.handle('secrets:clear', (_event, provider: unknown): void => {
+    if (!isProviderId(provider)) {
+      throw new Error('secrets:clear: provider must be a known ProviderId')
+    }
+    clearSecret(getDatabase(), secretKey(provider))
+  })
+}
+
+/** Stable SQLite key shape for per-Provider secrets. */
+function secretKey(provider: ProviderId): string {
+  return `secret:${provider}`
+}
+
+const encryptionBackend: EncryptionBackend = {
+  isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
+  encryptString: (plaintext) => safeStorage.encryptString(plaintext),
+  decryptString: (ciphertext) => safeStorage.decryptString(ciphertext)
 }
 
 /**

@@ -1,7 +1,13 @@
 // IPC contract surface exposed to the renderer via the preload bridge.
 // Every method here corresponds to a registered `ipcMain.handle` in src/main.
 
-import type { Project, ProjectPatch, ProjectStats, ThemePreference } from './types'
+import type {
+  Project,
+  ProjectPatch,
+  ProjectStats,
+  ProviderId,
+  ThemePreference
+} from './types'
 
 export interface MeshApi {
   /** Round-trip ping for verifying the IPC bridge is working. */
@@ -49,5 +55,19 @@ export interface MeshApi {
    */
   theme: {
     setSource(source: ThemePreference): void
+  }
+
+  /**
+   * Provider API keys, encrypted via Electron's `safeStorage` and
+   * persisted as bytes in `settings.value_blob`. The renderer never
+   * sees plaintext — `getMask` returns the display form
+   * (`sk-ant-…••••XXXX`) or `null` when nothing is stored.
+   */
+  secrets: {
+    /** True when the OS keychain is available (macOS Keychain, etc.). */
+    available(): Promise<boolean>
+    set(provider: ProviderId, plaintext: string): Promise<void>
+    getMask(provider: ProviderId): Promise<string | null>
+    clear(provider: ProviderId): Promise<void>
   }
 }

@@ -16,6 +16,10 @@ The stable `1.0.0` release ships once every item in the
 ## [Unreleased]
 
 ### Added
+- **Slice 7: API key entry + safeStorage round-trip.** Settings → Model now has an Anthropic API key field. Pasting a string that starts with `sk-ant-` auto-saves on the spot; ciphertext is stored as bytes in `settings.value_blob` (encrypted via Electron's `safeStorage`, backed by macOS Keychain). The field renders the stored key masked (`sk-ant-…••••XXXX` = first 7 + last 4) with a Clear button. Restarting Mesh preserves the saved key. When the OS keychain isn't available, the field surfaces an explicit error instead of falling back to plaintext.
+- `SecretsVault` (`src/main/secrets/vault.ts`) — encryption-backend seam (so tests can inject a fake), set/get/getMask/clear, refuses to save when encryption is unavailable. 13 vault tests covering round-trip, overwrite, the encryption-unavailable branches, and the masking rules.
+- `MeshApi.secrets` — `available()`, `set(provider, plaintext)`, `getMask(provider)`, `clear(provider)`. Plaintext never crosses the IPC bridge in the read direction; the renderer only ever sees the mask.
+- `ProviderId` shared type (`claude` | `openai` | `local`) plus a `secret:<provider>` SQLite key namespace so v1.1 providers slot in without a schema change.
 - **Slice 6: Light/Dark theming + design tokens.** Mesh now ships matching light and dark palettes switched by `<html data-theme>`. Settings → Appearance lets the user pick `Follow system` (default), `Light`, or `Dark`; the choice persists in SQLite, `nativeTheme.themeSource` mirrors it so the macOS title bar tracks the in-app palette, and `matchMedia('(prefers-color-scheme: dark)')` keeps Mesh in sync with the OS in real time while in `Follow system`.
 - `settings` table + migration `0002_settings.sql` (string `value` + reserved `value_blob` for Slice 7 secrets) and a `getSetting` / `setSetting` repository with full test coverage.
 - `MeshApi.settings.get/set` (async, SQLite-backed) and `MeshApi.theme.setSource` (one-way, for `nativeTheme`).

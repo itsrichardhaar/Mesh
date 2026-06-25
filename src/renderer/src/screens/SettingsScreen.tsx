@@ -1,16 +1,11 @@
-import { useEffect } from 'react'
-import type { ThemePreference } from '@shared/types'
+import { useEffect, useState } from 'react'
+import type { ProviderId, ThemePreference } from '@shared/types'
 import { useTheme } from '../theme/ThemeProvider'
 
 interface Props {
   onClose: () => void
 }
 
-/**
- * Slice 5 established Settings as a screen with the navigation contract;
- * Slice 6 fills in the Appearance section with three radio options that
- * drive `ThemeProvider`. Model placeholders stay until a later slice.
- */
 export function SettingsScreen({ onClose }: Props): JSX.Element {
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -39,7 +34,7 @@ export function SettingsScreen({ onClose }: Props): JSX.Element {
 
       <div className="settings-body">
         <AppearanceSection />
-        <PlaceholderSection title="Model" />
+        <ModelSection />
       </div>
     </div>
   )
@@ -109,11 +104,177 @@ function ThemeOption({
   )
 }
 
-function PlaceholderSection({ title }: { title: string }): JSX.Element {
+function ModelSection(): JSX.Element {
   return (
-    <section className="settings-section" aria-label={title}>
-      <h2>{title}</h2>
-      <p className="settings-section-placeholder">Coming soon.</p>
+    <section className="settings-section" aria-label="Model">
+      <h2>Model</h2>
+      <ApiKeyField provider="claude" label="Anthropic API key" placeholder="Paste your sk-ant-… key" />
     </section>
   )
+}
+
+type ApiKeyState =
+  | { status: 'loading' }
+  | { status: 'unavailable'; message: string }
+  | { status: 'empty' }
+  | { status: 'saved'; mask: string }
+  | { status: 'saving' }
+  | { status: 'error'; message: string; previous: ApiKeyView }
+
+interface ApiKeyView {
+  status: 'empty' | 'saved'
+  mask?: string
+}
+
+function ApiKeyField({
+  provider,
+  label,
+  placeholder
+}: {
+  provider: ProviderId
+  label: string
+  placeholder: string
+}): JSX.Element {
+  const [state, setState] = useState<ApiKeyState>({ status: 'loading' })
+  const [draft, setDraft] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const available = await window.api.secrets.available()
+        if (!available) {
+          if (!cancelled) {
+            setState({
+              status: 'unavailable',
+              message:
+                'macOS Keychain encryption isn’t available on this system; saving API keys is disabled.'
+            })
+          }
+          return
+        }
+        const mask = await window.api.secrets.getMask(provider)
+        if (cancelled) return
+        setState(mask ? { status: 'saved', mask } : { status: 'empty' })
+      } catch (err) {
+        if (cancelled) return
+        setState({
+          status: 'unavailable',
+          message: err instanceof Error ? err.message : String(err)
+        })
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [provider])
+
+  const save = async (plaintext: string): Promise<void> => {
+    const previous: ApiKeyView =
+      state.status === 'saved' ? { status: 'saved', mask: state.mask } : { status: 'empty' }
+    setState({ status: 'saving' })
+    try {
+      await window.api.secrets.set(provider, plaintext)
+      const mask = await window.api.secrets.getMask(provider)
+      setState(mask ? { status: 'saved', mask } : { status: 'empty' })
+      setDraft('')
+    } catch (err) {
+      setState({
+        status: 'error',
+        message: err instanceof Error ? err.message : String(err),
+        previous
+      })
+    }
+  }
+
+  const clear = async (): Promise<void> => {
+    setState({ status: 'saving' })
+    try {
+      await window.api.secrets.clear(provider)
+      setState({ status: 'empty' })
+      setDraft('')
+    } catch (err) {
+      const previous: ApiKeyView =
+        state.status === 'saved' ? { status: 'saved', mask: state.mask } : { status: 'empty' }
+      setState({
+        status: 'error',
+        message: err instanceof Error ? err.message : String(err),
+        previous
+      })
+    }
+  }
+
+  if (state.status === 'loading') {
+    return <p className="settings-section-placeholder">Loading…</p>
+  }
+
+  if (state.status === 'unavailable') {
+    return (
+      <div className="api-key-field">
+        <div className="form-label">{label}</div>
+        <p className="api-key-unavailable" role="alert">
+          {state.message}
+        </p>
+      </div>
+    )
+  }
+
+  const showSavedMask =
+    state.status === 'saved' || (state.status === 'error' && state.previous.status === 'saved')
+
+  const savedMask =
+    state.status === 'saved'
+      ? state.mask
+      : state.status === 'error' && state.previous.status === 'saved'
+        ? state.previous.mask
+        : undefined
+
+  return (
+    <div className="api-key-field">
+      <label className="form-label" htmlFor={`secret-${provider}`}>
+        {label}
+      </label>
+
+      {showSavedMask && savedMask && (
+        <div className="api-key-saved-row">
+          <code className="api-key-saved-mask">{savedMask}</code>
+          <button type="button" className="api-key-clear" onClick={() => void clear()}>
+            Clear
+          </button>
+        </div>
+      )}
+
+      <input
+        id={`secret-${provider}`}
+        className="api-key-input"
+        type="password"
+        autoComplete="off"
+        spellCheck={false}
+        value={draft}
+        placeholder={showSavedMask ? 'Paste a new key to replace' : placeholder}
+        onChange={(e) => {
+          const next = e.target.value
+          setDraft(next)
+          // Auto-save on what looks like a pasted Anthropic key. We don't
+          // want to fire on every keystroke as a user types — only when
+          // the value arrives whole (paste sets `next` in one shot to
+          // a string that already passes the predicate).
+          if (looksLikeAnthropicKey(next)) {
+            void save(next)
+          }
+        }}
+        disabled={state.status === 'saving'}
+      />
+
+      {state.status === 'error' && (
+        <p className="api-key-error" role="alert">
+          {state.message}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function looksLikeAnthropicKey(value: string): boolean {
+  return value.startsWith('sk-ant-') && value.length >= 20
 }

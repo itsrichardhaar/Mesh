@@ -27,6 +27,12 @@ const api: MeshApi = {
   },
   theme: {
     setSource: (source) => ipcRenderer.send('theme:set-source', source)
+  },
+  secrets: {
+    available: () => ipcRenderer.invoke('secrets:available'),
+    set: (provider, plaintext) => ipcRenderer.invoke('secrets:set', provider, plaintext),
+    getMask: (provider) => ipcRenderer.invoke('secrets:get-mask', provider),
+    clear: (provider) => ipcRenderer.invoke('secrets:clear', provider)
   }
 }
 
