@@ -1,7 +1,7 @@
 // IPC contract surface exposed to the renderer via the preload bridge.
 // Every method here corresponds to a registered `ipcMain.handle` in src/main.
 
-import type { Project, ProjectPatch } from './types'
+import type { Project, ProjectPatch, ProjectStats } from './types'
 
 export interface MeshApi {
   /** Round-trip ping for verifying the IPC bridge is working. */
@@ -13,5 +13,8 @@ export interface MeshApi {
 
     /** Apply a typed patch to a Project's augmentation columns (hidden, etc.). */
     update(encodedPath: string, patch: ProjectPatch): Promise<void>
+
+    /** Compute the Stats Row counters for one Project on demand. */
+    stats(encodedPath: string): Promise<ProjectStats>
   }
 }

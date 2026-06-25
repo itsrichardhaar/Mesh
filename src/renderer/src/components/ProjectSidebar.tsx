@@ -1,10 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Project } from '@shared/types'
-
-type FetchState =
-  | { status: 'loading' }
-  | { status: 'ok'; projects: Project[] }
-  | { status: 'error'; message: string }
+import type { ProjectListState } from '../hooks/useProjectList'
 
 interface ContextMenuState {
   encodedPath: string
@@ -14,39 +10,21 @@ interface ContextMenuState {
 }
 
 interface Props {
+  state: ProjectListState
+  refresh: () => void
   selectedEncodedPath: string | null
   onSelect: (encodedPath: string) => void
 }
 
-export function ProjectSidebar({ selectedEncodedPath, onSelect }: Props): JSX.Element {
-  const [state, setState] = useState<FetchState>({ status: 'loading' })
-  const [refreshKey, setRefreshKey] = useState(0)
+export function ProjectSidebar({
+  state,
+  refresh,
+  selectedEncodedPath,
+  onSelect
+}: Props): JSX.Element {
   const [query, setQuery] = useState('')
   const [showHidden, setShowHidden] = useState(false)
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    setState({ status: 'loading' })
-    window.api.projects
-      .list()
-      .then((projects) => {
-        if (cancelled) return
-        setState({ status: 'ok', projects })
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return
-        setState({
-          status: 'error',
-          message: err instanceof Error ? err.message : String(err)
-        })
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [refreshKey])
-
-  const refresh = (): void => setRefreshKey((k) => k + 1)
 
   const handleToggleHidden = async (encodedPath: string, hidden: boolean): Promise<void> => {
     setMenu(null)
@@ -116,7 +94,7 @@ function SidebarBody({
   onSelect,
   onContextMenu
 }: {
-  state: FetchState
+  state: ProjectListState
   query: string
   showHidden: boolean
   selectedEncodedPath: string | null

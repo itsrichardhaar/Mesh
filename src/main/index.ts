@@ -2,11 +2,18 @@ import { app, BrowserWindow, ipcMain, safeStorage } from 'electron'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { Project, ProjectPatch } from '@shared/types'
+import type { Project, ProjectPatch, ProjectStats } from '@shared/types'
 import { getDatabase, initDatabase } from './db'
 import { runMigrations } from './db/migrations'
 import { listProjects } from './projects/enumerator'
-import { readAugmentation, updateProject, upsertDiscovered } from './projects/repository'
+import { detect } from './projects/metadata-detector'
+import {
+  readAugmentation,
+  updateProject,
+  upsertDetectedMetadata,
+  upsertDiscovered
+} from './projects/repository'
+import { compute as computeStats } from './projects/stats-computer'
 
 const CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects')
 
@@ -74,11 +81,37 @@ function registerIpc(): void {
     const discovered = await listProjects(CLAUDE_PROJECTS_DIR)
     const db = getDatabase()
     upsertDiscovered(db, discovered)
+
+    // Run detection for any Project missing cached metadata; Source-Missing
+    // Projects are skipped because their canonical files are unreachable.
+    const augBefore = readAugmentation(db)
+    const needsDetection = discovered.filter(
+      (p) => !p.sourceMissing && augBefore.get(p.encodedPath)?.lastMetadataDetectedAt == null
+    )
+    if (needsDetection.length > 0) {
+      const detectedAt = new Date().toISOString()
+      await Promise.all(
+        needsDetection.map(async (p) => {
+          try {
+            const meta = await detect(p.sourcePath)
+            upsertDetectedMetadata(db, p.encodedPath, meta, detectedAt)
+          } catch (err) {
+            console.warn(`[mesh] metadata detection failed for ${p.encodedPath}:`, err)
+          }
+        })
+      )
+    }
+
     const augmentation = readAugmentation(db)
-    return discovered.map((p) => ({
-      ...p,
-      hidden: augmentation.get(p.encodedPath)?.hidden ?? false
-    }))
+    return discovered.map((p) => {
+      const aug = augmentation.get(p.encodedPath)
+      return {
+        ...p,
+        name: aug?.autoName ?? p.name,
+        autoSubtitle: aug?.autoSubtitle ?? null,
+        hidden: aug?.hidden ?? false
+      }
+    })
   })
 
   ipcMain.handle(
@@ -91,6 +124,16 @@ function registerIpc(): void {
         throw new Error('projects:update: patch must be an object')
       }
       updateProject(getDatabase(), encodedPath, patch as ProjectPatch)
+    }
+  )
+
+  ipcMain.handle(
+    'projects:stats',
+    async (_event, encodedPath: unknown): Promise<ProjectStats> => {
+      if (typeof encodedPath !== 'string' || encodedPath.length === 0) {
+        throw new Error('projects:stats: encodedPath must be a non-empty string')
+      }
+      return computeStats(join(CLAUDE_PROJECTS_DIR, encodedPath))
     }
   )
 }

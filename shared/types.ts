@@ -9,12 +9,25 @@ export interface Project {
   sourcePath: string
   /** Display name — typically `basename(sourcePath)`, overridable by the user (Slice 4+). */
   name: string
+  /** Auto-detected stack subtitle (e.g., `Next.js`, `Rust`). `null` until detection runs or when no canonical files match. */
+  autoSubtitle: string | null
   /** ISO 8601 timestamp of the newest event across the Project's Sessions. */
   activity: string
   /** True when the resolved Source Path no longer exists (or isn't a directory) on disk. */
   sourceMissing: boolean
   /** True when the user has flagged this Project as hidden in the sidebar. */
   hidden: boolean
+}
+
+/**
+ * Deterministic Stats Row counters. `lastActivityAt` is the precise event
+ * timestamp from the newest JSONL line — distinct from `Project.activity`
+ * which mirrors the newest JSONL file's mtime for sort purposes.
+ */
+export interface ProjectStats {
+  sessionCount: number
+  filesTouchedCount: number
+  lastActivityAt: string | null
 }
 
 /**

@@ -13,6 +13,21 @@ The stable `1.0.0` release ships once every item in the
 
 ---
 
+## [Unreleased]
+
+### Added
+- **Slice 4: Project header + Stats Row.** Clicking a sidebar Project shows its name, auto-detected subtitle, and the deterministic Stats Row (Sessions / Files Touched / Last Activity) in the right pane, with a `Not analyzed yet` empty state below.
+- `MetadataDetector` (`src/main/projects/metadata-detector.ts`) — derives a Project's humanized `autoName` and `autoSubtitle` from canonical files (`package.json` with Next.js / React / TypeScript / Node.js refinement, `Cargo.toml`, `go.mod`, `pyproject.toml` / `requirements.txt`, `Package.swift`) with a dominant-extension fallback.
+- `StatsComputer` (`src/main/projects/stats-computer.ts`) — walks a Project's `.jsonl` files to compute Sessions count, unique Files Touched (from `Edit`/`Write`/`Read` `tool_use` events), and the precise newest event timestamp.
+- `projects:stats` IPC handler and `MeshApi.projects.stats(encodedPath)` for on-demand Stats Row computation.
+- `autoSubtitle` on the `Project` shape and `ProjectStats` type in `shared/types.ts`.
+
+### Changed
+- `upsertDiscovered` no longer overwrites `auto_name` on conflict — that column is now detector-owned after first detection, so the humanized name survives every list refresh.
+- The Home Screen's project-list state lifted into `useProjectList` so the right-pane detail re-renders with fresh metadata after a sidebar refresh.
+
+---
+
 ## [0.1.0] — 2026-06-24
 
 ### Added

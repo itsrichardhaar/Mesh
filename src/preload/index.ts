@@ -5,7 +5,8 @@ const api: MeshApi = {
   ping: () => ipcRenderer.invoke('ping'),
   projects: {
     list: () => ipcRenderer.invoke('projects:list'),
-    update: (encodedPath, patch) => ipcRenderer.invoke('projects:update', encodedPath, patch)
+    update: (encodedPath, patch) => ipcRenderer.invoke('projects:update', encodedPath, patch),
+    stats: (encodedPath) => ipcRenderer.invoke('projects:stats', encodedPath)
   }
 }
 
