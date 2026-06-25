@@ -1,19 +1,15 @@
 import { useEffect } from 'react'
+import type { ThemePreference } from '@shared/types'
+import { useTheme } from '../theme/ThemeProvider'
 
 interface Props {
   onClose: () => void
 }
 
 /**
- * Slice 5 establishes Settings as a screen with the navigation contract
- * (open with ⌘,, close with Esc or ⌘W, returns to the previous screen)
- * but no controls yet — the Appearance and Model sections are
- * placeholders that later slices populate.
- *
- * Esc is handled here at the screen level because it's not a menu
- * accelerator. ⌘W comes in over IPC via `menu:close-requested` and
- * is handled by `App` so the same handler can also close the window
- * when Settings isn't open.
+ * Slice 5 established Settings as a screen with the navigation contract;
+ * Slice 6 fills in the Appearance section with three radio options that
+ * drive `ThemeProvider`. Model placeholders stay until a later slice.
  */
 export function SettingsScreen({ onClose }: Props): JSX.Element {
   useEffect(() => {
@@ -42,14 +38,78 @@ export function SettingsScreen({ onClose }: Props): JSX.Element {
       </header>
 
       <div className="settings-body">
-        <SettingsSection title="Appearance" />
-        <SettingsSection title="Model" />
+        <AppearanceSection />
+        <PlaceholderSection title="Model" />
       </div>
     </div>
   )
 }
 
-function SettingsSection({ title }: { title: string }): JSX.Element {
+function AppearanceSection(): JSX.Element {
+  const { preference, setPreference, ready } = useTheme()
+
+  return (
+    <section className="settings-section" aria-label="Appearance">
+      <h2>Appearance</h2>
+      <fieldset className="theme-options" disabled={!ready}>
+        <legend className="visually-hidden">Theme</legend>
+        <ThemeOption
+          value="system"
+          label="Follow system"
+          description="Match macOS Light or Dark mode automatically."
+          checked={preference === 'system'}
+          onChange={setPreference}
+        />
+        <ThemeOption
+          value="light"
+          label="Light"
+          description="Always use the light palette."
+          checked={preference === 'light'}
+          onChange={setPreference}
+        />
+        <ThemeOption
+          value="dark"
+          label="Dark"
+          description="Always use the dark palette."
+          checked={preference === 'dark'}
+          onChange={setPreference}
+        />
+      </fieldset>
+    </section>
+  )
+}
+
+function ThemeOption({
+  value,
+  label,
+  description,
+  checked,
+  onChange
+}: {
+  value: ThemePreference
+  label: string
+  description: string
+  checked: boolean
+  onChange: (next: ThemePreference) => void
+}): JSX.Element {
+  return (
+    <label className={`theme-option${checked ? ' theme-option-checked' : ''}`}>
+      <input
+        type="radio"
+        name="theme"
+        value={value}
+        checked={checked}
+        onChange={() => onChange(value)}
+      />
+      <span className="theme-option-text">
+        <span className="theme-option-label">{label}</span>
+        <span className="theme-option-description">{description}</span>
+      </span>
+    </label>
+  )
+}
+
+function PlaceholderSection({ title }: { title: string }): JSX.Element {
   return (
     <section className="settings-section" aria-label={title}>
       <h2>{title}</h2>

@@ -16,6 +16,11 @@ The stable `1.0.0` release ships once every item in the
 ## [Unreleased]
 
 ### Added
+- **Slice 6: Light/Dark theming + design tokens.** Mesh now ships matching light and dark palettes switched by `<html data-theme>`. Settings → Appearance lets the user pick `Follow system` (default), `Light`, or `Dark`; the choice persists in SQLite, `nativeTheme.themeSource` mirrors it so the macOS title bar tracks the in-app palette, and `matchMedia('(prefers-color-scheme: dark)')` keeps Mesh in sync with the OS in real time while in `Follow system`.
+- `settings` table + migration `0002_settings.sql` (string `value` + reserved `value_blob` for Slice 7 secrets) and a `getSetting` / `setSetting` repository with full test coverage.
+- `MeshApi.settings.get/set` (async, SQLite-backed) and `MeshApi.theme.setSource` (one-way, for `nativeTheme`).
+- `ThemeProvider` + `useTheme` hook owning the preference, the effective palette, and the live OS-theme subscription.
+- `--text-error`, `--shadow-popover`, and a parallel dark palette covering every existing token. Remaining hex / rgba literals removed from component CSS — every color references a token.
 - **Slice 5: Settings screen shell + ⌘, shortcut.** `CommandOrControl+,` opens a Settings screen with placeholder `Appearance` and `Model` sections. Esc or `CommandOrControl+W` returns to the previous screen. Settings is a screen (not a modal); the underlying Home Screen stays mounted so state survives the round-trip.
 - Application menu (`src/main/menu.ts`) — custom template owns the navigation accelerators (`CommandOrControl+,`, `CommandOrControl+W`) so the renderer can interpret each based on the active screen.
 - `window:close` IPC + `MeshApi.window.close()` so the renderer can delegate the hide-on-close behavior when ⌘W is pressed outside Settings.

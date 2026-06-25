@@ -31,6 +31,19 @@ export interface ProjectStats {
 }
 
 /**
+ * Theme preference. `system` follows the OS `prefers-color-scheme` and
+ * re-evaluates live; `light` and `dark` are explicit user choices that
+ * override the system signal.
+ */
+export type ThemePreference = 'system' | 'light' | 'dark'
+
+export const THEME_PREFERENCES: readonly ThemePreference[] = ['system', 'light', 'dark']
+
+export function isThemePreference(value: unknown): value is ThemePreference {
+  return typeof value === 'string' && (THEME_PREFERENCES as readonly string[]).includes(value)
+}
+
+/**
  * Patch shape accepted by the `projects.update` IPC. Each key maps to a
  * single column on the `projects` table. Slice 3 exposes `hidden`; later
  * slices add more updatable fields here.

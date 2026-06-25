@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { HomeScreen } from './screens/HomeScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
+import { ThemeProvider } from './theme/ThemeProvider'
 
 /**
  * Top-level screens. Settings is a *screen*, not a modal — the previous
@@ -46,11 +47,11 @@ export function App(): JSX.Element {
   }, [screen, closeSettings])
 
   return (
-    <>
+    <ThemeProvider>
       <div hidden={screen !== 'home'}>
         <HomeScreen />
       </div>
       {screen === 'settings' && <SettingsScreen onClose={closeSettings} />}
-    </>
+    </ThemeProvider>
   )
 }

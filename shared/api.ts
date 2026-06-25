@@ -1,7 +1,7 @@
 // IPC contract surface exposed to the renderer via the preload bridge.
 // Every method here corresponds to a registered `ipcMain.handle` in src/main.
 
-import type { Project, ProjectPatch, ProjectStats } from './types'
+import type { Project, ProjectPatch, ProjectStats, ThemePreference } from './types'
 
 export interface MeshApi {
   /** Round-trip ping for verifying the IPC bridge is working. */
@@ -31,5 +31,23 @@ export interface MeshApi {
   window: {
     /** Ask main to close the BrowserWindow — main intercepts to hide on macOS. */
     close(): void
+  }
+
+  /**
+   * Persistent key/value store backed by the SQLite `settings` table.
+   * Strings only here — encrypted secrets (Slice 7) use a separate API.
+   */
+  settings: {
+    get(key: string): Promise<string | null>
+    set(key: string, value: string): Promise<void>
+  }
+
+  /**
+   * Native-theme integration. Setting the source updates Electron's
+   * `nativeTheme.themeSource`, which controls macOS chrome (title bar,
+   * vibrancy, native dialogs) in lock-step with the in-app palette.
+   */
+  theme: {
+    setSource(source: ThemePreference): void
   }
 }

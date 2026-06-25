@@ -1,8 +1,9 @@
-import { app, BrowserWindow, ipcMain, safeStorage } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, safeStorage } from 'electron'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Project, ProjectPatch, ProjectStats } from '@shared/types'
+import { isThemePreference } from '@shared/types'
 import { getDatabase, initDatabase } from './db'
 import { runMigrations } from './db/migrations'
 import { buildApplicationMenu } from './menu'
@@ -15,6 +16,7 @@ import {
   upsertDiscovered
 } from './projects/repository'
 import { compute as computeStats } from './projects/stats-computer'
+import { getSetting, setSetting } from './settings/repository'
 
 const CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects')
 
@@ -143,6 +145,45 @@ function registerIpc(): void {
       return computeStats(join(CLAUDE_PROJECTS_DIR, encodedPath))
     }
   )
+
+  ipcMain.handle('settings:get', (_event, key: unknown): string | null => {
+    if (typeof key !== 'string' || key.length === 0) {
+      throw new Error('settings:get: key must be a non-empty string')
+    }
+    return getSetting(getDatabase(), key)
+  })
+
+  ipcMain.handle(
+    'settings:set',
+    (_event, key: unknown, value: unknown): void => {
+      if (typeof key !== 'string' || key.length === 0) {
+        throw new Error('settings:set: key must be a non-empty string')
+      }
+      if (typeof value !== 'string') {
+        throw new Error('settings:set: value must be a string')
+      }
+      setSetting(getDatabase(), key, value)
+    }
+  )
+
+  // Renderer notifies main when the user's theme preference changes so
+  // nativeTheme can update macOS chrome (title bar tint, vibrancy, etc.)
+  // in lock-step with the in-app palette.
+  ipcMain.on('theme:set-source', (_event, source: unknown) => {
+    if (isThemePreference(source)) {
+      nativeTheme.themeSource = source
+    }
+  })
+}
+
+/**
+ * Apply the persisted theme to `nativeTheme` before any window opens so
+ * the title bar paints in the right palette on first frame. Falls back
+ * to `system` when no preference is recorded.
+ */
+function applyPersistedTheme(): void {
+  const stored = getSetting(getDatabase(), 'theme')
+  nativeTheme.themeSource = isThemePreference(stored) ? stored : 'system'
 }
 
 app.whenReady().then(() => {
@@ -150,6 +191,7 @@ app.whenReady().then(() => {
   runMigrations(db)
   smokeTestSafeStorage()
   registerIpc()
+  applyPersistedTheme()
   buildApplicationMenu(() => mainWindow)
   createWindow()
 

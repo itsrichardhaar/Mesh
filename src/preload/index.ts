@@ -20,6 +20,13 @@ const api: MeshApi = {
   },
   window: {
     close: () => ipcRenderer.send('window:close')
+  },
+  settings: {
+    get: (key) => ipcRenderer.invoke('settings:get', key),
+    set: (key, value) => ipcRenderer.invoke('settings:set', key, value)
+  },
+  theme: {
+    setSource: (source) => ipcRenderer.send('theme:set-source', source)
   }
 }
 
