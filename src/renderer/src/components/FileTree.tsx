@@ -4,13 +4,22 @@ import type { FileNode, FilesTreeResponse } from '@shared/files'
 interface Props {
   encodedPath: string
   showHidden: boolean
+  /** Highlighted file (in File Editor mode). null when nothing is selected. */
+  selectedRelPath?: string | null
+  /** Called when the user clicks a file row. Directory clicks toggle expand instead. */
+  onFileSelect?: (relPath: string) => void
 }
 
 type Cache = Map<string, FileNode[]>
 
 const ROOT_REL = ''
 
-export function FileTree({ encodedPath, showHidden }: Props): JSX.Element {
+export function FileTree({
+  encodedPath,
+  showHidden,
+  selectedRelPath,
+  onFileSelect
+}: Props): JSX.Element {
   const [cache, setCache] = useState<Cache>(new Map())
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
@@ -62,18 +71,21 @@ export function FileTree({ encodedPath, showHidden }: Props): JSX.Element {
     return off
   }, [encodedPath, expanded, fetchDir])
 
-  const toggle = (node: FileNode): void => {
-    if (node.type !== 'dir') return
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(node.relPath)) {
-        next.delete(node.relPath)
-      } else {
-        next.add(node.relPath)
-        if (!cache.has(node.relPath)) void fetchDir(node.relPath)
-      }
-      return next
-    })
+  const onRowClick = (node: FileNode): void => {
+    if (node.type === 'dir') {
+      setExpanded((prev) => {
+        const next = new Set(prev)
+        if (next.has(node.relPath)) {
+          next.delete(node.relPath)
+        } else {
+          next.add(node.relPath)
+          if (!cache.has(node.relPath)) void fetchDir(node.relPath)
+        }
+        return next
+      })
+      return
+    }
+    onFileSelect?.(node.relPath)
   }
 
   const rootEntries = cache.get(ROOT_REL)
@@ -103,7 +115,8 @@ export function FileTree({ encodedPath, showHidden }: Props): JSX.Element {
               depth={0}
               expanded={expanded}
               cache={cache}
-              onToggle={toggle}
+              onRowClick={onRowClick}
+              selectedRelPath={selectedRelPath ?? null}
             />
           ))}
         </ul>
@@ -117,25 +130,30 @@ function FileTreeNode({
   depth,
   expanded,
   cache,
-  onToggle
+  onRowClick,
+  selectedRelPath
 }: {
   node: FileNode
   depth: number
   expanded: Set<string>
   cache: Cache
-  onToggle: (node: FileNode) => void
+  onRowClick: (node: FileNode) => void
+  selectedRelPath: string | null
 }): JSX.Element {
   const isDir = node.type === 'dir'
   const isOpen = isDir && expanded.has(node.relPath)
   const children = isOpen ? cache.get(node.relPath) : undefined
+  const isSelected = !isDir && selectedRelPath === node.relPath
 
   return (
     <li role="treeitem" aria-expanded={isDir ? isOpen : undefined}>
       <button
         type="button"
-        className={`file-tree-row file-tree-row-${node.type}`}
+        className={`file-tree-row file-tree-row-${node.type}${
+          isSelected ? ' file-tree-row-selected' : ''
+        }`}
         style={{ paddingLeft: 8 + depth * 14 }}
-        onClick={() => onToggle(node)}
+        onClick={() => onRowClick(node)}
       >
         {isDir ? (
           <span className={`file-tree-caret${isOpen ? ' file-tree-caret-open' : ''}`}>›</span>
@@ -153,7 +171,8 @@ function FileTreeNode({
               depth={depth + 1}
               expanded={expanded}
               cache={cache}
-              onToggle={onToggle}
+              onRowClick={onRowClick}
+              selectedRelPath={selectedRelPath}
             />
           ))}
         </ul>

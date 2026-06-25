@@ -48,7 +48,8 @@ const api: MeshApi = {
   files: {
     tree: (encodedPath, request) =>
       ipcRenderer.invoke('files:tree', encodedPath, request ?? {}),
-    onTreeChanged: (cb) => subscribeArg<string>('files:tree-changed', cb)
+    onTreeChanged: (cb) => subscribeArg<string>('files:tree-changed', cb),
+    read: (encodedPath, relPath) => ipcRenderer.invoke('files:read', encodedPath, relPath)
   },
   sessions: {
     list: (encodedPath) => ipcRenderer.invoke('sessions:list', encodedPath),

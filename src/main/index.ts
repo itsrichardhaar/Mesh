@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, nativeTheme, safeStorage } from 'electron'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { FilesTreeRequest, FilesTreeResponse } from '@shared/files'
+import type { FileReadResponse, FilesTreeRequest, FilesTreeResponse } from '@shared/files'
 import type { SessionSummary, TranscriptEntry } from '@shared/sessions'
 import type {
   Project,
@@ -15,6 +15,7 @@ import { isProviderId, isThemePreference } from '@shared/types'
 import { latestForProject } from './analyses/repository'
 import { getDatabase, initDatabase } from './db'
 import { runMigrations } from './db/migrations'
+import { FileReadError, readProjectFile } from './files/file-reader'
 import {
   closeAll as closeAllWatchers,
   listDirectory,
@@ -323,6 +324,31 @@ function registerIpc(): void {
 
       const entries = await listDirectory(sourcePath, relPath, showHidden)
       return { sourcePath, relPath, entries }
+    }
+  )
+
+  ipcMain.handle(
+    'files:read',
+    async (_event, encodedPath: unknown, relPath: unknown): Promise<FileReadResponse> => {
+      if (typeof encodedPath !== 'string' || encodedPath.length === 0) {
+        throw new Error('files:read: encodedPath must be a non-empty string')
+      }
+      if (typeof relPath !== 'string' || relPath.length === 0) {
+        throw new Error('files:read: relPath must be a non-empty string')
+      }
+      const sourcePath = getSourcePath(getDatabase(), encodedPath)
+      if (!sourcePath) {
+        throw new Error(`files:read: unknown encodedPath ${encodedPath}`)
+      }
+      try {
+        const result = await readProjectFile(sourcePath, relPath)
+        return { ok: true, ...result }
+      } catch (err) {
+        if (err instanceof FileReadError) {
+          return { ok: false, code: err.code, message: err.message, relPath }
+        }
+        throw err
+      }
     }
   )
 }

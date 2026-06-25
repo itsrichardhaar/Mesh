@@ -1,7 +1,7 @@
 // IPC contract surface exposed to the renderer via the preload bridge.
 // Every method here corresponds to a registered `ipcMain.handle` in src/main.
 
-import type { FilesTreeRequest, FilesTreeResponse } from './files'
+import type { FileReadResponse, FilesTreeRequest, FilesTreeResponse } from './files'
 import type { SessionSummary, TranscriptEntry } from './sessions'
 import type {
   Project,
@@ -96,6 +96,15 @@ export interface MeshApi {
   files: {
     tree(encodedPath: string, request?: FilesTreeRequest): Promise<FilesTreeResponse>
     onTreeChanged(cb: (encodedPath: string) => void): () => void
+    /**
+     * Read a file relative to the Project's Source Path. Rejects with
+     * a `FileReadError`-shaped object (carrying a `code` field) when
+     * the file is too large, missing, not a regular file, or escapes
+     * the root. The 5 MB cap is enforced in main and surfaces as a
+     * `too-large` code — the renderer renders an "open externally"
+     * banner rather than the editor.
+     */
+    read(encodedPath: string, relPath: string): Promise<FileReadResponse>
   }
 
   /**
