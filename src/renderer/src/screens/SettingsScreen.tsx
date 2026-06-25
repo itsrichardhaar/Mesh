@@ -1,5 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ProviderId, ThemePreference } from '@shared/types'
+import {
+  PROVIDERS,
+  getRecommendedModel,
+  isModelId,
+  selectedModelSettingKey,
+  type ModelDescriptor,
+  type ModelId
+} from '@shared/models'
+import { PROVIDER_IDS } from '@shared/types'
 import { useTheme } from '../theme/ThemeProvider'
 
 interface Props {
@@ -105,12 +114,147 @@ function ThemeOption({
 }
 
 function ModelSection(): JSX.Element {
+  // v1 locks the Active Provider to Claude — the pills exist so the
+  // multi-Provider future is telegraphed, but only Claude is selectable.
+  const activeProvider: ProviderId = 'claude'
+
   return (
     <section className="settings-section" aria-label="Model">
       <h2>Model</h2>
-      <ApiKeyField provider="claude" label="Anthropic API key" placeholder="Paste your sk-ant-… key" />
+
+      <div className="provider-pills" role="tablist" aria-label="Provider">
+        {PROVIDER_IDS.map((id) => (
+          <ProviderPill
+            key={id}
+            provider={id}
+            active={id === activeProvider}
+          />
+        ))}
+      </div>
+
+      <ApiKeyField provider={activeProvider} label="Anthropic API key" placeholder="Paste your sk-ant-… key" />
+
+      <ModelSelect provider={activeProvider} />
     </section>
   )
+}
+
+function ProviderPill({
+  provider,
+  active
+}: {
+  provider: ProviderId
+  active: boolean
+}): JSX.Element {
+  const descriptor = PROVIDERS[provider]
+  const disabled = !descriptor.available
+  const classes = ['provider-pill']
+  if (active) classes.push('provider-pill-active')
+  if (disabled) classes.push('provider-pill-disabled')
+
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      aria-disabled={disabled}
+      className={classes.join(' ')}
+      title={disabled ? descriptor.comingSoonNote : undefined}
+      onClick={() => {
+        /* v1: pills are presentational. Active Provider is locked to Claude. */
+      }}
+    >
+      {descriptor.label}
+    </button>
+  )
+}
+
+function ModelSelect({ provider }: { provider: ProviderId }): JSX.Element {
+  const descriptor = PROVIDERS[provider]
+  const fallback = useMemo(() => getRecommendedModel(provider), [provider])
+  const [selected, setSelected] = useState<ModelId | null>(null)
+  const [ready, setReady] = useState(false)
+
+  // Hydrate from settings; fall back to the recommended model when no
+  // preference is stored. We persist the recommendation on first run so
+  // future sessions see a stable choice the user can change.
+  useEffect(() => {
+    let cancelled = false
+    const key = selectedModelSettingKey(provider)
+    ;(async () => {
+      try {
+        const stored = await window.api.settings.get(key)
+        if (cancelled) return
+        if (isModelId(stored)) {
+          setSelected(stored)
+        } else if (fallback) {
+          setSelected(fallback.id)
+          void window.api.settings.set(key, fallback.id)
+        }
+      } finally {
+        if (!cancelled) setReady(true)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [provider, fallback])
+
+  const handleChange = (next: ModelId): void => {
+    setSelected(next)
+    void window.api.settings.set(selectedModelSettingKey(provider), next)
+  }
+
+  if (descriptor.models.length === 0) return <></>
+
+  return (
+    <div className="model-select">
+      <label className="form-label" htmlFor={`model-${provider}`}>
+        Model
+      </label>
+      <select
+        id={`model-${provider}`}
+        className="model-select-input"
+        value={selected ?? ''}
+        disabled={!ready}
+        onChange={(e) => {
+          const value = e.target.value
+          if (isModelId(value)) handleChange(value)
+        }}
+      >
+        {descriptor.models.map((model) => (
+          <option key={model.id} value={model.id}>
+            {formatModelOption(model)}
+          </option>
+        ))}
+      </select>
+
+      {selected &&
+        (() => {
+          const model = descriptor.models.find((m) => m.id === selected)
+          if (!model) return null
+          return (
+            <p className="model-select-note">
+              {model.recommended && (
+                <span className="model-recommended-tag">Recommended</span>
+              )}{' '}
+              ~{formatCost(model.approxCostPerAnalysisUSD)} per analysis
+            </p>
+          )
+        })()}
+    </div>
+  )
+}
+
+function formatModelOption(model: ModelDescriptor): string {
+  const base = `${model.label} — ${model.subtitle}`
+  const rec = model.recommended ? ' (Recommended)' : ''
+  return `${base}${rec} · ~${formatCost(model.approxCostPerAnalysisUSD)} per analysis`
+}
+
+function formatCost(usd: number): string {
+  if (usd < 0.01) return `$${usd.toFixed(3)}`
+  return `$${usd.toFixed(2)}`
 }
 
 type ApiKeyState =
@@ -255,10 +399,6 @@ function ApiKeyField({
         onChange={(e) => {
           const next = e.target.value
           setDraft(next)
-          // Auto-save on what looks like a pasted Anthropic key. We don't
-          // want to fire on every keystroke as a user types — only when
-          // the value arrives whole (paste sets `next` in one shot to
-          // a string that already passes the predicate).
           if (looksLikeAnthropicKey(next)) {
             void save(next)
           }

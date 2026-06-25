@@ -16,6 +16,10 @@ The stable `1.0.0` release ships once every item in the
 ## [Unreleased]
 
 ### Added
+- **Slice 9: Provider pills + Model dropdown.** Settings → Model now shows three Provider pills (Claude active; OpenAI and Local disabled with a `Coming in v1.1` tooltip) and a Model dropdown for Claude with `Haiku 4.5`, `Sonnet 4.6`, and `Opus 4.7`. Each row carries an approximate per-Analysis cost and Haiku 4.5 is flagged Recommended. The selected Model persists in the `settings` table under `model:claude`.
+- `shared/models.ts` — `PROVIDERS` catalog, `ModelDescriptor` / `ProviderDescriptor` shapes, recommended lookup, and the `selectedModelSettingKey(providerId)` helper.
+- `ModelClient` interface in `shared/types.ts` with `AnalysisOutput`, `AnalyzeProjectInput`, `ValidationResult`.
+- `ClaudeClient` shell (constructor + readonly model/provider) and `OpenAIClient` / `LocalClient` stubs in `src/main/models/`. Method bodies for Claude land in Slices 8/10; the stubs throw `not implemented in v1` per ADR-0003. 8 new tests pin the contract.
 - **Slice 7: API key entry + safeStorage round-trip.** Settings → Model now has an Anthropic API key field. Pasting a string that starts with `sk-ant-` auto-saves on the spot; ciphertext is stored as bytes in `settings.value_blob` (encrypted via Electron's `safeStorage`, backed by macOS Keychain). The field renders the stored key masked (`sk-ant-…••••XXXX` = first 7 + last 4) with a Clear button. Restarting Mesh preserves the saved key. When the OS keychain isn't available, the field surfaces an explicit error instead of falling back to plaintext.
 - `SecretsVault` (`src/main/secrets/vault.ts`) — encryption-backend seam (so tests can inject a fake), set/get/getMask/clear, refuses to save when encryption is unavailable. 13 vault tests covering round-trip, overwrite, the encryption-unavailable branches, and the masking rules.
 - `MeshApi.secrets` — `available()`, `set(provider, plaintext)`, `getMask(provider)`, `clear(provider)`. Plaintext never crosses the IPC bridge in the read direction; the renderer only ever sees the mask.

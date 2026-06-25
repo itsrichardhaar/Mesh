@@ -609,3 +609,92 @@ button {
   font-size: 12px;
   color: var(--text-error);
 }
+
+/* --- Provider pills + Model dropdown (Slice 9) --------------------------- */
+
+.provider-pills {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+
+.provider-pill {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--bg-canvas);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.provider-pill:hover:not(.provider-pill-disabled):not(.provider-pill-active) {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.provider-pill-active,
+.provider-pill-active:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+.provider-pill-disabled,
+.provider-pill-disabled:hover {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: var(--bg-canvas);
+  color: var(--text-muted);
+}
+
+.model-select {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.model-select-input {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+}
+
+.model-select-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.model-select-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.model-select-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.model-recommended-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent-fg);
+  background: var(--accent);
+  border-radius: 999px;
+}

@@ -56,6 +56,44 @@ export function isProviderId(value: unknown): value is ProviderId {
   return typeof value === 'string' && (PROVIDER_IDS as readonly string[]).includes(value)
 }
 
+// --- Analysis shapes ------------------------------------------------------
+
+/**
+ * Three-section LLM output Mesh expects back from `ModelClient.analyzeProject`.
+ * Slice 10 wires the schema validation; Slice 9 ships the contract so
+ * the provider abstraction can compile cleanly.
+ */
+export interface AnalysisOutput {
+  summaryMarkdown: string
+  nextSteps: ReadonlyArray<{ text: string }>
+  suggestedImprovements: ReadonlyArray<{ text: string }>
+}
+
+export interface AnalyzeProjectInput {
+  /** Caller passes whatever context the prompt template needs. */
+  systemPrompt: string
+  userPrompt: string
+}
+
+export interface ValidationResult {
+  ok: boolean
+  /** Human-readable detail (`401 invalid api key`, `network`, …) when ok=false. */
+  message?: string
+}
+
+/**
+ * The provider-agnostic surface every Model-backed client implements.
+ * v1 ships `ClaudeClient` as the functional implementation; `OpenAIClient`
+ * and `LocalClient` are stubs that throw if invoked. Decision recorded
+ * in ADR-0003.
+ */
+export interface ModelClient {
+  readonly provider: ProviderId
+  readonly model: string
+  validate(): Promise<ValidationResult>
+  analyzeProject(input: AnalyzeProjectInput): Promise<AnalysisOutput>
+}
+
 /**
  * Patch shape accepted by the `projects.update` IPC. Each key maps to a
  * single column on the `projects` table. Slice 3 exposes `hidden`; later
