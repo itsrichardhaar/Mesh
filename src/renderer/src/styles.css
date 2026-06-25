@@ -339,3 +339,75 @@ button {
   font-size: 13px;
   color: var(--text-muted);
 }
+
+/* --- Settings screen (Slice 5) ------------------------------------------- */
+
+.settings-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-canvas);
+  overflow-y: auto;
+  -webkit-app-region: no-drag;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 56px 48px 24px;
+  border-bottom: 1px solid var(--border-subtle);
+  -webkit-app-region: drag;
+}
+
+.settings-header h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.settings-close {
+  -webkit-app-region: no-drag;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+}
+
+.settings-close:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.settings-body {
+  padding: 32px 48px 48px;
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.settings-section {
+  padding: 24px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+}
+
+.settings-section h2 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.settings-section-placeholder {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}

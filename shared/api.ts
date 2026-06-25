@@ -17,4 +17,19 @@ export interface MeshApi {
     /** Compute the Stats Row counters for one Project on demand. */
     stats(encodedPath: string): Promise<ProjectStats>
   }
+
+  /**
+   * Application-menu signals. Main fires these when the user triggers a
+   * menu item (or its accelerator); the renderer decides what to do with
+   * each based on the active screen. Each subscribe returns an unsubscribe.
+   */
+  menu: {
+    onOpenSettings(cb: () => void): () => void
+    onCloseRequested(cb: () => void): () => void
+  }
+
+  window: {
+    /** Ask main to close the BrowserWindow — main intercepts to hide on macOS. */
+    close(): void
+  }
 }

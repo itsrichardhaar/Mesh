@@ -16,6 +16,10 @@ The stable `1.0.0` release ships once every item in the
 ## [Unreleased]
 
 ### Added
+- **Slice 5: Settings screen shell + ⌘, shortcut.** `CommandOrControl+,` opens a Settings screen with placeholder `Appearance` and `Model` sections. Esc or `CommandOrControl+W` returns to the previous screen. Settings is a screen (not a modal); the underlying Home Screen stays mounted so state survives the round-trip.
+- Application menu (`src/main/menu.ts`) — custom template owns the navigation accelerators (`CommandOrControl+,`, `CommandOrControl+W`) so the renderer can interpret each based on the active screen.
+- `window:close` IPC + `MeshApi.window.close()` so the renderer can delegate the hide-on-close behavior when ⌘W is pressed outside Settings.
+- `MeshApi.menu` event subscriptions (`onOpenSettings`, `onCloseRequested`) bridging menu clicks/accelerators into the renderer.
 - **Slice 4: Project header + Stats Row.** Clicking a sidebar Project shows its name, auto-detected subtitle, and the deterministic Stats Row (Sessions / Files Touched / Last Activity) in the right pane, with a `Not analyzed yet` empty state below.
 - `MetadataDetector` (`src/main/projects/metadata-detector.ts`) — derives a Project's humanized `autoName` and `autoSubtitle` from canonical files (`package.json` with Next.js / React / TypeScript / Node.js refinement, `Cargo.toml`, `go.mod`, `pyproject.toml` / `requirements.txt`, `Package.swift`) with a dominant-extension fallback.
 - `StatsComputer` (`src/main/projects/stats-computer.ts`) — walks a Project's `.jsonl` files to compute Sessions count, unique Files Touched (from `Edit`/`Write`/`Read` `tool_use` events), and the precise newest event timestamp.

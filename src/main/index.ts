@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import type { Project, ProjectPatch, ProjectStats } from '@shared/types'
 import { getDatabase, initDatabase } from './db'
 import { runMigrations } from './db/migrations'
+import { buildApplicationMenu } from './menu'
 import { listProjects } from './projects/enumerator'
 import { detect } from './projects/metadata-detector'
 import {
@@ -77,6 +78,12 @@ function smokeTestSafeStorage(): void {
 function registerIpc(): void {
   ipcMain.handle('ping', () => 'pong')
 
+  // Renderer asks the window to close — same path the red-X uses, which
+  // our `close` listener intercepts to hide the window on macOS.
+  ipcMain.on('window:close', () => {
+    mainWindow?.close()
+  })
+
   ipcMain.handle('projects:list', async (): Promise<Project[]> => {
     const discovered = await listProjects(CLAUDE_PROJECTS_DIR)
     const db = getDatabase()
@@ -143,6 +150,7 @@ app.whenReady().then(() => {
   runMigrations(db)
   smokeTestSafeStorage()
   registerIpc()
+  buildApplicationMenu(() => mainWindow)
   createWindow()
 
   app.on('activate', () => {
