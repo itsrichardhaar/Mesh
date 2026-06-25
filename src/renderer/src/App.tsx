@@ -67,7 +67,7 @@ export function App(): JSX.Element {
   return (
     <ThemeProvider>
       <div hidden={screen !== 'home'}>
-        <HomeScreen onOpenWorkspace={openWorkspace} />
+        <HomeScreen onOpenWorkspace={openWorkspace} onOpenSettings={openSettings} />
       </div>
       {workspaceProject && (
         <WorkspaceScreen

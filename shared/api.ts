@@ -9,7 +9,9 @@ import type {
   ProjectStats,
   ProviderId,
   StoredAnalysis,
-  ThemePreference
+  StoredValidation,
+  ThemePreference,
+  ValidationResult
 } from './types'
 
 export interface MeshApi {
@@ -74,6 +76,30 @@ export interface MeshApi {
     set(provider: ProviderId, plaintext: string): Promise<void>
     getMask(provider: ProviderId): Promise<string | null>
     clear(provider: ProviderId): Promise<void>
+    /**
+     * 1-token probe against the stored key for `provider`. Returns
+     * `{ ok }` when the call succeeds and `{ ok: false, message }`
+     * with a human-readable reason on failure. Always persists the
+     * outcome to the `settings` table so future mounts can render the
+     * "last verified Xs ago" tag without re-spending a token.
+     */
+    validate(provider: ProviderId): Promise<ValidationResult>
+    /**
+     * Last persisted validation record for `provider`, or `null` if
+     * the key has never been validated. Used by Settings → Model on
+     * mount to show the prior status without re-spending a token.
+     */
+    getLastValidation(provider: ProviderId): Promise<StoredValidation | null>
+  }
+
+  /**
+   * Native shell handoff. `openExternal` defers to the user's default
+   * browser via `shell.openExternal`; in-app webviews are intentionally
+   * not used so signing-in flows and link previews land in the
+   * platform's own browser.
+   */
+  shell: {
+    openExternal(url: string): Promise<void>
   }
 
   /**

@@ -88,8 +88,91 @@ button {
 
 .home-screen {
   display: flex;
+  flex-direction: column;
   height: 100vh;
   overflow: hidden;
+}
+
+.home-screen-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.onboarding-banner {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 20px;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: var(--accent-soft);
+  border: none;
+  border-bottom: 1px solid var(--accent);
+  font-family: inherit;
+  -webkit-app-region: no-drag;
+}
+
+.onboarding-banner:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+/* --- Settings helper / validation chrome --------------------------------- */
+
+.settings-helper-link {
+  margin: 4px 0 14px;
+  font-size: 12px;
+}
+
+.settings-helper-link a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.settings-helper-link a:hover {
+  text-decoration: underline;
+}
+
+.api-key-validation {
+  margin: 8px 0 0;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.api-key-validation-checking {
+  color: var(--text-muted);
+}
+
+.api-key-validation-ok {
+  color: var(--text-secondary);
+}
+
+.api-key-validation-ok span {
+  color: var(--accent);
+}
+
+.api-key-validation-bad {
+  color: var(--text-error);
+}
+
+.api-key-validation-retry {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  margin-left: auto;
+}
+
+.api-key-validation-retry:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
 }
 
 /* --- Sidebar -------------------------------------------------------------- */

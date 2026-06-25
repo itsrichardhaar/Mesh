@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, nativeTheme, safeStorage } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, safeStorage, shell } from 'electron'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -9,9 +9,13 @@ import type {
   ProjectPatch,
   ProjectStats,
   ProviderId,
-  StoredAnalysis
+  StoredAnalysis,
+  StoredValidation,
+  ValidationResult
 } from '@shared/types'
 import { isProviderId, isThemePreference } from '@shared/types'
+import { isModelId, selectedModelSettingKey } from '@shared/models'
+import { ClaudeClient } from './models/claude-client'
 import { latestForProject } from './analyses/repository'
 import { getDatabase, initDatabase } from './db'
 import { runMigrations } from './db/migrations'
@@ -41,6 +45,7 @@ import {
   clearSecret,
   EncryptionBackend,
   getMaskedSecret,
+  getSecret,
   SecretsVaultUnavailableError,
   setSecret
 } from './secrets/vault'
@@ -251,6 +256,86 @@ function registerIpc(): void {
       throw new Error('secrets:clear: provider must be a known ProviderId')
     }
     clearSecret(getDatabase(), secretKey(provider))
+    // Drop the cached validation record so the next mount doesn't
+    // show "✓ Connected" for a key that no longer exists.
+    setSetting(getDatabase(), validationKey(provider), '')
+  })
+
+  ipcMain.handle(
+    'secrets:validate',
+    async (_event, provider: unknown): Promise<ValidationResult> => {
+      if (!isProviderId(provider)) {
+        throw new Error('secrets:validate: provider must be a known ProviderId')
+      }
+      if (provider !== 'claude') {
+        // OpenAI and Local don't ship a functional client in v1; surface
+        // the same shape so the renderer's switch is uniform.
+        return { ok: false, message: 'Provider not available in v1' }
+      }
+      const db = getDatabase()
+      let plaintext: string | null
+      try {
+        plaintext = getSecret(db, encryptionBackend, secretKey(provider))
+      } catch (err) {
+        if (err instanceof SecretsVaultUnavailableError) {
+          return { ok: false, message: 'Encryption unavailable; cannot read stored key' }
+        }
+        throw err
+      }
+      if (!plaintext) {
+        return { ok: false, message: 'No API key saved' }
+      }
+      const modelId = getSetting(db, selectedModelSettingKey(provider))
+      const model = isModelId(modelId) ? modelId : 'claude-haiku-4-5'
+      const client = new ClaudeClient(model, plaintext)
+      const result = await client.validate()
+      const stored: StoredValidation = {
+        at: new Date().toISOString(),
+        ok: result.ok,
+        ...(result.message ? { message: result.message } : {})
+      }
+      setSetting(db, validationKey(provider), JSON.stringify(stored))
+      return result
+    }
+  )
+
+  ipcMain.handle(
+    'secrets:get-last-validation',
+    (_event, provider: unknown): StoredValidation | null => {
+      if (!isProviderId(provider)) {
+        throw new Error('secrets:get-last-validation: provider must be a known ProviderId')
+      }
+      const raw = getSetting(getDatabase(), validationKey(provider))
+      if (!raw) return null
+      try {
+        const parsed = JSON.parse(raw) as unknown
+        if (
+          parsed &&
+          typeof parsed === 'object' &&
+          typeof (parsed as Record<string, unknown>).at === 'string' &&
+          typeof (parsed as Record<string, unknown>).ok === 'boolean'
+        ) {
+          return parsed as StoredValidation
+        }
+      } catch {
+        // Fall through to null — a malformed record is not fatal.
+      }
+      return null
+    }
+  )
+
+  ipcMain.handle('shell:open-external', async (_event, url: unknown): Promise<void> => {
+    if (typeof url !== 'string' || url.length === 0) {
+      throw new Error('shell:open-external: url must be a non-empty string')
+    }
+    // Allowlist: only http(s) URLs may be opened externally. Anything
+    // else (file://, javascript:, custom schemes) is refused — a
+    // compromised renderer shouldn't be able to launch arbitrary
+    // handlers via this IPC.
+    if (!/^https?:\/\//i.test(url)) {
+      throw new Error('shell:open-external: only http(s) URLs are allowed')
+    }
+    await shell.openExternal(url)
   })
 
   ipcMain.handle(
@@ -356,6 +441,11 @@ function registerIpc(): void {
 /** Stable SQLite key shape for per-Provider secrets. */
 function secretKey(provider: ProviderId): string {
   return `secret:${provider}`
+}
+
+/** Stable SQLite key shape for the cached validation outcome per Provider. */
+function validationKey(provider: ProviderId): string {
+  return `model:${provider}:validation`
 }
 
 const encryptionBackend: EncryptionBackend = {

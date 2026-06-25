@@ -1,14 +1,16 @@
 import { useState } from 'react'
 import type { Project } from '@shared/types'
+import { OnboardingBanner } from '../components/OnboardingBanner'
 import { ProjectDetail } from '../components/ProjectDetail'
 import { ProjectSidebar } from '../components/ProjectSidebar'
 import { useProjectList } from '../hooks/useProjectList'
 
 interface Props {
   onOpenWorkspace: (project: Project) => void
+  onOpenSettings: () => void
 }
 
-export function HomeScreen({ onOpenWorkspace }: Props): JSX.Element {
+export function HomeScreen({ onOpenWorkspace, onOpenSettings }: Props): JSX.Element {
   const { state, refresh } = useProjectList()
   const [selectedEncodedPath, setSelectedEncodedPath] = useState<string | null>(null)
 
@@ -19,16 +21,19 @@ export function HomeScreen({ onOpenWorkspace }: Props): JSX.Element {
 
   return (
     <div className="home-screen">
-      <ProjectSidebar
-        state={state}
-        refresh={refresh}
-        selectedEncodedPath={selectedEncodedPath}
-        onSelect={setSelectedEncodedPath}
-        onOpen={onOpenWorkspace}
-      />
-      <main className="detail-pane" aria-label="Project detail">
-        {selected ? <ProjectDetail project={selected} /> : <EmptyDetail />}
-      </main>
+      <OnboardingBanner onOpenSettings={onOpenSettings} />
+      <div className="home-screen-body">
+        <ProjectSidebar
+          state={state}
+          refresh={refresh}
+          selectedEncodedPath={selectedEncodedPath}
+          onSelect={setSelectedEncodedPath}
+          onOpen={onOpenWorkspace}
+        />
+        <main className="detail-pane" aria-label="Project detail">
+          {selected ? <ProjectDetail project={selected} /> : <EmptyDetail />}
+        </main>
+      </div>
     </div>
   )
 }

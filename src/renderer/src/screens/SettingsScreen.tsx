@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { ProviderId, ThemePreference } from '@shared/types'
+import type {
+  ProviderId,
+  StoredValidation,
+  ThemePreference,
+  ValidationResult
+} from '@shared/types'
 import {
   PROVIDERS,
   getRecommendedModel,
@@ -10,6 +15,9 @@ import {
 } from '@shared/models'
 import { PROVIDER_IDS } from '@shared/types'
 import { useTheme } from '../theme/ThemeProvider'
+import { relativeTime } from '../util/relativeTime'
+
+const ANTHROPIC_CONSOLE_URL = 'https://console.anthropic.com'
 
 interface Props {
   onClose: () => void
@@ -133,6 +141,18 @@ function ModelSection(): JSX.Element {
       </div>
 
       <ApiKeyField provider={activeProvider} label="Anthropic API key" placeholder="Paste your sk-ant-… key" />
+
+      <p className="settings-helper-link">
+        <a
+          href={ANTHROPIC_CONSOLE_URL}
+          onClick={(e) => {
+            e.preventDefault()
+            void window.api.shell.openExternal(ANTHROPIC_CONSOLE_URL)
+          }}
+        >
+          Get a key →
+        </a>
+      </p>
 
       <ModelSelect provider={activeProvider} />
     </section>
@@ -270,6 +290,12 @@ interface ApiKeyView {
   mask?: string
 }
 
+type ValidationState =
+  | { status: 'idle' }
+  | { status: 'checking' }
+  | { status: 'cached'; record: StoredValidation }
+  | { status: 'fresh'; at: string; result: ValidationResult }
+
 function ApiKeyField({
   provider,
   label,
@@ -281,6 +307,7 @@ function ApiKeyField({
 }): JSX.Element {
   const [state, setState] = useState<ApiKeyState>({ status: 'loading' })
   const [draft, setDraft] = useState('')
+  const [validation, setValidation] = useState<ValidationState>({ status: 'idle' })
 
   useEffect(() => {
     let cancelled = false
@@ -300,6 +327,11 @@ function ApiKeyField({
         const mask = await window.api.secrets.getMask(provider)
         if (cancelled) return
         setState(mask ? { status: 'saved', mask } : { status: 'empty' })
+        if (mask) {
+          const cached = await window.api.secrets.getLastValidation(provider)
+          if (cancelled) return
+          if (cached) setValidation({ status: 'cached', record: cached })
+        }
       } catch (err) {
         if (cancelled) return
         setState({
@@ -313,6 +345,20 @@ function ApiKeyField({
     }
   }, [provider])
 
+  const runValidation = async (): Promise<void> => {
+    setValidation({ status: 'checking' })
+    try {
+      const result = await window.api.secrets.validate(provider)
+      setValidation({ status: 'fresh', at: new Date().toISOString(), result })
+    } catch (err) {
+      setValidation({
+        status: 'fresh',
+        at: new Date().toISOString(),
+        result: { ok: false, message: err instanceof Error ? err.message : String(err) }
+      })
+    }
+  }
+
   const save = async (plaintext: string): Promise<void> => {
     const previous: ApiKeyView =
       state.status === 'saved' ? { status: 'saved', mask: state.mask } : { status: 'empty' }
@@ -322,6 +368,7 @@ function ApiKeyField({
       const mask = await window.api.secrets.getMask(provider)
       setState(mask ? { status: 'saved', mask } : { status: 'empty' })
       setDraft('')
+      if (mask) void runValidation()
     } catch (err) {
       setState({
         status: 'error',
@@ -337,6 +384,7 @@ function ApiKeyField({
       await window.api.secrets.clear(provider)
       setState({ status: 'empty' })
       setDraft('')
+      setValidation({ status: 'idle' })
     } catch (err) {
       const previous: ApiKeyView =
         state.status === 'saved' ? { status: 'saved', mask: state.mask } : { status: 'empty' }
@@ -411,7 +459,53 @@ function ApiKeyField({
           {state.message}
         </p>
       )}
+
+      {showSavedMask && (
+        <ValidationStatusBanner
+          validation={validation}
+          onRetry={() => void runValidation()}
+        />
+      )}
     </div>
+  )
+}
+
+function ValidationStatusBanner({
+  validation,
+  onRetry
+}: {
+  validation: ValidationState
+  onRetry: () => void
+}): JSX.Element | null {
+  if (validation.status === 'idle') return null
+  if (validation.status === 'checking') {
+    return (
+      <p className="api-key-validation api-key-validation-checking">Checking…</p>
+    )
+  }
+
+  const result =
+    validation.status === 'fresh'
+      ? validation.result
+      : { ok: validation.record.ok, message: validation.record.message }
+  const at = validation.status === 'fresh' ? validation.at : validation.record.at
+  const verifiedLine = `last verified ${relativeTime(at)}`
+
+  if (result.ok) {
+    return (
+      <p className="api-key-validation api-key-validation-ok">
+        <span aria-hidden="true">✓</span> Connected · {verifiedLine}
+      </p>
+    )
+  }
+  return (
+    <p className="api-key-validation api-key-validation-bad" role="alert">
+      <span aria-hidden="true">✗</span> Invalid key
+      {result.message ? <> — {result.message}</> : null} · {verifiedLine}
+      <button type="button" className="api-key-validation-retry" onClick={onRetry}>
+        Retry
+      </button>
+    </p>
   )
 }
 

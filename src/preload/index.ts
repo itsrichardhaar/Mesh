@@ -40,7 +40,13 @@ const api: MeshApi = {
     available: () => ipcRenderer.invoke('secrets:available'),
     set: (provider, plaintext) => ipcRenderer.invoke('secrets:set', provider, plaintext),
     getMask: (provider) => ipcRenderer.invoke('secrets:get-mask', provider),
-    clear: (provider) => ipcRenderer.invoke('secrets:clear', provider)
+    clear: (provider) => ipcRenderer.invoke('secrets:clear', provider),
+    validate: (provider) => ipcRenderer.invoke('secrets:validate', provider),
+    getLastValidation: (provider) =>
+      ipcRenderer.invoke('secrets:get-last-validation', provider)
+  },
+  shell: {
+    openExternal: (url) => ipcRenderer.invoke('shell:open-external', url)
   },
   analyses: {
     latest: (encodedPath) => ipcRenderer.invoke('analyses:latest', encodedPath)

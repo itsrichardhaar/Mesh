@@ -102,6 +102,19 @@ export interface ValidationResult {
 }
 
 /**
+ * Persisted record of the most recent validation attempt for a
+ * Provider. Stored as JSON under `model:<provider>:validation` in the
+ * `settings` table so Settings → Model can render "last verified Xs
+ * ago" on mount without re-spending a token.
+ */
+export interface StoredValidation {
+  /** ISO 8601 timestamp the validation completed. */
+  at: string
+  ok: boolean
+  message?: string
+}
+
+/**
  * The provider-agnostic surface every Model-backed client implements.
  * v1 ships `ClaudeClient` as the functional implementation; `OpenAIClient`
  * and `LocalClient` are stubs that throw if invoked. Decision recorded
