@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FileNode, FilesTreeResponse } from '@shared/files'
+import { getFileIconUrl, getFolderIconUrl } from '../material-icons/loader'
 
 interface Props {
   encodedPath: string
@@ -144,6 +145,9 @@ function FileTreeNode({
   const isOpen = isDir && expanded.has(node.relPath)
   const children = isOpen ? cache.get(node.relPath) : undefined
   const isSelected = !isDir && selectedRelPath === node.relPath
+  const iconUrl = isDir
+    ? getFolderIconUrl(node.name, isOpen)
+    : getFileIconUrl(node.name)
 
   return (
     <li role="treeitem" aria-expanded={isDir ? isOpen : undefined}>
@@ -159,6 +163,9 @@ function FileTreeNode({
           <span className={`file-tree-caret${isOpen ? ' file-tree-caret-open' : ''}`}>›</span>
         ) : (
           <span className="file-tree-caret-spacer" />
+        )}
+        {iconUrl && (
+          <img className="file-tree-icon" src={iconUrl} alt="" aria-hidden="true" />
         )}
         <span className="file-tree-name">{node.name}</span>
       </button>
