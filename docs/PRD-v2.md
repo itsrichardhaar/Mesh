@@ -38,7 +38,7 @@ App-wide chrome row across every screen. Replaces the floating Settings gear (co
 - Theme toggle is **binary** (sun ↔ moon), reflects current *effective* theme. Settings retains the tri-state (Light / Dark / System).
 - Settings icon opens Settings; same handler as `⌘,`.
 - Entire strip is a single `-webkit-app-region: drag` region. Interactive elements inside it are `no-drag`. This resolves the v1 drag-region gotcha (per CHANGELOG `[Unreleased]`) — the top bar IS the canonical drag region.
-- `< Home` breadcrumb button in the Workspace screen is removed (the wordmark replaces it).
+- `< Home` button in the Workspace screen is kept as a secondary in-context affordance. The Mesh wordmark in the top bar is the global home button (works from anywhere); the Workspace's `< Home` is the contextual one when you're inside a Project.
 
 ### Home Reframe
 

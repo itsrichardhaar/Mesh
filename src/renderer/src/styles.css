@@ -124,7 +124,10 @@ body,
 }
 
 body {
-  -webkit-app-region: drag;
+  /* Top bar is now the sole drag region (Slice 21). v1 defaulted body to
+     `drag` and each interactive surface opted out — that pattern is gone;
+     content surfaces are non-draggable by default. */
+  -webkit-app-region: no-drag;
 }
 
 button {
@@ -148,51 +151,119 @@ button {
   border: 0;
 }
 
-/* --- Home Screen layout --------------------------------------------------- */
+/* --- App shell + TopBar (Slice 21) --------------------------------------- */
 
-.home-screen {
+.app-shell {
   display: flex;
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
+}
+
+.app-screens {
+  flex: 1;
+  min-height: 0;
   position: relative;
+  overflow: hidden;
 }
 
-.home-drag-region {
-  height: 28px;
+.top-bar {
+  display: flex;
+  align-items: center;
+  height: 38px;
   flex-shrink: 0;
-  -webkit-app-region: drag;
   background: var(--bg-canvas);
+  border-bottom: 1px solid var(--border-subtle);
+  -webkit-app-region: drag;
 }
 
-/* --- Persistent Settings gear ------------------------------------------- */
+/* macOS hiddenInset traffic-light reservation. The OS paints the three
+   buttons inside this strip; we just keep our content from overlapping. */
+.top-bar-traffic-lights {
+  width: 76px;
+  height: 100%;
+  flex-shrink: 0;
+}
 
-.settings-gear {
-  position: fixed;
-  top: 4px;
-  right: 12px;
-  z-index: 200;
-  width: 28px;
-  height: 28px;
+.top-bar-home {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.top-bar-home:hover {
+  background: var(--bg-elevated);
+}
+
+.top-bar-home:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.top-bar-icon {
+  width: 20px;
+  height: 20px;
+  display: block;
+  border-radius: var(--radius-sm);
+}
+
+.top-bar-wordmark {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+}
+
+.top-bar-spacer {
+  flex: 1;
+  height: 100%;
+}
+
+.top-bar-action {
+  -webkit-app-region: no-drag;
+  width: 30px;
+  height: 30px;
+  margin-right: 4px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  border-radius: 6px;
-  color: var(--text-muted);
   background: transparent;
   border: none;
-  -webkit-app-region: no-drag;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
 }
 
-.settings-gear:hover {
+.top-bar-action:last-child {
+  margin-right: 8px;
+}
+
+.top-bar-action:hover {
   background: var(--bg-elevated);
   color: var(--text-primary);
 }
 
-.settings-gear:focus-visible {
+.top-bar-action:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+/* --- Home Screen layout --------------------------------------------------- */
+
+.home-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .home-screen-body {
@@ -675,11 +746,10 @@ button {
 /* --- Settings screen (Slice 5) ------------------------------------------- */
 
 .settings-screen {
-  position: fixed;
+  position: absolute;
   inset: 0;
   background: var(--bg-canvas);
   overflow-y: auto;
-  -webkit-app-region: no-drag;
   display: flex;
   flex-direction: column;
 }
@@ -688,9 +758,8 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 56px 48px 24px;
+  padding: 24px 48px;
   border-bottom: 1px solid var(--border-subtle);
-  -webkit-app-region: drag;
 }
 
 .settings-header h1 {
@@ -1089,7 +1158,7 @@ button {
 /* --- Workspace screen (Slice 13) ----------------------------------------- */
 
 .workspace-screen {
-  position: fixed;
+  position: absolute;
   inset: 0;
   background: var(--bg-canvas);
   display: flex;
@@ -1106,23 +1175,22 @@ button {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 40px 20px 12px;
+  padding: 16px 20px 12px;
   border-bottom: 1px solid var(--border-subtle);
-  -webkit-app-region: drag;
 }
 
 .workspace-back {
-  -webkit-app-region: no-drag;
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
   color: var(--text-secondary);
   border: 1px solid var(--border-subtle);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--bg-surface);
+  cursor: pointer;
 }
 
 .workspace-back:hover {
@@ -1130,11 +1198,15 @@ button {
   color: var(--text-primary);
 }
 
+.workspace-back:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .workspace-title {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  -webkit-app-region: drag;
 }
 
 .workspace-title-name {

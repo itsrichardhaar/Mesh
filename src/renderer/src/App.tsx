@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Project } from '@shared/types'
-import { SettingsButton } from './components/SettingsButton'
+import { TopBar } from './components/TopBar'
 import { HomeScreen } from './screens/HomeScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { WorkspaceScreen } from './screens/WorkspaceScreen'
@@ -69,19 +69,23 @@ export function App(): JSX.Element {
   return (
     <ThemeProvider>
       <UiModeProvider>
-        <div hidden={screen !== 'home'}>
-          <HomeScreen onOpenWorkspace={openWorkspace} onOpenSettings={openSettings} />
+        <div className="app-shell">
+          <TopBar onGoHome={goHome} onOpenSettings={openSettings} />
+          <div className="app-screens">
+            <div hidden={screen !== 'home'}>
+              <HomeScreen onOpenWorkspace={openWorkspace} onOpenSettings={openSettings} />
+            </div>
+            {workspaceProject && (
+              <WorkspaceScreen
+                key={workspaceProject.encodedPath}
+                project={workspaceProject}
+                visible={screen === 'workspace'}
+                onBack={goHome}
+              />
+            )}
+            {screen === 'settings' && <SettingsScreen onClose={closeSettings} />}
+          </div>
         </div>
-        {workspaceProject && (
-          <WorkspaceScreen
-            key={workspaceProject.encodedPath}
-            project={workspaceProject}
-            visible={screen === 'workspace'}
-            onBack={goHome}
-          />
-        )}
-        {screen === 'settings' && <SettingsScreen onClose={closeSettings} />}
-        {screen !== 'settings' && <SettingsButton onOpen={openSettings} />}
       </UiModeProvider>
     </ThemeProvider>
   )

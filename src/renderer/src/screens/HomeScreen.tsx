@@ -21,10 +21,6 @@ export function HomeScreen({ onOpenWorkspace, onOpenSettings }: Props): JSX.Elem
 
   return (
     <div className="home-screen">
-      {/* Thin strip mirroring the Workspace header's drag region so
-          the user can move the window from the top of Home (the
-          sidebar and detail-pane below explicitly opt out of drag). */}
-      <div className="home-drag-region" />
       <OnboardingBanner onOpenSettings={onOpenSettings} />
       <div className="home-screen-body">
         <ProjectSidebar
