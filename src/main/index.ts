@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, nativeTheme, safeStorage, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, safeStorage, shell } from 'electron'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -571,6 +571,10 @@ function registerIpc(): void {
     ptyManager.kill(ptyId)
   })
 
+  ipcMain.handle('pty:list', (): string[] => {
+    return ptyManager.list()
+  })
+
   ipcMain.handle(
     'files:tree',
     async (
@@ -699,7 +703,30 @@ app.on('window-all-closed', () => {
   }
 })
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  // If any pty is still alive, ask before SIGTERM'ing them — the
+  // user might have a long-running Claude session they don't want to
+  // interrupt. The confirm only runs once: after the user picks
+  // "Quit anyway", `isQuitting` is set and subsequent before-quit
+  // events (which Electron fires per window-close) take the fast path.
+  if (!isQuitting) {
+    const live = ptyManager.list()
+    if (live.length > 0 && mainWindow) {
+      const choice = dialog.showMessageBoxSync(mainWindow, {
+        type: 'warning',
+        buttons: ['Cancel', 'Quit anyway'],
+        defaultId: 0,
+        cancelId: 0,
+        title: 'Active Claude sessions',
+        message: `Mesh has ${live.length} active Claude session${live.length === 1 ? '' : 's'}. Quit anyway?`,
+        detail: 'Active work will be interrupted.'
+      })
+      if (choice !== 1) {
+        event.preventDefault()
+        return
+      }
+    }
+  }
   isQuitting = true
   void closeAllWatchers()
   void closeAllSessionWatchers()

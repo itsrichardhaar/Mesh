@@ -8,6 +8,16 @@ interface Props {
   encodedPath: string
   sessionId: string
   onExit?: () => void
+  /** Fired (with the assigned ptyId) once the pty spawns. */
+  onPtyId?: (ptyId: string) => void
+  /** Fired on every output chunk so the parent can drive the ● activity indicator. */
+  onActivity?: () => void
+  /**
+   * When the Workspace is hosting multiple tabs (Slice 17), inactive
+   * PtyViews stay mounted with `display: none` so scrollback survives.
+   * The viewport hides itself when `hidden` is true.
+   */
+  hidden?: boolean
 }
 
 type State =
@@ -25,7 +35,14 @@ type State =
  * single-tab semantics in Slice 16; multi-tab persistence lands in
  * Slice 17.
  */
-export function PtyView({ encodedPath, sessionId, onExit }: Props): JSX.Element {
+export function PtyView({
+  encodedPath,
+  sessionId,
+  onExit,
+  onPtyId,
+  onActivity,
+  hidden
+}: Props): JSX.Element {
   const { effective } = useTheme()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const termRef = useRef<Terminal | null>(null)
@@ -76,7 +93,10 @@ export function PtyView({ encodedPath, sessionId, onExit }: Props): JSX.Element 
     })
 
     const offData = window.api.pty.onData((event) => {
-      if (event.ptyId === ptyIdRef.current) term.write(event.data)
+      if (event.ptyId === ptyIdRef.current) {
+        term.write(event.data)
+        onActivity?.()
+      }
     })
     const offExit = window.api.pty.onExit((event) => {
       if (event.ptyId !== ptyIdRef.current) return
@@ -99,6 +119,7 @@ export function PtyView({ encodedPath, sessionId, onExit }: Props): JSX.Element 
         }
         ptyIdRef.current = result.ptyId
         setState({ status: 'running', ptyId: result.ptyId })
+        onPtyId?.(result.ptyId)
         // Drain any input the user typed while the spawn was in flight.
         const drained = writeQueueRef.current
         writeQueueRef.current = []
@@ -143,15 +164,31 @@ export function PtyView({ encodedPath, sessionId, onExit }: Props): JSX.Element 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [encodedPath, sessionId])
 
-  // Push theme changes into the live terminal without re-creating it.
+  // Push theme changes into the live terminal without re-creating
+  // it. We listen on the `[data-theme]` attribute itself rather than
+  // the React `effective` value because child effects run before
+  // parent effects — by the time `effective` flips, the DOM attribute
+  // (which ThemeProvider writes from its own effect) might not have
+  // updated yet, and `getComputedStyle` would still see the old
+  // palette. The MutationObserver fires after the attribute write,
+  // so the values are always fresh.
   useEffect(() => {
-    if (termRef.current) {
-      termRef.current.options.theme = xtermTheme(effective)
+    const apply = (): void => {
+      if (termRef.current) {
+        termRef.current.options.theme = xtermTheme(effective)
+      }
     }
+    apply()
+    const observer = new MutationObserver(apply)
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme']
+    })
+    return () => observer.disconnect()
   }, [effective])
 
   return (
-    <div className="pty-view">
+    <div className="pty-view" hidden={hidden}>
       {state.status === 'error' && <PtyErrorBanner state={state} />}
       <div ref={containerRef} className="pty-view-terminal" />
       {state.status === 'exited' && (
@@ -200,22 +237,24 @@ function PtyErrorBanner({
   )
 }
 
-function xtermTheme(effective: 'light' | 'dark'): Record<string, string> {
-  // Minimal token-aligned default; the full design-token integration
-  // criterion deferred from Slice 18 will replace this with a
-  // CSS-variable-driven palette under Slice 17.
-  if (effective === 'dark') {
-    return {
-      background: '#1a1814',
-      foreground: '#f5f1ea',
-      cursor: '#d97757',
-      selectionBackground: '#3a352e'
-    }
+/**
+ * Read xterm's palette from Mesh's design tokens via the live
+ * `getComputedStyle(document.documentElement)` so the terminal stays
+ * in lock-step with the rest of the app. `effective` is unused at
+ * the call site but kept as a parameter so React re-runs the
+ * `useEffect` that calls this when the theme flips.
+ */
+function xtermTheme(_effective: 'light' | 'dark'): Record<string, string> {
+  const css = getComputedStyle(document.documentElement)
+  const v = (name: string, fallback: string): string => {
+    const raw = css.getPropertyValue(name).trim()
+    return raw.length > 0 ? raw : fallback
   }
   return {
-    background: '#faf8f4',
-    foreground: '#1a1814',
-    cursor: '#d97757',
-    selectionBackground: '#e8e4dc'
+    background: v('--bg-canvas', '#faf8f4'),
+    foreground: v('--text-primary', '#1a1814'),
+    cursor: v('--accent', '#d97757'),
+    cursorAccent: v('--accent-fg', '#ffffff'),
+    selectionBackground: v('--bg-elevated', '#e8e4dc')
   }
 }

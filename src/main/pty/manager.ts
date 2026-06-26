@@ -48,7 +48,20 @@ interface Entry {
   pty: PtyLike
   dataSub: { dispose(): void }
   exitSub: { dispose(): void }
+  /** Active SIGKILL fallback timer after a SIGTERM. */
+  killTimer: NodeJS.Timeout | null
 }
+
+/**
+ * Wait time between SIGTERM and the SIGKILL fallback. Long enough for
+ * a well-behaved child (and the Claude Code CLI's session save) to
+ * shut down cleanly; short enough that the user doesn't notice the
+ * window hanging on quit.
+ */
+export const SIGKILL_GRACE_MS = 3_000
+
+export type ScheduleTimeout = (cb: () => void, ms: number) => NodeJS.Timeout
+export type CancelTimeout = (timer: NodeJS.Timeout) => void
 
 /**
  * Owns the live `node-pty` processes for the renderer's xterm
@@ -61,7 +74,11 @@ interface Entry {
 export class PtyManager {
   private readonly entries = new Map<string, Entry>()
 
-  constructor(private readonly spawn: PtySpawn = defaultSpawn) {}
+  constructor(
+    private readonly spawn: PtySpawn = defaultSpawn,
+    private readonly schedule: ScheduleTimeout = setTimeout,
+    private readonly cancel: CancelTimeout = clearTimeout
+  ) {}
 
   create(input: CreatePtyInput): string {
     const ptyId = input.ptyId ?? randomUUID()
@@ -74,13 +91,15 @@ export class PtyManager {
     const dataSub = pty.onData((data) => input.onData(ptyId, data))
     const exitSub = pty.onExit(({ exitCode }) => {
       input.onExit(ptyId, exitCode)
+      const entry = this.entries.get(ptyId)
+      if (entry?.killTimer) this.cancel(entry.killTimer)
       // Auto-remove from the registry so the renderer can never
       // accidentally write to an already-exited pty.
       this.entries.delete(ptyId)
       dataSub.dispose()
       exitSub.dispose()
     })
-    this.entries.set(ptyId, { pty, dataSub, exitSub })
+    this.entries.set(ptyId, { pty, dataSub, exitSub, killTimer: null })
     return ptyId
   }
 
@@ -101,10 +120,28 @@ export class PtyManager {
     return true
   }
 
-  kill(ptyId: string, signal: string = 'SIGTERM'): boolean {
+  /**
+   * Graceful shutdown: send SIGTERM, then SIGKILL after
+   * `SIGKILL_GRACE_MS` if the pty hasn't exited. The grace timer is
+   * cleared automatically when the pty's exit event fires, so a
+   * well-behaved child never receives the SIGKILL. Calling `kill`
+   * twice for the same ptyId is a no-op on the second call (the
+   * SIGTERM was already sent and the timer is already scheduled).
+   */
+  kill(ptyId: string): boolean {
     const entry = this.entries.get(ptyId)
     if (!entry) return false
-    entry.pty.kill(signal)
+    if (entry.killTimer) return true
+    entry.pty.kill('SIGTERM')
+    entry.killTimer = this.schedule(() => {
+      const current = this.entries.get(ptyId)
+      if (!current) return
+      try {
+        current.pty.kill('SIGKILL')
+      } catch {
+        // Pty may have torn down between the SIGTERM and now — that's fine.
+      }
+    }, SIGKILL_GRACE_MS)
     return true
   }
 
@@ -112,8 +149,15 @@ export class PtyManager {
     return Array.from(this.entries.keys())
   }
 
+  /**
+   * Best-effort fleet teardown for `before-quit`. Sends SIGTERM to
+   * everything and disposes subscriptions immediately — we don't
+   * schedule the SIGKILL grace because the renderer is going down
+   * anyway; the OS reaps anything still alive.
+   */
   closeAll(signal: string = 'SIGTERM'): void {
     for (const [, entry] of this.entries) {
+      if (entry.killTimer) this.cancel(entry.killTimer)
       try {
         entry.pty.kill(signal)
       } catch {

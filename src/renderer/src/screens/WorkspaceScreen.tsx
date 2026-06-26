@@ -3,6 +3,7 @@ import type { Project } from '@shared/types'
 import { FileTree } from '../components/FileTree'
 import { FileViewer } from '../components/FileViewer'
 import { ModeTabs } from '../components/ModeTabs'
+import { PtyTabBar, type PtyTab } from '../components/PtyTabBar'
 import { PtyView } from '../components/PtyView'
 import { SessionsList } from '../components/SessionsList'
 import { Transcript } from '../components/Transcript'
@@ -14,45 +15,47 @@ interface Props {
   onBack: () => void
 }
 
+interface PtySlot {
+  /** Synthetic id assigned before the pty spawns so React keying is stable. */
+  slotId: string
+  sessionId: string
+  /** Filled in once `pty.create` returns. Until then, key by `slotId`. */
+  ptyId: string | null
+  lastActivityAt: number
+}
+
+let nextSlotCounter = 0
+function nextSlotId(): string {
+  nextSlotCounter += 1
+  return `pty-slot-${nextSlotCounter}`
+}
+
 /**
  * Three-column Workspace: file tree (left), Sessions list (middle),
  * Mode-toggled content pane (right). The right pane carries Mode Tabs
- * — Sessions (transcript) or File Editor (Monaco) — both kept mounted
- * with `display: none` when inactive so transcript scroll, selected
- * Session, and (later) live Pty Tabs survive the toggle. Workspace
- * visibility itself is driven by the parent so the whole screen can
- * stay mounted on the Home round-trip.
+ * — Sessions (transcript) or File Editor (Monaco). The Sessions pane
+ * itself hosts the Transcript reader plus a multi-tab strip of live
+ * Pty Tabs (Slice 17): each `Resume` opens a fresh tab; existing
+ * tabs stay DOM-mounted with `display: none` so scrollback survives
+ * tab switches and Home round-trips.
  */
 export function WorkspaceScreen({ project, visible, onBack }: Props): JSX.Element {
   const [showHidden, setShowHidden] = useState(false)
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [selectedFileRelPath, setSelectedFileRelPath] = useState<string | null>(null)
-  // Slice 16: single live Pty Tab per Workspace. When the user
-  // Resumes a session, this gets set; selecting a different session
-  // clears it (Slice 17 will make this multi-tab).
-  const [resumedSessionId, setResumedSessionId] = useState<string | null>(null)
+  const [ptyTabs, setPtyTabs] = useState<PtySlot[]>([])
+  const [activePtySlotId, setActivePtySlotId] = useState<string | null>(null)
   const { mode, setMode } = useWorkspaceMode(project.encodedPath)
 
-  // Reset selections when the user opens a different Project so we
-  // don't try to read a sessionId / relPath that doesn't belong here.
+  // Reset Project-scoped state on Project switch so we don't leak
+  // selections/tabs across.
   useEffect(() => {
     setSelectedSessionId(null)
     setSelectedFileRelPath(null)
-    setResumedSessionId(null)
+    setPtyTabs([])
+    setActivePtySlotId(null)
   }, [project.encodedPath])
 
-  const handleSessionSelect = (sessionId: string): void => {
-    setSelectedSessionId(sessionId)
-    // Single-pty semantics: changing the selected session abandons
-    // the previous live pty (PtyView's cleanup effect kills it).
-    if (resumedSessionId !== null && resumedSessionId !== sessionId) {
-      setResumedSessionId(null)
-    }
-  }
-
-  // ⌘. routes through the application menu so the accelerator is
-  // standard across screens; here we only act on it when the Workspace
-  // is the visible screen.
   useEffect(() => {
     if (!visible) return
     const off = window.api.menu.onToggleHidden(() => setShowHidden((v) => !v))
@@ -61,10 +64,80 @@ export function WorkspaceScreen({ project, visible, onBack }: Props): JSX.Elemen
 
   const handleFileSelect = (relPath: string): void => {
     setSelectedFileRelPath(relPath)
-    // Clicking a file while still in Sessions mode is the natural way
-    // to indicate "I want to look at files now" — auto-switch.
     if (mode !== 'editor') setMode('editor')
   }
+
+  const handleSessionSelect = (sessionId: string): void => {
+    setSelectedSessionId(sessionId)
+    // Clicking a Session in the middle column means "show me this
+    // session's transcript". If a Pty Tab is currently active, the
+    // transcript host is hidden behind it — deactivate the tab so the
+    // transcript surfaces. The tab itself stays alive in the strip;
+    // the user can click it again to return to the live terminal.
+    setActivePtySlotId(null)
+  }
+
+  const handleResume = (sessionId: string): void => {
+    const slotId = nextSlotId()
+    setPtyTabs((prev) => [
+      ...prev,
+      { slotId, sessionId, ptyId: null, lastActivityAt: Date.now() }
+    ])
+    setActivePtySlotId(slotId)
+  }
+
+  const handleTabSelect = (slotId: string): void => {
+    setActivePtySlotId(slotId)
+    // Surface the underlying session in the middle column too so the
+    // user's mental model (which session am I in?) stays in sync.
+    const tab = ptyTabs.find((t) => t.slotId === slotId)
+    if (tab) setSelectedSessionId(tab.sessionId)
+  }
+
+  const handleTabClose = (slotId: string): void => {
+    const tab = ptyTabs.find((t) => t.slotId === slotId)
+    if (tab?.ptyId) void window.api.pty.kill(tab.ptyId)
+    setPtyTabs((prev) => prev.filter((t) => t.slotId !== slotId))
+    // If we closed the active tab, fall back to the rightmost remaining one.
+    setActivePtySlotId((current) => {
+      if (current !== slotId) return current
+      const remaining = ptyTabs.filter((t) => t.slotId !== slotId)
+      return remaining.length > 0 ? remaining[remaining.length - 1]!.slotId : null
+    })
+  }
+
+  const handlePtyExit = (slotId: string): void => {
+    // Drop the tab when the child process exits on its own — the
+    // viewport's "Session exited" line stays for a beat via the
+    // remove-tab animation… well, instant removal for v1.
+    setPtyTabs((prev) => prev.filter((t) => t.slotId !== slotId))
+    setActivePtySlotId((current) => {
+      if (current !== slotId) return current
+      const remaining = ptyTabs.filter((t) => t.slotId !== slotId)
+      return remaining.length > 0 ? remaining[remaining.length - 1]!.slotId : null
+    })
+  }
+
+  const setPtyId = (slotId: string, ptyId: string): void => {
+    setPtyTabs((prev) =>
+      prev.map((t) => (t.slotId === slotId ? { ...t, ptyId } : t))
+    )
+  }
+
+  const markActivity = (slotId: string): void => {
+    setPtyTabs((prev) =>
+      prev.map((t) =>
+        t.slotId === slotId ? { ...t, lastActivityAt: Date.now() } : t
+      )
+    )
+  }
+
+  const tabBarData: PtyTab[] = ptyTabs.map((t) => ({
+    slotId: t.slotId,
+    sessionId: t.sessionId,
+    label: t.sessionId.slice(0, 8),
+    lastActivityAt: t.lastActivityAt
+  }))
 
   return (
     <div className="workspace-screen" hidden={!visible}>
@@ -121,25 +194,41 @@ export function WorkspaceScreen({ project, visible, onBack }: Props): JSX.Elemen
         <section className="workspace-content-column" aria-label="Content pane">
           <ModeTabs mode={mode} onChange={setMode} />
           <div className="workspace-mode-pane" hidden={mode !== 'sessions'}>
-            {selectedSessionId ? (
-              resumedSessionId === selectedSessionId ? (
-                <PtyView
-                  key={`pty:${project.encodedPath}:${selectedSessionId}`}
-                  encodedPath={project.encodedPath}
-                  sessionId={selectedSessionId}
-                  onExit={() => setResumedSessionId(null)}
-                />
-              ) : (
+            <PtyTabBar
+              tabs={tabBarData}
+              activeSlotId={activePtySlotId}
+              onSelect={handleTabSelect}
+              onClose={handleTabClose}
+            />
+            {/* All live Pty Tabs stay mounted; only the active one is visible. */}
+            {ptyTabs.map((tab) => (
+              <PtyView
+                key={tab.slotId}
+                encodedPath={project.encodedPath}
+                sessionId={tab.sessionId}
+                hidden={tab.slotId !== activePtySlotId}
+                onPtyId={(ptyId) => setPtyId(tab.slotId, ptyId)}
+                onActivity={() => markActivity(tab.slotId)}
+                onExit={() => handlePtyExit(tab.slotId)}
+              />
+            ))}
+            {/* Transcript shows when no tab is active. Selecting a tab
+                hides it; closing the last tab brings it back. */}
+            <div
+              className="workspace-transcript-host"
+              hidden={activePtySlotId !== null}
+            >
+              {selectedSessionId ? (
                 <Transcript
                   key={`${project.encodedPath}:${selectedSessionId}`}
                   encodedPath={project.encodedPath}
                   sessionId={selectedSessionId}
-                  onResume={(sessionId) => setResumedSessionId(sessionId)}
+                  onResume={handleResume}
                 />
-              )
-            ) : (
-              <p className="workspace-stub">Select a Session.</p>
-            )}
+              ) : (
+                <p className="workspace-stub">Select a Session.</p>
+              )}
+            </div>
           </div>
           <div className="workspace-mode-pane" hidden={mode !== 'editor'}>
             <FileViewer

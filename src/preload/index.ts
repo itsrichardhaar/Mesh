@@ -70,6 +70,7 @@ const api: MeshApi = {
     write: (ptyId, data) => ipcRenderer.invoke('pty:write', ptyId, data),
     resize: (ptyId, cols, rows) => ipcRenderer.invoke('pty:resize', ptyId, cols, rows),
     kill: (ptyId) => ipcRenderer.invoke('pty:kill', ptyId),
+    list: () => ipcRenderer.invoke('pty:list'),
     onData: (cb) => subscribeArg<PtyDataEvent>('pty:data', cb),
     onExit: (cb) => subscribeArg<PtyExitEvent>('pty:exit', cb)
   }

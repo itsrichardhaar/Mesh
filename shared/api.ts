@@ -161,6 +161,12 @@ export interface MeshApi {
     write(ptyId: string, data: string): Promise<void>
     resize(ptyId: string, cols: number, rows: number): Promise<void>
     kill(ptyId: string): Promise<void>
+    /**
+     * Snapshot of every live pty's id, for renderer-crash rehydration
+     * (the React tree is gone but the main-process processes survive
+     * a window reload). Slice 17.
+     */
+    list(): Promise<string[]>
     onData(cb: (event: PtyDataEvent) => void): () => void
     onExit(cb: (event: PtyExitEvent) => void): () => void
   }

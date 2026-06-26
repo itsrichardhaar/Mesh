@@ -1,5 +1,12 @@
 import { describe, it, expect, vi } from 'vitest'
-import { PtyManager, type PtyLike, type PtySpawn } from '@main/pty/manager'
+import {
+  PtyManager,
+  SIGKILL_GRACE_MS,
+  type CancelTimeout,
+  type PtyLike,
+  type PtySpawn,
+  type ScheduleTimeout
+} from '@main/pty/manager'
 
 interface FakePty extends PtyLike {
   emitData(data: string): void
@@ -56,7 +63,50 @@ function makeFakePty(): FakePty {
   }
 }
 
-function makeManager(): { mgr: PtyManager; spawn: ReturnType<typeof vi.fn>; created: FakePty[] } {
+interface FakeTimers {
+  schedule: ScheduleTimeout
+  cancel: CancelTimeout
+  /** Run any timer whose deadline is at or before `nowMs`. */
+  advance(nowMs: number): void
+  pending: Array<{ id: number; cb: () => void; due: number }>
+}
+
+function makeFakeTimers(): FakeTimers {
+  const pending: FakeTimers['pending'] = []
+  let now = 0
+  let nextId = 1
+  const schedule: ScheduleTimeout = (cb, ms) => {
+    const id = nextId++
+    pending.push({ id, cb, due: now + ms })
+    return id as unknown as NodeJS.Timeout
+  }
+  const cancel: CancelTimeout = (timer) => {
+    const id = timer as unknown as number
+    const i = pending.findIndex((p) => p.id === id)
+    if (i >= 0) pending.splice(i, 1)
+  }
+  return {
+    schedule,
+    cancel,
+    pending,
+    advance(nowMs) {
+      now = nowMs
+      const due = pending.filter((p) => p.due <= now)
+      for (const p of due) {
+        const i = pending.indexOf(p)
+        if (i >= 0) pending.splice(i, 1)
+        p.cb()
+      }
+    }
+  }
+}
+
+function makeManager(opts: { timers?: FakeTimers } = {}): {
+  mgr: PtyManager
+  spawn: ReturnType<typeof vi.fn>
+  created: FakePty[]
+  timers: FakeTimers
+} {
   const created: FakePty[] = []
   const spawn: PtySpawn = (_cmd, _args, _opts) => {
     const p = makeFakePty()
@@ -64,8 +114,9 @@ function makeManager(): { mgr: PtyManager; spawn: ReturnType<typeof vi.fn>; crea
     return p
   }
   const spy = vi.fn(spawn)
-  const mgr = new PtyManager(spy as unknown as PtySpawn)
-  return { mgr, spawn: spy, created }
+  const timers = opts.timers ?? makeFakeTimers()
+  const mgr = new PtyManager(spy as unknown as PtySpawn, timers.schedule, timers.cancel)
+  return { mgr, spawn: spy, created, timers }
 }
 
 describe('PtyManager', () => {
@@ -123,6 +174,49 @@ describe('PtyManager', () => {
     expect(mgr.kill(id)).toBe(true)
     expect(created[0]!.writes).toEqual(['ls\n'])
     expect(created[0]!.resizes).toEqual([[120, 40]])
+    // SIGTERM goes out immediately; the SIGKILL is on the grace timer.
+    expect(created[0]!.kills).toEqual(['SIGTERM'])
+  })
+
+  it('escalates to SIGKILL when the pty does not exit within the grace window', () => {
+    const { mgr, created, timers } = makeManager()
+    const id = mgr.create({
+      command: 'x', args: [], cwd: '/', cols: 80, rows: 24,
+      onData: vi.fn(), onExit: vi.fn()
+    })
+    mgr.kill(id)
+    expect(created[0]!.kills).toEqual(['SIGTERM'])
+    // Just before the deadline → no SIGKILL yet.
+    timers.advance(SIGKILL_GRACE_MS - 1)
+    expect(created[0]!.kills).toEqual(['SIGTERM'])
+    // At / past the deadline → SIGKILL fires.
+    timers.advance(SIGKILL_GRACE_MS)
+    expect(created[0]!.kills).toEqual(['SIGTERM', 'SIGKILL'])
+  })
+
+  it('cancels the SIGKILL timer when the pty exits cleanly during the grace window', () => {
+    const { mgr, created, timers } = makeManager()
+    const id = mgr.create({
+      command: 'x', args: [], cwd: '/', cols: 80, rows: 24,
+      onData: vi.fn(), onExit: vi.fn()
+    })
+    mgr.kill(id)
+    // Child exits cleanly after SIGTERM but before the grace deadline.
+    created[0]!.emitExit(0)
+    // Even after the deadline passes, no SIGKILL goes out.
+    timers.advance(SIGKILL_GRACE_MS + 1)
+    expect(created[0]!.kills).toEqual(['SIGTERM'])
+    expect(timers.pending).toHaveLength(0)
+  })
+
+  it('is idempotent: a second kill while the SIGTERM is in flight is a no-op', () => {
+    const { mgr, created } = makeManager()
+    const id = mgr.create({
+      command: 'x', args: [], cwd: '/', cols: 80, rows: 24,
+      onData: vi.fn(), onExit: vi.fn()
+    })
+    expect(mgr.kill(id)).toBe(true)
+    expect(mgr.kill(id)).toBe(true)
     expect(created[0]!.kills).toEqual(['SIGTERM'])
   })
 
