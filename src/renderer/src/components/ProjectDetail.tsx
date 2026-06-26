@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Plus } from 'lucide-react'
 import type { Project, ProjectStats, StoredAnalysis } from '@shared/types'
 import { findModel } from '@shared/models'
 import { relativeTime } from '../util/relativeTime'
+import { tildify } from '../util/tildify'
 
 type StatsState =
   | { status: 'loading' }
@@ -136,14 +137,20 @@ export function ProjectDetail({ project, onBack, onOpenWorkspace }: Props): JSX.
       </div>
       <header className="project-detail-header">
         <h1 className="project-detail-name">{project.name}</h1>
+        <span
+          className="project-detail-path"
+          title={project.sourcePath}
+        >
+          {tildify(project.sourcePath)}
+        </span>
         {project.autoSubtitle && (
-          <p className="project-detail-subtitle">{project.autoSubtitle}</p>
+          <span className="project-detail-subtitle">{project.autoSubtitle}</span>
         )}
       </header>
 
       <StatsRow project={project} state={stats} />
 
-      <AnalyzeArea
+      <AnalyzeBar
         project={project}
         analysis={analysis}
         run={run}
@@ -181,7 +188,15 @@ function Stat({ label, value }: { label: string; value: string }): JSX.Element {
   )
 }
 
-function AnalyzeArea({
+type BarTone = 'neutral' | 'info' | 'success' | 'error'
+
+type BarView =
+  | { tone: 'neutral'; role: 'status'; message: string; action: 'Analyze' }
+  | { tone: 'info'; role: 'status'; message: string; action: null }
+  | { tone: 'success'; role: 'status'; message: string; action: 'Re-analyze' }
+  | { tone: 'error'; role: 'alert'; message: string; action: 'Try again' }
+
+function AnalyzeBar({
   project,
   analysis,
   run,
@@ -192,87 +207,72 @@ function AnalyzeArea({
   run: RunState
   onAnalyze: () => void
 }): JSX.Element {
-  const banner = pickBanner(analysis, run)
+  const view = pickBarView(analysis, run)
   return (
-    <div className="analyze-area">
-      {banner && <AnalyzeBanner banner={banner} onRetry={onAnalyze} />}
-      <button
-        type="button"
-        className="analyze-button"
-        disabled={run.status === 'running' || project.sourceMissing}
-        onClick={onAnalyze}
-        title={
-          project.sourceMissing
-            ? 'Source path is missing on disk — can’t analyze.'
-            : undefined
-        }
-      >
-        {run.status === 'running' ? 'Analyzing…' : 'Analyze'}
-      </button>
-    </div>
-  )
-}
-
-type Banner =
-  | { tone: 'info'; message: string }
-  | { tone: 'success'; message: string }
-  | { tone: 'error'; message: string; retry: true }
-
-function pickBanner(analysis: AnalysisState, run: RunState): Banner | null {
-  if (run.status === 'running') {
-    return { tone: 'info', message: 'Analyzing…' }
-  }
-  if (run.status === 'preflight-error') {
-    return { tone: 'error', message: run.message, retry: true }
-  }
-  if (analysis.status !== 'ok' || analysis.analysis === null) {
-    return null
-  }
-  const row = analysis.analysis
-  if (row.status === 'failed') {
-    return {
-      tone: 'error',
-      message: row.errorMessage ?? 'Analysis failed.',
-      retry: true
-    }
-  }
-  const count = row.sourceSessionCount ?? 0
-  const word = count === 1 ? 'session' : 'sessions'
-  return {
-    tone: 'success',
-    message: `Analyzed from ${count} ${word} (last 14 days) · ${relativeTime(row.generatedAt)}`
-  }
-}
-
-function AnalyzeBanner({
-  banner,
-  onRetry
-}: {
-  banner: Banner
-  onRetry: () => void
-}): JSX.Element {
-  const isError = banner.tone === 'error'
-  return (
-    <div
-      className={`analyze-banner analyze-banner-${banner.tone}`}
-      role={isError ? 'alert' : 'status'}
-    >
-      {banner.tone === 'info' && (
-        <span className="analyze-banner-spinner" aria-hidden="true" />
+    <div className={`analyze-bar analyze-bar-${view.tone}`} role={view.role}>
+      {view.tone === 'info' && (
+        <span className="analyze-bar-spinner" aria-hidden="true" />
       )}
-      <span className="analyze-banner-message">{banner.message}</span>
-      {isError && 'retry' in banner && (
+      <span className="analyze-bar-message">{view.message}</span>
+      {view.action && (
         <button
           type="button"
-          className="analyze-banner-retry"
-          onClick={onRetry}
+          className="analyze-bar-action"
+          disabled={project.sourceMissing}
+          onClick={onAnalyze}
+          title={
+            project.sourceMissing
+              ? "Source path is missing on disk — can't analyze."
+              : undefined
+          }
         >
-          Try again
+          <Plus size={14} aria-hidden="true" />
+          {view.action}
         </button>
       )}
     </div>
   )
 }
+
+function pickBarView(analysis: AnalysisState, run: RunState): BarView {
+  if (run.status === 'running') {
+    return { tone: 'info', role: 'status', message: 'Analyzing…', action: null }
+  }
+  if (run.status === 'preflight-error') {
+    return { tone: 'error', role: 'alert', message: run.message, action: 'Try again' }
+  }
+  if (analysis.status !== 'ok' || analysis.analysis === null) {
+    return {
+      tone: 'neutral',
+      role: 'status',
+      message: 'Not yet analyzed',
+      action: 'Analyze'
+    }
+  }
+  const row = analysis.analysis
+  if (row.status === 'failed') {
+    return {
+      tone: 'error',
+      role: 'alert',
+      message: row.errorMessage ?? 'Analysis failed.',
+      action: 'Try again'
+    }
+  }
+  const count = row.sourceSessionCount ?? 0
+  const word = count === 1 ? 'session' : 'sessions'
+  const model = findModel(row.model)
+  const modelLabel = model?.label ?? row.model
+  return {
+    tone: 'success',
+    role: 'status',
+    message: `Analyzed from ${count} ${word} (last 14 days) · ${relativeTime(row.generatedAt)} · ${modelLabel}`,
+    action: 'Re-analyze'
+  }
+}
+
+/* `BarTone` is exported so future Analyze-bar consumers can extend the
+   palette; kept local for now. */
+export type { BarTone }
 
 function AnalysisPanel({ state }: { state: AnalysisState }): JSX.Element {
   if (state.status === 'loading') {
@@ -341,28 +341,8 @@ function AnalysisView({ analysis }: { analysis: StoredAnalysis }): JSX.Element {
           </ul>
         </>
       )}
-
-      <AttributionFooter analysis={analysis} />
     </section>
   )
-}
-
-function AttributionFooter({ analysis }: { analysis: StoredAnalysis }): JSX.Element {
-  const model = findModel(analysis.model)
-  const modelLabel = model ? model.label : analysis.model
-  const providerLabel = capitalize(analysis.provider)
-  return (
-    <footer className="analysis-attribution">
-      <span>
-        via {providerLabel} · {modelLabel}
-      </span>
-      <span>· {relativeTime(analysis.generatedAt)}</span>
-    </footer>
-  )
-}
-
-function capitalize(value: string): string {
-  return value.length > 0 ? value[0]!.toUpperCase() + value.slice(1) : value
 }
 
 /**
