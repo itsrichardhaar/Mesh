@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { Project } from '@shared/types'
 import type { ProjectListState } from '../hooks/useProjectList'
+
+const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000
+
+function isIdle(project: Project): boolean {
+  if (project.sourceMissing) return false
+  return Date.now() - new Date(project.activity).getTime() > FOURTEEN_DAYS_MS
+}
 
 interface ContextMenuState {
   encodedPath: string
@@ -26,6 +34,7 @@ export function ProjectSidebar({
 }: Props): JSX.Element {
   const [query, setQuery] = useState('')
   const [showHidden, setShowHidden] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
 
   const handleToggleHidden = async (encodedPath: string, hidden: boolean): Promise<void> => {
@@ -41,39 +50,56 @@ export function ProjectSidebar({
   return (
     <aside className="sidebar" aria-label="Projects">
       <header className="sidebar-header">
-        <h2>Projects</h2>
+        <button
+          type="button"
+          className="sidebar-group-toggle"
+          onClick={() => setCollapsed((v) => !v)}
+          aria-expanded={!collapsed}
+          aria-controls="sidebar-projects-body"
+        >
+          {collapsed ? (
+            <ChevronRight size={14} aria-hidden="true" />
+          ) : (
+            <ChevronDown size={14} aria-hidden="true" />
+          )}
+          <span>Projects</span>
+        </button>
       </header>
 
-      <div className="sidebar-search">
-        <input
-          type="search"
-          placeholder="Search projects…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          aria-label="Search projects"
-        />
-      </div>
+      {!collapsed && (
+        <div id="sidebar-projects-body" className="sidebar-projects-body">
+          <div className="sidebar-search">
+            <input
+              type="search"
+              placeholder="Search projects…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              aria-label="Search projects"
+            />
+          </div>
 
-      <SidebarBody
-        state={state}
-        query={query}
-        showHidden={showHidden}
-        selectedEncodedPath={selectedEncodedPath}
-        onSelect={onSelect}
-        onOpen={onOpen}
-        onContextMenu={(e, p) => {
-          e.preventDefault()
-          e.stopPropagation()
-          setMenu({ encodedPath: p.encodedPath, hidden: p.hidden, x: e.clientX, y: e.clientY })
-        }}
-      />
+          <SidebarBody
+            state={state}
+            query={query}
+            showHidden={showHidden}
+            selectedEncodedPath={selectedEncodedPath}
+            onSelect={onSelect}
+            onOpen={onOpen}
+            onContextMenu={(e, p) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setMenu({ encodedPath: p.encodedPath, hidden: p.hidden, x: e.clientX, y: e.clientY })
+            }}
+          />
 
-      {state.status === 'ok' && (
-        <SidebarFooter
-          projects={state.projects}
-          showHidden={showHidden}
-          onToggle={() => setShowHidden((v) => !v)}
-        />
+          {state.status === 'ok' && (
+            <SidebarFooter
+              projects={state.projects}
+              showHidden={showHidden}
+              onToggle={() => setShowHidden((v) => !v)}
+            />
+          )}
+        </div>
       )}
 
       {menu && (
@@ -143,9 +169,11 @@ function SidebarBody({
   return (
     <ul className="project-list" role="list">
       {visible.map((p) => {
+        const idle = isIdle(p)
         const classes = ['project-row']
         if (p.encodedPath === selectedEncodedPath) classes.push('project-row-selected')
         if (p.sourceMissing) classes.push('project-row-missing')
+        if (idle) classes.push('project-row-idle')
         if (p.hidden) classes.push('project-row-hidden')
         return (
           <li key={p.encodedPath}>
@@ -166,7 +194,13 @@ function SidebarBody({
               title={p.sourceMissing ? 'Source folder no longer exists on disk' : undefined}
             >
               <span className="project-name">{p.name}</span>
-              <span className="project-activity">{formatRelative(p.activity)}</span>
+              {p.sourceMissing ? (
+                <span className="sidebar-pill sidebar-pill-missing">Source missing</span>
+              ) : idle ? (
+                <span className="sidebar-pill sidebar-pill-idle">Idle</span>
+              ) : (
+                <span className="project-activity">{formatRelative(p.activity)}</span>
+              )}
             </button>
           </li>
         )

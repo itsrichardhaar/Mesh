@@ -13,6 +13,10 @@ type NonSettingsScreen = Exclude<Screen, 'settings'>
 export function App(): JSX.Element {
   const [screen, setScreen] = useState<Screen>('home')
   const [workspaceProject, setWorkspaceProject] = useState<Project | null>(null)
+  // Selected Project on the Home Screen. `null` means "show cards view";
+  // a value means "show that project's Analysis detail." Lifted from
+  // HomeScreen so `goHome` can clear it when invoked from the top bar.
+  const [homeSelection, setHomeSelection] = useState<string | null>(null)
   // `previousScreen` is whatever non-Settings screen was active when
   // Settings opened — that's where Esc / ⌘W returns us to.
   const previousScreen = useRef<NonSettingsScreen>('home')
@@ -35,6 +39,7 @@ export function App(): JSX.Element {
 
   const goHome = useCallback(() => {
     setScreen('home')
+    setHomeSelection(null)
   }, [])
 
   useEffect(() => {
@@ -73,7 +78,12 @@ export function App(): JSX.Element {
           <TopBar onGoHome={goHome} onOpenSettings={openSettings} />
           <div className="app-screens">
             <div hidden={screen !== 'home'}>
-              <HomeScreen onOpenWorkspace={openWorkspace} onOpenSettings={openSettings} />
+              <HomeScreen
+                onOpenWorkspace={openWorkspace}
+                onOpenSettings={openSettings}
+                selectedEncodedPath={homeSelection}
+                onSelect={setHomeSelection}
+              />
             </div>
             {workspaceProject && (
               <WorkspaceScreen

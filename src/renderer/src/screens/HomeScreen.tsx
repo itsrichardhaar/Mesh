@@ -1,6 +1,6 @@
-import { useState } from 'react'
 import type { Project } from '@shared/types'
 import { OnboardingBanner } from '../components/OnboardingBanner'
+import { ProjectCards } from '../components/ProjectCards'
 import { ProjectDetail } from '../components/ProjectDetail'
 import { ProjectSidebar } from '../components/ProjectSidebar'
 import { useProjectList } from '../hooks/useProjectList'
@@ -8,11 +8,17 @@ import { useProjectList } from '../hooks/useProjectList'
 interface Props {
   onOpenWorkspace: (project: Project) => void
   onOpenSettings: () => void
+  selectedEncodedPath: string | null
+  onSelect: (encodedPath: string | null) => void
 }
 
-export function HomeScreen({ onOpenWorkspace, onOpenSettings }: Props): JSX.Element {
+export function HomeScreen({
+  onOpenWorkspace,
+  onOpenSettings,
+  selectedEncodedPath,
+  onSelect
+}: Props): JSX.Element {
   const { state, refresh } = useProjectList()
-  const [selectedEncodedPath, setSelectedEncodedPath] = useState<string | null>(null)
 
   const selected =
     state.status === 'ok'
@@ -27,23 +33,45 @@ export function HomeScreen({ onOpenWorkspace, onOpenSettings }: Props): JSX.Elem
           state={state}
           refresh={refresh}
           selectedEncodedPath={selectedEncodedPath}
-          onSelect={setSelectedEncodedPath}
+          onSelect={onSelect}
           onOpen={onOpenWorkspace}
         />
         <main className="detail-pane" aria-label="Project detail">
-          {selected ? <ProjectDetail project={selected} /> : <EmptyDetail />}
+          {selected ? (
+            <ProjectDetail project={selected} onBack={() => onSelect(null)} />
+          ) : state.status === 'ok' && state.projects.filter((p) => !p.hidden && !p.sourceMissing).length === 0 ? (
+            <EmptyHome />
+          ) : state.status === 'ok' ? (
+            <ProjectCards
+              projects={state.projects}
+              onSelect={onSelect}
+              onOpenWorkspace={onOpenWorkspace}
+            />
+          ) : (
+            <EmptyDetail loading={state.status === 'loading'} />
+          )}
         </main>
       </div>
     </div>
   )
 }
 
-function EmptyDetail(): JSX.Element {
+function EmptyHome(): JSX.Element {
+  return (
+    <div className="home-empty">
+      <h2>No projects yet</h2>
+      <p>
+        Mesh discovers projects automatically from <code>~/.claude/projects/</code>.
+        Open Claude Code in any folder to get started — it'll appear here on next launch.
+      </p>
+    </div>
+  )
+}
+
+function EmptyDetail({ loading }: { loading: boolean }): JSX.Element {
   return (
     <div className="detail-placeholder">
-      <h1>Mesh</h1>
-      <p className="detail-subtitle">AI workspace OS</p>
-      <p className="detail-hint">Select a project from the sidebar.</p>
+      <p className="detail-hint">{loading ? 'Loading projects…' : 'Select a project from the sidebar.'}</p>
     </div>
   )
 }

@@ -31,9 +31,10 @@ type RunState =
 
 interface Props {
   project: Project
+  onBack: () => void
 }
 
-export function ProjectDetail({ project }: Props): JSX.Element {
+export function ProjectDetail({ project, onBack }: Props): JSX.Element {
   const [stats, setStats] = useState<StatsState>({ status: 'loading' })
   const [analysis, setAnalysis] = useState<AnalysisState>({ status: 'loading' })
   const [run, setRun] = useState<RunState>({ status: 'idle' })
@@ -107,6 +108,14 @@ export function ProjectDetail({ project }: Props): JSX.Element {
 
   return (
     <div className="project-detail">
+      <button
+        type="button"
+        className="project-detail-back"
+        onClick={onBack}
+        aria-label="Back to home"
+      >
+        <span aria-hidden="true">‹</span> Home
+      </button>
       <header className="project-detail-header">
         <h1 className="project-detail-name">{project.name}</h1>
         {project.autoSubtitle && (
