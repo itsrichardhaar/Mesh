@@ -946,8 +946,15 @@ button {
 }
 
 .analyze-bar-action:hover:not(:disabled) {
-  background: var(--accent-soft);
-  border-color: var(--accent);
+  /* Green tone mirroring the success bar — a "go" affordance that
+     reads as positive across all bar states (neutral / success / error). */
+  background: rgba(80, 160, 110, 0.18);
+  border-color: rgba(80, 160, 110, 0.60);
+}
+
+[data-theme='dark'] .analyze-bar-action:hover:not(:disabled) {
+  background: rgba(110, 190, 140, 0.20);
+  border-color: rgba(110, 190, 140, 0.55);
 }
 
 .analyze-bar-action:disabled {
