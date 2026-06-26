@@ -2,6 +2,12 @@
 // Every method here corresponds to a registered `ipcMain.handle` in src/main.
 
 import type { FileReadResponse, FilesTreeRequest, FilesTreeResponse } from './files'
+import type {
+  PtyCreateRequest,
+  PtyCreateResponse,
+  PtyDataEvent,
+  PtyExitEvent
+} from './pty'
 import type { SessionSummary, TranscriptEntry } from './sessions'
 import type {
   Project,
@@ -139,6 +145,24 @@ export interface MeshApi {
      * banner rather than the editor.
      */
     read(encodedPath: string, relPath: string): Promise<FileReadResponse>
+  }
+
+  /**
+   * Live `claude --resume <sessionId>` pty layer. `create` spawns the
+   * process (cwd = the Project's Source Path); `write` / `resize` /
+   * `kill` operate on a given `ptyId`. Streaming events arrive via
+   * `onData` (every output chunk) and `onExit` (once, when the child
+   * exits). v1 ships single-pty-per-window semantics; the surface is
+   * already keyed by `ptyId` so Slice 17 can add multi-tab without
+   * changing this contract.
+   */
+  pty: {
+    create(request: PtyCreateRequest): Promise<PtyCreateResponse>
+    write(ptyId: string, data: string): Promise<void>
+    resize(ptyId: string, cols: number, rows: number): Promise<void>
+    kill(ptyId: string): Promise<void>
+    onData(cb: (event: PtyDataEvent) => void): () => void
+    onExit(cb: (event: PtyExitEvent) => void): () => void
   }
 
   /**

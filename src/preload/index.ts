@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { MeshApi } from '@shared/api'
+import type { PtyDataEvent, PtyExitEvent } from '@shared/pty'
 
 function subscribe(channel: string, cb: () => void): () => void {
   const handler = (): void => cb()
@@ -63,6 +64,14 @@ const api: MeshApi = {
     readTranscript: (encodedPath, sessionId) =>
       ipcRenderer.invoke('sessions:read-transcript', encodedPath, sessionId),
     onChanged: (cb) => subscribeArg<string>('sessions:changed', cb)
+  },
+  pty: {
+    create: (request) => ipcRenderer.invoke('pty:create', request),
+    write: (ptyId, data) => ipcRenderer.invoke('pty:write', ptyId, data),
+    resize: (ptyId, cols, rows) => ipcRenderer.invoke('pty:resize', ptyId, cols, rows),
+    kill: (ptyId) => ipcRenderer.invoke('pty:kill', ptyId),
+    onData: (cb) => subscribeArg<PtyDataEvent>('pty:data', cb),
+    onExit: (cb) => subscribeArg<PtyExitEvent>('pty:exit', cb)
   }
 }
 

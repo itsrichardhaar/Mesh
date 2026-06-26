@@ -3,6 +3,7 @@ import type { Project } from '@shared/types'
 import { FileTree } from '../components/FileTree'
 import { FileViewer } from '../components/FileViewer'
 import { ModeTabs } from '../components/ModeTabs'
+import { PtyView } from '../components/PtyView'
 import { SessionsList } from '../components/SessionsList'
 import { Transcript } from '../components/Transcript'
 import { useWorkspaceMode } from '../hooks/useWorkspaceMode'
@@ -26,6 +27,10 @@ export function WorkspaceScreen({ project, visible, onBack }: Props): JSX.Elemen
   const [showHidden, setShowHidden] = useState(false)
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [selectedFileRelPath, setSelectedFileRelPath] = useState<string | null>(null)
+  // Slice 16: single live Pty Tab per Workspace. When the user
+  // Resumes a session, this gets set; selecting a different session
+  // clears it (Slice 17 will make this multi-tab).
+  const [resumedSessionId, setResumedSessionId] = useState<string | null>(null)
   const { mode, setMode } = useWorkspaceMode(project.encodedPath)
 
   // Reset selections when the user opens a different Project so we
@@ -33,7 +38,17 @@ export function WorkspaceScreen({ project, visible, onBack }: Props): JSX.Elemen
   useEffect(() => {
     setSelectedSessionId(null)
     setSelectedFileRelPath(null)
+    setResumedSessionId(null)
   }, [project.encodedPath])
+
+  const handleSessionSelect = (sessionId: string): void => {
+    setSelectedSessionId(sessionId)
+    // Single-pty semantics: changing the selected session abandons
+    // the previous live pty (PtyView's cleanup effect kills it).
+    if (resumedSessionId !== null && resumedSessionId !== sessionId) {
+      setResumedSessionId(null)
+    }
+  }
 
   // ⌘. routes through the application menu so the accelerator is
   // standard across screens; here we only act on it when the Workspace
@@ -99,7 +114,7 @@ export function WorkspaceScreen({ project, visible, onBack }: Props): JSX.Elemen
           <SessionsList
             encodedPath={project.encodedPath}
             selectedSessionId={selectedSessionId}
-            onSelect={setSelectedSessionId}
+            onSelect={handleSessionSelect}
           />
         </section>
 
@@ -107,11 +122,21 @@ export function WorkspaceScreen({ project, visible, onBack }: Props): JSX.Elemen
           <ModeTabs mode={mode} onChange={setMode} />
           <div className="workspace-mode-pane" hidden={mode !== 'sessions'}>
             {selectedSessionId ? (
-              <Transcript
-                key={`${project.encodedPath}:${selectedSessionId}`}
-                encodedPath={project.encodedPath}
-                sessionId={selectedSessionId}
-              />
+              resumedSessionId === selectedSessionId ? (
+                <PtyView
+                  key={`pty:${project.encodedPath}:${selectedSessionId}`}
+                  encodedPath={project.encodedPath}
+                  sessionId={selectedSessionId}
+                  onExit={() => setResumedSessionId(null)}
+                />
+              ) : (
+                <Transcript
+                  key={`${project.encodedPath}:${selectedSessionId}`}
+                  encodedPath={project.encodedPath}
+                  sessionId={selectedSessionId}
+                  onResume={(sessionId) => setResumedSessionId(sessionId)}
+                />
+              )
             ) : (
               <p className="workspace-stub">Select a Session.</p>
             )}

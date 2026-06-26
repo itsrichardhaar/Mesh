@@ -12,6 +12,7 @@ import { CodeBlock } from './CodeBlock'
 interface Props {
   encodedPath: string
   sessionId: string
+  onResume: (sessionId: string) => void
 }
 
 /**
@@ -24,7 +25,7 @@ interface Props {
  * don't lock up the renderer. The "Resume in terminal →" button is
  * intentionally disabled here; Slice 16 wires it up.
  */
-export function Transcript({ encodedPath, sessionId }: Props): JSX.Element {
+export function Transcript({ encodedPath, sessionId, onResume }: Props): JSX.Element {
   const [entries, setEntries] = useState<TranscriptEntry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -60,8 +61,7 @@ export function Transcript({ encodedPath, sessionId }: Props): JSX.Element {
         <button
           type="button"
           className="transcript-resume"
-          disabled
-          title="Live terminal lands in Slice 16"
+          onClick={() => onResume(sessionId)}
         >
           Resume in terminal →
         </button>

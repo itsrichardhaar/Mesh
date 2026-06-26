@@ -20,8 +20,11 @@ import {
   humanizeAnthropicError,
   SchemaViolationError
 } from './models/claude-client'
+import type { PtyCreateRequest, PtyCreateResponse } from '@shared/pty'
 import { AnalysisOrchestrator } from './analyses/orchestrator'
 import { insertAnalysis, latestForProject } from './analyses/repository'
+import { resolveClaudeBinary } from './pty/claude-resolver'
+import { PtyManager } from './pty/manager'
 import { getDatabase, initDatabase } from './db'
 import { runMigrations } from './db/migrations'
 import { FileReadError, readProjectFile } from './files/file-reader'
@@ -62,6 +65,7 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
 let mainWindow: BrowserWindow | null = null
 let isQuitting = false
+const ptyManager = new PtyManager()
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -475,6 +479,99 @@ function registerIpc(): void {
   )
 
   ipcMain.handle(
+    'pty:create',
+    async (_event, request: unknown): Promise<PtyCreateResponse> => {
+      if (request === null || typeof request !== 'object' || Array.isArray(request)) {
+        throw new Error('pty:create: request must be an object')
+      }
+      const req = request as PtyCreateRequest
+      if (typeof req.encodedPath !== 'string' || req.encodedPath.length === 0) {
+        throw new Error('pty:create: encodedPath must be a non-empty string')
+      }
+      if (typeof req.sessionId !== 'string' || req.sessionId.length === 0) {
+        throw new Error('pty:create: sessionId must be a non-empty string')
+      }
+      const cols = Number.isFinite(req.cols) && req.cols > 0 ? Math.floor(req.cols) : 80
+      const rows = Number.isFinite(req.rows) && req.rows > 0 ? Math.floor(req.rows) : 24
+
+      const sourcePath = getSourcePath(getDatabase(), req.encodedPath)
+      if (!sourcePath) {
+        return {
+          ok: false,
+          code: 'project-not-found',
+          message: `Unknown project ${req.encodedPath}`
+        }
+      }
+
+      // Source-Missing projects can't host a Pty Tab — the cwd no
+      // longer exists. Resolve the claude binary in the same step so
+      // the user sees one banner per failure mode.
+      const stat = await import('node:fs/promises').then((m) => m.stat(sourcePath).catch(() => null))
+      if (!stat || !stat.isDirectory()) {
+        return {
+          ok: false,
+          code: 'source-missing',
+          message: `Source path no longer exists: ${sourcePath}`
+        }
+      }
+      const claudeBin = await resolveClaudeBinary()
+      if (!claudeBin) {
+        return {
+          ok: false,
+          code: 'claude-not-found',
+          message:
+            'The `claude` CLI was not found on PATH. Install Claude Code from claude.com/claude-code, then try Resume again.'
+        }
+      }
+
+      const ptyId = ptyManager.create({
+        command: claudeBin,
+        args: ['--resume', req.sessionId],
+        cwd: sourcePath,
+        cols,
+        rows,
+        onData: (id, data) => {
+          mainWindow?.webContents.send('pty:data', { ptyId: id, data })
+        },
+        onExit: (id, exitCode) => {
+          mainWindow?.webContents.send('pty:exit', { ptyId: id, exitCode })
+        }
+      })
+      return { ok: true, ptyId }
+    }
+  )
+
+  ipcMain.handle('pty:write', (_event, ptyId: unknown, data: unknown): void => {
+    if (typeof ptyId !== 'string' || ptyId.length === 0) {
+      throw new Error('pty:write: ptyId must be a non-empty string')
+    }
+    if (typeof data !== 'string') {
+      throw new Error('pty:write: data must be a string')
+    }
+    ptyManager.write(ptyId, data)
+  })
+
+  ipcMain.handle(
+    'pty:resize',
+    (_event, ptyId: unknown, cols: unknown, rows: unknown): void => {
+      if (typeof ptyId !== 'string' || ptyId.length === 0) {
+        throw new Error('pty:resize: ptyId must be a non-empty string')
+      }
+      if (typeof cols !== 'number' || typeof rows !== 'number') {
+        throw new Error('pty:resize: cols and rows must be numbers')
+      }
+      ptyManager.resize(ptyId, cols, rows)
+    }
+  )
+
+  ipcMain.handle('pty:kill', (_event, ptyId: unknown): void => {
+    if (typeof ptyId !== 'string' || ptyId.length === 0) {
+      throw new Error('pty:kill: ptyId must be a non-empty string')
+    }
+    ptyManager.kill(ptyId)
+  })
+
+  ipcMain.handle(
     'files:tree',
     async (
       _event,
@@ -606,4 +703,5 @@ app.on('before-quit', () => {
   isQuitting = true
   void closeAllWatchers()
   void closeAllSessionWatchers()
+  ptyManager.closeAll()
 })
