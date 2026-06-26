@@ -5,8 +5,13 @@
 node_modules/
 dist/
 out/
-build/
 *.tsbuildinfo
+# `build/` holds electron-builder's `buildResources` (source assets like
+# icons). The icon files committed there are source, not generated — only
+# anything else under `build/` is build output that shouldn't be tracked.
+build/*
+!build/icon.icns
+!build/icon.png
 
 # Electron / electron-vite
 .vite/

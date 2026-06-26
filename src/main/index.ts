@@ -67,6 +67,13 @@ let mainWindow: BrowserWindow | null = null
 let isQuitting = false
 const ptyManager = new PtyManager()
 
+// In production builds, `electron-builder` embeds `build/icon.icns` into the
+// `.app` bundle (configured in `electron-builder.yml`), so the dock icon
+// comes from CFBundleIconFile automatically. In dev (`pnpm dev`), Electron
+// uses its default app icon unless we set one explicitly — `app.dock.setIcon`
+// covers macOS, and `BrowserWindow({ icon })` covers Linux/Windows.
+const APP_ICON_PATH = join(__dirname, '../../build/icon.png')
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -74,6 +81,7 @@ function createWindow(): void {
     minWidth: 900,
     minHeight: 600,
     show: false,
+    icon: APP_ICON_PATH,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
@@ -678,6 +686,18 @@ function applyPersistedTheme(): void {
 }
 
 app.whenReady().then(() => {
+  // macOS dev-mode dock icon. Production bundles get their icon from
+  // electron-builder's `mac.icon` config, so `app.dock.setIcon` is a no-op
+  // there but harmless. Wrapped in try/catch because the dock module is
+  // macOS-only — calling it on other platforms throws.
+  if (process.platform === 'darwin' && app.dock) {
+    try {
+      app.dock.setIcon(APP_ICON_PATH)
+    } catch {
+      // Non-fatal: the dock will fall back to Electron's default icon.
+    }
+  }
+
   const db = initDatabase()
   runMigrations(db)
   smokeTestSafeStorage()
