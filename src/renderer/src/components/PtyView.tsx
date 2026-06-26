@@ -67,6 +67,11 @@ export function PtyView({
         "'JetBrains Mono Variable', 'SF Mono', Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace",
       fontSize: 13,
       theme: xtermTheme(effective),
+      // CLIs (Claude, git diff, delta, etc.) sometimes set foreground and
+      // background to the same ANSI color, producing invisible text. xterm
+      // can post-process the rendered colors to maintain a minimum WCAG
+      // contrast ratio between fg and bg — 4.5 = WCAG AA for normal text.
+      minimumContrastRatio: 4.5,
       scrollback: 10_000
     })
     const fit = new FitAddon()
@@ -238,28 +243,31 @@ function PtyErrorBanner({
 }
 
 /**
- * Mesh Light ANSI palette (Slice 27). Derived from Solarized Light but
- * tuned toward Mesh's warm cream/peach aesthetic — yellows and oranges
- * pulled away from the high-luminance yellows that became unreadable
- * against the v1 `#faf8f4` canvas (default xterm ANSI yellow `#e5e510`
- * was the bug we're fixing).
+ * Mesh Light ANSI palette (Slice 27). Built on Solarized Light's proven
+ * saturated mid-tones — they're chosen so each slot is readable BOTH as
+ * foreground text on a light canvas AND as a background with default
+ * foreground text on top (the latter matters for `git diff`, `delta`,
+ * etc., which highlight whole lines with `ESC[4N`m background codes).
+ * A previous iteration of this palette used dark muted tones (e.g.,
+ * green `#5e8454`) which caused green-on-green collisions when tools
+ * used ANSI green as a background.
  */
 const MESH_LIGHT_ANSI: Record<string, string> = {
   black: '#1a1814',
-  red: '#c45c5c',
-  green: '#5e8454',
-  yellow: '#a36a30',
-  blue: '#4f6f9a',
-  magenta: '#8e5e8e',
-  cyan: '#3f7d7d',
+  red: '#dc322f',
+  green: '#859900',
+  yellow: '#b58900',
+  blue: '#268bd2',
+  magenta: '#d33682',
+  cyan: '#2aa198',
   white: '#9a948a',
   brightBlack: '#6b665d',
-  brightRed: '#d97676',
-  brightGreen: '#7aa56e',
-  brightYellow: '#c08540',
-  brightBlue: '#6b8db8',
-  brightMagenta: '#a878a8',
-  brightCyan: '#5d9999',
+  brightRed: '#e54838',
+  brightGreen: '#92a30f',
+  brightYellow: '#c69500',
+  brightBlue: '#3d99e3',
+  brightMagenta: '#df4f93',
+  brightCyan: '#37b3aa',
   brightWhite: '#1a1814'
 }
 
