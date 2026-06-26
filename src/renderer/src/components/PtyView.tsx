@@ -238,23 +238,76 @@ function PtyErrorBanner({
 }
 
 /**
- * Read xterm's palette from Mesh's design tokens via the live
- * `getComputedStyle(document.documentElement)` so the terminal stays
- * in lock-step with the rest of the app. `effective` is unused at
- * the call site but kept as a parameter so React re-runs the
- * `useEffect` that calls this when the theme flips.
+ * Mesh Light ANSI palette (Slice 27). Derived from Solarized Light but
+ * tuned toward Mesh's warm cream/peach aesthetic — yellows and oranges
+ * pulled away from the high-luminance yellows that became unreadable
+ * against the v1 `#faf8f4` canvas (default xterm ANSI yellow `#e5e510`
+ * was the bug we're fixing).
  */
-function xtermTheme(_effective: 'light' | 'dark'): Record<string, string> {
+const MESH_LIGHT_ANSI: Record<string, string> = {
+  black: '#1a1814',
+  red: '#c45c5c',
+  green: '#5e8454',
+  yellow: '#a36a30',
+  blue: '#4f6f9a',
+  magenta: '#8e5e8e',
+  cyan: '#3f7d7d',
+  white: '#9a948a',
+  brightBlack: '#6b665d',
+  brightRed: '#d97676',
+  brightGreen: '#7aa56e',
+  brightYellow: '#c08540',
+  brightBlue: '#6b8db8',
+  brightMagenta: '#a878a8',
+  brightCyan: '#5d9999',
+  brightWhite: '#1a1814'
+}
+
+/**
+ * Mesh Dark ANSI palette. Explicit (rather than relying on xterm
+ * defaults) so palette evolution is symmetric with light mode — both
+ * tracked in source, no implicit version-dependent defaults.
+ */
+const MESH_DARK_ANSI: Record<string, string> = {
+  black: '#2f2b25',
+  red: '#e88a8a',
+  green: '#88c180',
+  yellow: '#e0b060',
+  blue: '#88a8d0',
+  magenta: '#c08ac0',
+  cyan: '#80c0c0',
+  white: '#b8b0a3',
+  brightBlack: '#5a554d',
+  brightRed: '#f0a6a6',
+  brightGreen: '#a0d098',
+  brightYellow: '#eec888',
+  brightBlue: '#a0c0e0',
+  brightMagenta: '#d0a6d0',
+  brightCyan: '#a0d0d0',
+  brightWhite: '#f5f1ea'
+}
+
+/**
+ * Read xterm's surface palette from Mesh's design tokens via live
+ * `getComputedStyle(document.documentElement)` (so the terminal stays
+ * in lock-step with the rest of the app), and merge in the explicit
+ * ANSI palette for `effective`. Without the ANSI override, xterm falls
+ * back to its dark-tuned defaults which become unreadable on Mesh's
+ * light canvas (yellow `#e5e510` on cream `#faf8f4` was the v1 bug).
+ */
+function xtermTheme(effective: 'light' | 'dark'): Record<string, string> {
   const css = getComputedStyle(document.documentElement)
   const v = (name: string, fallback: string): string => {
     const raw = css.getPropertyValue(name).trim()
     return raw.length > 0 ? raw : fallback
   }
+  const ansi = effective === 'light' ? MESH_LIGHT_ANSI : MESH_DARK_ANSI
   return {
     background: v('--bg-canvas', '#faf8f4'),
     foreground: v('--text-primary', '#1a1814'),
     cursor: v('--accent', '#d97757'),
     cursorAccent: v('--accent-fg', '#ffffff'),
-    selectionBackground: v('--bg-elevated', '#e8e4dc')
+    selectionBackground: v('--bg-elevated', '#e8e4dc'),
+    ...ansi
   }
 }
