@@ -49,7 +49,7 @@ export function FileViewer({ encodedPath, relPath }: Props): JSX.Element {
         renderWhitespace: 'selection',
         fontSize: 13,
         fontFamily:
-          "'SF Mono', Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace",
+          "'JetBrains Mono Variable', 'SF Mono', Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace",
         wordWrap: 'off'
       })
     })

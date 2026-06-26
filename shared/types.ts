@@ -44,6 +44,22 @@ export function isThemePreference(value: unknown): value is ThemePreference {
 }
 
 /**
+ * UI Mode preference (v2). `sans` keeps Mesh's default Inter-based document
+ * feel; `mono` switches the UI font to JetBrains Mono, tightens corner radii,
+ * and widens tracking slightly for a CLI / code-editor character. Monaco and
+ * xterm stay monospace regardless of this preference.
+ */
+export type UiModePreference = 'sans' | 'mono'
+
+export const UI_MODE_PREFERENCES: readonly UiModePreference[] = ['sans', 'mono']
+
+export function isUiModePreference(value: unknown): value is UiModePreference {
+  return (
+    typeof value === 'string' && (UI_MODE_PREFERENCES as readonly string[]).includes(value)
+  )
+}
+
+/**
  * Identifier for the three Provider slots Mesh ships with. Only `claude`
  * is functional in v1; the others exist so the secrets/settings shape
  * doesn't change when Slice 9 turns them on.

@@ -3,6 +3,7 @@ import type {
   ProviderId,
   StoredValidation,
   ThemePreference,
+  UiModePreference,
   ValidationResult
 } from '@shared/types'
 import {
@@ -15,6 +16,7 @@ import {
 } from '@shared/models'
 import { PROVIDER_IDS } from '@shared/types'
 import { useTheme } from '../theme/ThemeProvider'
+import { useUiMode } from '../theme/UiModeProvider'
 import { relativeTime } from '../util/relativeTime'
 
 const ANTHROPIC_CONSOLE_URL = 'https://console.anthropic.com'
@@ -59,6 +61,7 @@ export function SettingsScreen({ onClose }: Props): JSX.Element {
 
 function AppearanceSection(): JSX.Element {
   const { preference, setPreference, ready } = useTheme()
+  const { mode, setMode, ready: uiModeReady } = useUiMode()
 
   return (
     <section className="settings-section" aria-label="Appearance">
@@ -87,6 +90,24 @@ function AppearanceSection(): JSX.Element {
           onChange={setPreference}
         />
       </fieldset>
+
+      <fieldset className="theme-options ui-mode-options" disabled={!uiModeReady}>
+        <legend className="settings-fieldset-legend">UI Mode</legend>
+        <UiModeOption
+          value="sans"
+          label="Sans"
+          description="Proportional Inter font, softer document feel."
+          checked={mode === 'sans'}
+          onChange={setMode}
+        />
+        <UiModeOption
+          value="mono"
+          label="Mono"
+          description="Monospace JetBrains Mono, tighter CLI / code-editor feel."
+          checked={mode === 'mono'}
+          onChange={setMode}
+        />
+      </fieldset>
     </section>
   )
 }
@@ -109,6 +130,36 @@ function ThemeOption({
       <input
         type="radio"
         name="theme"
+        value={value}
+        checked={checked}
+        onChange={() => onChange(value)}
+      />
+      <span className="theme-option-text">
+        <span className="theme-option-label">{label}</span>
+        <span className="theme-option-description">{description}</span>
+      </span>
+    </label>
+  )
+}
+
+function UiModeOption({
+  value,
+  label,
+  description,
+  checked,
+  onChange
+}: {
+  value: UiModePreference
+  label: string
+  description: string
+  checked: boolean
+  onChange: (next: UiModePreference) => void
+}): JSX.Element {
+  return (
+    <label className={`theme-option${checked ? ' theme-option-checked' : ''}`}>
+      <input
+        type="radio"
+        name="ui-mode"
         value={value}
         checked={checked}
         onChange={() => onChange(value)}

@@ -5,6 +5,10 @@
  * swaps the palette when ThemeProvider sets the attribute on <html>.
  * Component CSS below never references hex / rgba directly — only
  * `var(--token)` so theme switching is automatic.
+ *
+ * v2 adds a UI Mode dimension. `[data-ui-mode='mono']` (set by
+ * UiModeProvider) flips `--font-ui` to monospace, tightens `--radius-base`,
+ * and nudges `--tracking-normal` wider for the CLI feel.
  */
 
 :root,
@@ -39,8 +43,43 @@
 }
 
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
-  font-size: 14px;
+  --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'SF Mono', Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  --font-ui: var(--font-sans);
+
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 15px;
+  --text-lg: 18px;
+  --text-xl: 22px;
+  --text-2xl: 28px;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  --line-tight: 1.2;
+  --line-normal: 1.5;
+  --line-relaxed: 1.7;
+
+  --tracking-tight: -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.02em;
+
+  --radius-base: 8px;
+}
+
+[data-ui-mode='mono'] {
+  --font-ui: var(--font-mono);
+  --tracking-normal: 0.01em;
+  --radius-base: 4px;
+}
+
+:root {
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  letter-spacing: var(--tracking-normal);
   color: var(--text-primary);
   background: var(--bg-canvas);
   -webkit-font-smoothing: antialiased;
@@ -738,6 +777,20 @@ button {
 .theme-option-description {
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+/* --- UI Mode (Slice 19) ------------------------------------------------- */
+
+.ui-mode-options {
+  margin-top: 20px;
+}
+
+.settings-fieldset-legend {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding: 0;
+  margin: 0 0 8px;
 }
 
 /* --- API key field (Slice 7) --------------------------------------------- */

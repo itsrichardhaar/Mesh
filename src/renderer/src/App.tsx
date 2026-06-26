@@ -5,6 +5,7 @@ import { HomeScreen } from './screens/HomeScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { WorkspaceScreen } from './screens/WorkspaceScreen'
 import { ThemeProvider } from './theme/ThemeProvider'
+import { UiModeProvider } from './theme/UiModeProvider'
 
 type Screen = 'home' | 'settings' | 'workspace'
 type NonSettingsScreen = Exclude<Screen, 'settings'>
@@ -67,19 +68,21 @@ export function App(): JSX.Element {
 
   return (
     <ThemeProvider>
-      <div hidden={screen !== 'home'}>
-        <HomeScreen onOpenWorkspace={openWorkspace} onOpenSettings={openSettings} />
-      </div>
-      {workspaceProject && (
-        <WorkspaceScreen
-          key={workspaceProject.encodedPath}
-          project={workspaceProject}
-          visible={screen === 'workspace'}
-          onBack={goHome}
-        />
-      )}
-      {screen === 'settings' && <SettingsScreen onClose={closeSettings} />}
-      {screen !== 'settings' && <SettingsButton onOpen={openSettings} />}
+      <UiModeProvider>
+        <div hidden={screen !== 'home'}>
+          <HomeScreen onOpenWorkspace={openWorkspace} onOpenSettings={openSettings} />
+        </div>
+        {workspaceProject && (
+          <WorkspaceScreen
+            key={workspaceProject.encodedPath}
+            project={workspaceProject}
+            visible={screen === 'workspace'}
+            onBack={goHome}
+          />
+        )}
+        {screen === 'settings' && <SettingsScreen onClose={closeSettings} />}
+        {screen !== 'settings' && <SettingsButton onOpen={openSettings} />}
+      </UiModeProvider>
     </ThemeProvider>
   )
 }

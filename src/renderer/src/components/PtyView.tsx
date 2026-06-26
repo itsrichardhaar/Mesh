@@ -64,7 +64,7 @@ export function PtyView({
       convertEol: true,
       cursorBlink: true,
       fontFamily:
-        "'SF Mono', Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace",
+        "'JetBrains Mono Variable', 'SF Mono', Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace",
       fontSize: 13,
       theme: xtermTheme(effective),
       scrollback: 10_000
