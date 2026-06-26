@@ -139,6 +139,55 @@ button {
   -webkit-app-region: no-drag;
 }
 
+/* --- Scrollbars (Slice 28) -----------------------------------------------
+   Custom thin scrollbars, themeable, hover-prominent. Webkit
+   pseudo-elements + Firefox properties for cross-platform coverage. The
+   `border-with-clip` trick gives the thumb visual breathing room without
+   needing a separate inset. Monaco and xterm have their own scrollbar
+   rendering — Monaco is configured via its options (see FileViewer);
+   xterm uses the browser's scrollbar so picks these rules up. */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-subtle) transparent;
+}
+
+/* --- Focus rings (Slice 28) ----------------------------------------------
+   Global :focus-visible default for any focusable element that doesn't
+   define its own. Per-component rules still win on specificity, so
+   existing component overrides keep working. */
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

@@ -50,7 +50,12 @@ export function FileViewer({ encodedPath, relPath }: Props): JSX.Element {
         fontSize: 13,
         fontFamily:
           "'JetBrains Mono Variable', 'SF Mono', Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace",
-        wordWrap: 'off'
+        wordWrap: 'off',
+        scrollbar: {
+          verticalScrollbarSize: 8,
+          horizontalScrollbarSize: 8,
+          useShadows: false
+        }
       })
     })
     return () => {
