@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { ArrowRight, Plus } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { ArrowRight, FileText, Lightbulb, ListChecks, Plus, type LucideIcon } from 'lucide-react'
 import type { Project, ProjectStats, StoredAnalysis } from '@shared/types'
 import { findModel } from '@shared/models'
 import { relativeTime } from '../util/relativeTime'
@@ -317,31 +317,57 @@ function AnalysisView({ analysis }: { analysis: StoredAnalysis }): JSX.Element {
 
   return (
     <section className="analysis" aria-label="Latest analysis">
-      <h2 className="analysis-section-heading">Summary of Recent Sessions</h2>
-      <div className="analysis-summary">{content.summaryMarkdown}</div>
+      <AnalysisSection icon={FileText} title="Summary of Recent Sessions">
+        <div className="analysis-summary">{content.summaryMarkdown}</div>
+      </AnalysisSection>
 
       {content.nextSteps.length > 0 && (
-        <>
-          <h2 className="analysis-section-heading">Next Steps</h2>
-          <ol className="analysis-list analysis-list-ordered">
+        <AnalysisSection icon={ListChecks} title="Next Steps">
+          <ol className="analysis-numbered-list">
             {content.nextSteps.map((item, i) => (
-              <li key={`${i}:${item.text}`}>{item.text}</li>
+              <li key={`${i}:${item.text}`}>
+                <span className="analysis-numbered-badge" aria-hidden="true">
+                  {i + 1}
+                </span>
+                <span className="analysis-list-text">{item.text}</span>
+              </li>
             ))}
           </ol>
-        </>
+        </AnalysisSection>
       )}
 
       {content.suggestedImprovements.length > 0 && (
-        <>
-          <h2 className="analysis-section-heading">Suggested Improvements</h2>
-          <ul className="analysis-list">
+        <AnalysisSection icon={Lightbulb} title="Suggested Improvements">
+          <ul className="analysis-dotted-list">
             {content.suggestedImprovements.map((item, i) => (
-              <li key={`${i}:${item.text}`}>{item.text}</li>
+              <li key={`${i}:${item.text}`}>
+                <span className="analysis-list-text">{item.text}</span>
+              </li>
             ))}
           </ul>
-        </>
+        </AnalysisSection>
       )}
     </section>
+  )
+}
+
+function AnalysisSection({
+  icon: Icon,
+  title,
+  children
+}: {
+  icon: LucideIcon
+  title: string
+  children: ReactNode
+}): JSX.Element {
+  return (
+    <div className="analysis-section">
+      <h2 className="analysis-section-heading">
+        <Icon size={16} aria-hidden={true} />
+        <span>{title}</span>
+      </h2>
+      {children}
+    </div>
   )
 }
 

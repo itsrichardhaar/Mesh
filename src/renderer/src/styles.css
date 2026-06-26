@@ -1338,50 +1338,100 @@ button {
 
 /* --- Analysis panel (Slice 11) ------------------------------------------- */
 
+/* --- Analysis content (Slice 25) -----------------------------------------
+   Section headers carry small-caps treatment + Lucide icons; Next Steps
+   render as filled accent-soft circular badges; Suggested Improvements
+   as accent-colored dot bullets. Section headers stay in --text-secondary
+   so accent stays reserved for CTAs (Slice 24 bar). */
+
 .analysis {
-  padding: 24px 28px;
+  padding: var(--space-6) var(--space-6);
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-8);
+}
+
+.analysis-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
 .analysis-section-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  min-width: 120px;
   margin: 0;
-  font-size: 11px;
-  font-weight: 600;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-}
-
-.analysis-section-heading + .analysis-summary,
-.analysis-section-heading + .analysis-list {
-  margin-top: -8px;
+  letter-spacing: var(--tracking-wide);
+  color: var(--text-secondary);
 }
 
 .analysis-summary {
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: var(--text-base);
+  line-height: var(--line-relaxed);
   color: var(--text-primary);
   white-space: pre-wrap;
 }
 
-.analysis-list {
+.analysis-numbered-list,
+.analysis-dotted-list {
   margin: 0;
-  padding-left: 24px;
+  padding: 0;
+  list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  color: var(--text-primary);
-  font-size: 14px;
-  line-height: 1.5;
+  gap: var(--space-4);
 }
 
-.analysis-list-ordered {
+.analysis-numbered-list li,
+.analysis-dotted-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.analysis-numbered-badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: var(--weight-semibold);
   font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.analysis-dotted-list li::before {
+  content: '';
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  margin-top: 0.55em;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+}
+
+.analysis-list-text {
+  font-size: var(--text-base);
+  line-height: var(--line-relaxed);
+  color: var(--text-primary);
+  min-width: 0;
 }
 
 .analysis-failed {
