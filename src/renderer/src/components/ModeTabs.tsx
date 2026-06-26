@@ -1,3 +1,4 @@
+import { FileText, MessageSquare, type LucideIcon } from 'lucide-react'
 import type { WorkspaceMode } from '../hooks/useWorkspaceMode'
 
 interface Props {
@@ -5,17 +6,22 @@ interface Props {
   onChange: (next: WorkspaceMode) => void
 }
 
-const TABS: ReadonlyArray<{ id: WorkspaceMode; label: string }> = [
-  { id: 'sessions', label: 'Sessions' },
-  { id: 'editor', label: 'File Editor' }
+const TABS: ReadonlyArray<{
+  id: WorkspaceMode
+  label: string
+  Icon: LucideIcon
+}> = [
+  { id: 'sessions', label: 'Sessions', Icon: MessageSquare },
+  { id: 'editor', label: 'File Editor', Icon: FileText }
 ]
 
 /**
- * The Workspace Screen's right-pane Mode Tab toggle. Lives at the top
- * of the third column. Switching the tab does NOT unmount the
- * inactive pane — the parent keeps both mounted (display:none) so
- * Sessions transcript scroll state and (later) xterm processes
- * survive the round-trip.
+ * Workspace Mode Tab toggle. Slice 23 promotes this to span the entire
+ * content area (everything right of the file tree) — switching the tab
+ * changes both the middle and right sub-columns (sessions list visible
+ * in Sessions mode, gone in File Editor mode). Both panes stay mounted
+ * (display:none on the inactive one) so transcript scroll and xterm
+ * processes survive the round-trip.
  */
 export function ModeTabs({ mode, onChange }: Props): JSX.Element {
   return (
@@ -31,7 +37,8 @@ export function ModeTabs({ mode, onChange }: Props): JSX.Element {
             className={`mode-tab${active ? ' mode-tab-active' : ''}`}
             onClick={() => onChange(tab.id)}
           >
-            {tab.label}
+            <tab.Icon size={14} aria-hidden={true} />
+            <span>{tab.label}</span>
           </button>
         )
       })}

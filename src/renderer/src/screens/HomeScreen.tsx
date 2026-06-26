@@ -38,7 +38,11 @@ export function HomeScreen({
         />
         <main className="detail-pane" aria-label="Project detail">
           {selected ? (
-            <ProjectDetail project={selected} onBack={() => onSelect(null)} />
+            <ProjectDetail
+              project={selected}
+              onBack={() => onSelect(null)}
+              onOpenWorkspace={() => onOpenWorkspace(selected)}
+            />
           ) : state.status === 'ok' && state.projects.filter((p) => !p.hidden && !p.sourceMissing).length === 0 ? (
             <EmptyHome />
           ) : state.status === 'ok' ? (

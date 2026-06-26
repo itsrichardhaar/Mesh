@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { Project } from '@shared/types'
 import { FileTree } from '../components/FileTree'
 import { FileViewer } from '../components/FileViewer'
@@ -7,6 +8,7 @@ import { PtyTabBar, type PtyTab } from '../components/PtyTabBar'
 import { PtyView } from '../components/PtyView'
 import { SessionsList } from '../components/SessionsList'
 import { Transcript } from '../components/Transcript'
+import { useFileTreeCollapsed } from '../hooks/useFileTreeCollapsed'
 import { useWorkspaceMode } from '../hooks/useWorkspaceMode'
 
 interface Props {
@@ -46,6 +48,7 @@ export function WorkspaceScreen({ project, visible, onBack }: Props): JSX.Elemen
   const [ptyTabs, setPtyTabs] = useState<PtySlot[]>([])
   const [activePtySlotId, setActivePtySlotId] = useState<string | null>(null)
   const { mode, setMode } = useWorkspaceMode(project.encodedPath)
+  const { collapsed: treeCollapsed, toggle: toggleTreeCollapsed } = useFileTreeCollapsed()
 
   // Reset Project-scoped state on Project switch so we don't leak
   // selections/tabs across.
@@ -159,10 +162,24 @@ export function WorkspaceScreen({ project, visible, onBack }: Props): JSX.Elemen
         <div className="workspace-header-spacer" />
       </header>
 
-      <div className="workspace-body">
-        <aside className="workspace-tree-column" aria-label="File tree column">
+      <div className={`workspace-body${treeCollapsed ? ' workspace-body-tree-collapsed' : ''}`}>
+        <aside
+          className="workspace-tree-column"
+          aria-label="File tree column"
+          hidden={treeCollapsed}
+        >
           <div className="workspace-column-header">
-            <span>Files</span>
+            <button
+              type="button"
+              className="workspace-tree-toggle"
+              onClick={toggleTreeCollapsed}
+              aria-label="Collapse file tree"
+              aria-expanded={true}
+              title="Collapse file tree"
+            >
+              <ChevronLeft size={14} aria-hidden="true" />
+              <span>Files</span>
+            </button>
             <button
               type="button"
               className={`workspace-hidden-toggle${showHidden ? ' workspace-hidden-toggle-on' : ''}`}
@@ -180,57 +197,70 @@ export function WorkspaceScreen({ project, visible, onBack }: Props): JSX.Elemen
           />
         </aside>
 
-        <section className="workspace-sessions-column" aria-label="Sessions column">
-          <div className="workspace-column-header">
-            <span>Sessions</span>
-          </div>
-          <SessionsList
-            encodedPath={project.encodedPath}
-            selectedSessionId={selectedSessionId}
-            onSelect={handleSessionSelect}
-          />
-        </section>
+        {treeCollapsed && (
+          <button
+            type="button"
+            className="workspace-tree-toggle workspace-tree-toggle-collapsed"
+            onClick={toggleTreeCollapsed}
+            aria-label="Expand file tree"
+            aria-expanded={false}
+            title="Show file tree"
+          >
+            <ChevronRight size={14} aria-hidden="true" />
+          </button>
+        )}
 
-        <section className="workspace-content-column" aria-label="Content pane">
+        <section className="workspace-content-area" aria-label="Workspace content">
           <ModeTabs mode={mode} onChange={setMode} />
-          <div className="workspace-mode-pane" hidden={mode !== 'sessions'}>
-            <PtyTabBar
-              tabs={tabBarData}
-              activeSlotId={activePtySlotId}
-              onSelect={handleTabSelect}
-              onClose={handleTabClose}
-            />
-            {/* All live Pty Tabs stay mounted; only the active one is visible. */}
-            {ptyTabs.map((tab) => (
-              <PtyView
-                key={tab.slotId}
+
+          <div className="workspace-mode-pane workspace-sessions-pane" hidden={mode !== 'sessions'}>
+            <aside className="workspace-sessions-column" aria-label="Sessions list">
+              <SessionsList
                 encodedPath={project.encodedPath}
-                sessionId={tab.sessionId}
-                hidden={tab.slotId !== activePtySlotId}
-                onPtyId={(ptyId) => setPtyId(tab.slotId, ptyId)}
-                onActivity={() => markActivity(tab.slotId)}
-                onExit={() => handlePtyExit(tab.slotId)}
+                selectedSessionId={selectedSessionId}
+                onSelect={handleSessionSelect}
               />
-            ))}
-            {/* Transcript shows when no tab is active. Selecting a tab
-                hides it; closing the last tab brings it back. */}
-            <div
-              className="workspace-transcript-host"
-              hidden={activePtySlotId !== null}
-            >
-              {selectedSessionId ? (
-                <Transcript
-                  key={`${project.encodedPath}:${selectedSessionId}`}
+            </aside>
+            <div className="workspace-sessions-content">
+              <PtyTabBar
+                tabs={tabBarData}
+                activeSlotId={activePtySlotId}
+                onSelect={handleTabSelect}
+                onClose={handleTabClose}
+              />
+              {/* All live Pty Tabs stay mounted; only the active one is visible. */}
+              {ptyTabs.map((tab) => (
+                <PtyView
+                  key={tab.slotId}
                   encodedPath={project.encodedPath}
-                  sessionId={selectedSessionId}
-                  onResume={handleResume}
+                  sessionId={tab.sessionId}
+                  hidden={tab.slotId !== activePtySlotId}
+                  onPtyId={(ptyId) => setPtyId(tab.slotId, ptyId)}
+                  onActivity={() => markActivity(tab.slotId)}
+                  onExit={() => handlePtyExit(tab.slotId)}
                 />
-              ) : (
-                <p className="workspace-stub">Select a Session.</p>
-              )}
+              ))}
+              {/* Transcript shows when no tab is active. Selecting a tab
+                  hides it; closing the last tab brings it back. */}
+              <div
+                className="workspace-transcript-host"
+                hidden={activePtySlotId !== null}
+              >
+                {selectedSessionId ? (
+                  <Transcript
+                    key={`${project.encodedPath}:${selectedSessionId}`}
+                    encodedPath={project.encodedPath}
+                    sessionId={selectedSessionId}
+                    onResume={handleResume}
+                  />
+                ) : (
+                  <p className="workspace-stub">Select a Session.</p>
+                )}
+              </div>
             </div>
           </div>
-          <div className="workspace-mode-pane" hidden={mode !== 'editor'}>
+
+          <div className="workspace-mode-pane workspace-editor-pane" hidden={mode !== 'editor'}>
             <FileViewer
               encodedPath={project.encodedPath}
               relPath={selectedFileRelPath}

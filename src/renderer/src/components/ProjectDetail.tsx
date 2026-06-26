@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ArrowRight } from 'lucide-react'
 import type { Project, ProjectStats, StoredAnalysis } from '@shared/types'
 import { findModel } from '@shared/models'
 import { relativeTime } from '../util/relativeTime'
@@ -32,9 +33,10 @@ type RunState =
 interface Props {
   project: Project
   onBack: () => void
+  onOpenWorkspace: () => void
 }
 
-export function ProjectDetail({ project, onBack }: Props): JSX.Element {
+export function ProjectDetail({ project, onBack, onOpenWorkspace }: Props): JSX.Element {
   const [stats, setStats] = useState<StatsState>({ status: 'loading' })
   const [analysis, setAnalysis] = useState<AnalysisState>({ status: 'loading' })
   const [run, setRun] = useState<RunState>({ status: 'idle' })
@@ -108,14 +110,30 @@ export function ProjectDetail({ project, onBack }: Props): JSX.Element {
 
   return (
     <div className="project-detail">
-      <button
-        type="button"
-        className="project-detail-back"
-        onClick={onBack}
-        aria-label="Back to home"
-      >
-        <span aria-hidden="true">‹</span> Home
-      </button>
+      <div className="project-detail-actions">
+        <button
+          type="button"
+          className="project-detail-back"
+          onClick={onBack}
+          aria-label="Back to home"
+        >
+          <span aria-hidden="true">‹</span> Home
+        </button>
+        <button
+          type="button"
+          className="project-detail-open-workspace"
+          onClick={onOpenWorkspace}
+          disabled={project.sourceMissing}
+          aria-label={`Open ${project.name} Workspace`}
+          title={
+            project.sourceMissing
+              ? "Workspace unavailable — source folder doesn't exist on disk"
+              : 'Open Workspace'
+          }
+        >
+          Open Workspace <ArrowRight size={14} aria-hidden="true" />
+        </button>
+      </div>
       <header className="project-detail-header">
         <h1 className="project-detail-name">{project.name}</h1>
         {project.autoSubtitle && (
