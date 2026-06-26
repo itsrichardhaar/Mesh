@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Project } from '@shared/types'
+import { SettingsButton } from './components/SettingsButton'
 import { HomeScreen } from './screens/HomeScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { WorkspaceScreen } from './screens/WorkspaceScreen'
@@ -78,6 +79,7 @@ export function App(): JSX.Element {
         />
       )}
       {screen === 'settings' && <SettingsScreen onClose={closeSettings} />}
+      {screen !== 'settings' && <SettingsButton onOpen={openSettings} />}
     </ThemeProvider>
   )
 }
