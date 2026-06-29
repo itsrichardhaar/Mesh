@@ -15,6 +15,8 @@ The stable `1.0.0` release ships once every item in the
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-06-29
+
 ### Fixed
 - **Renderer CSP blocked `data:` URIs — file-tree icons + bundled fonts broken in packaged build (#38).** Discovered in v0.3.0 after Slice 31's smoke test missed it. Symptoms: Material Icon Theme glyphs (Slice 26) all rendered as generic broken-image placeholders; bundled Inter / JetBrains Mono fonts silently fell back to system fonts. Root cause: `src/renderer/index.html` set `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'`. The `default-src 'self'` directive inherits down to `img-src` and `font-src`, which banned `data:` URIs. Vite's production build inlines small assets as `data:image/svg+xml,…` / `data:font/woff2;base64,…` — every one of those loads got refused by CSP under the packaged `file://` build. In `pnpm dev`, Vite serves assets as separate same-origin URLs (no inlining), so `'self'` covered them and the dev workflow looked fine. Fix: relax the CSP to `… img-src 'self' data:; font-src 'self' data:`. `script-src` stays strict; `style-src` keeps `'unsafe-inline'` for inline JSX `style` props. Standard practice for Electron apps that bundle assets.
 
