@@ -713,6 +713,14 @@ app.whenReady().then(() => {
       mainWindow?.show()
     }
   })
+}).catch((err) => {
+  // Without this, a throw in initDatabase / runMigrations / registerIpc leaves
+  // the app with a menu bar but no window — the unhandled rejection vanishes
+  // and the user has no idea why nothing opened. Surface it and quit cleanly.
+  const message = err instanceof Error ? `${err.message}\n\n${err.stack ?? ''}` : String(err)
+  console.error('[main] fatal init error:', message)
+  dialog.showErrorBox('Mesh failed to start', message)
+  app.exit(1)
 })
 
 app.on('window-all-closed', () => {
