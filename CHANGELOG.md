@@ -15,6 +15,12 @@ The stable `1.0.0` release ships once every item in the
 
 ## [Unreleased]
 
+### Added
+- **Slice 29: electron-builder x64 unsigned `.dmg`.** First slice of v3 (internal hardening). `electron-builder.yml` `mac.target` switches from the dev-only `target: dir` + `arch: [arm64]` shape to a real DMG installer: `target: dmg` + `arch: [x64]`. `pnpm dist` now produces `dist/Mesh-<version>.dmg` (~134MB) with both native modules (`better-sqlite3`, `node-pty`) rebuilt cleanly for x64. `pnpm package` (uses `--dir` flag) continues to produce `dist/mac/Mesh.app` for dev use — both scripts produce valid outputs.
+- Build remains **unsigned** under v3's internal-hardening framing — `identity: null`, `hardenedRuntime: false`, `gatekeeperAssess: false` are retained. Code signing + notarization are Go-Public concerns (see `docs/PRD-v3.md` once Slice 32 lands). First-launch Gatekeeper warning is the documented bypass for internal installs (right-click → Open once).
+- **arm64 explicitly deferred** until arm64 hardware is accessible for verification. Building arm64 from an x64 host would require cross-compiling `node-pty`'s native bindings, and a produced-but-unverifiable arm64 `.dmg` would be a false-done. Adding arm64 later is a single-line `arch: [x64, arm64]` change once a target machine is available.
+- electron-builder surfaces two non-blocking advisories worth noting for future cleanup: `@electron/rebuild` is now redundant since electron-builder calls it internally (`postinstall` could move to `electron-builder install-app-deps`); the current `electron-rebuild` script still works correctly, so this is a future micro-cleanup, not a Slice 29 item.
+
 ## [0.2.0] — 2026-06-29
 
 ### Added
