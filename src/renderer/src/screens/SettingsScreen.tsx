@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type {
   ProviderId,
   StoredValidation,
@@ -19,7 +19,42 @@ import { useTheme } from '../theme/ThemeProvider'
 import { useUiMode } from '../theme/UiModeProvider'
 import { relativeTime } from '../util/relativeTime'
 
-const ANTHROPIC_CONSOLE_URL = 'https://console.anthropic.com'
+/**
+ * Per-Provider input rules and onboarding pointers. Slice 35 adds OpenAI;
+ * Local is unavailable so it doesn't appear here.
+ */
+const PROVIDER_KEY_CONFIG: Record<'claude' | 'openai', {
+  keyLabel: string
+  placeholder: string
+  consoleUrl: string
+  /** Auto-save trigger — pastes that match are saved on type so the user doesn't have to hit Enter. */
+  looksLikeKey: (value: string) => boolean
+  /** Tooltip shown on the pill when this Provider is `available` but no key is stored yet. */
+  noKeyTooltip: string
+}> = {
+  claude: {
+    keyLabel: 'Anthropic API key',
+    placeholder: 'Paste your sk-ant-… key',
+    consoleUrl: 'https://console.anthropic.com',
+    looksLikeKey: (v) => v.startsWith('sk-ant-') && v.length >= 20,
+    noKeyTooltip: 'Add an Anthropic API key in Settings → Model'
+  },
+  openai: {
+    keyLabel: 'OpenAI API key',
+    placeholder: 'Paste your sk-… key',
+    consoleUrl: 'https://platform.openai.com/api-keys',
+    // OpenAI keys start with `sk-` or `sk-proj-`. Disambiguate from
+    // Anthropic's `sk-ant-` so a pasted Claude key doesn't auto-save
+    // into the OpenAI slot.
+    looksLikeKey: (v) =>
+      v.startsWith('sk-') && !v.startsWith('sk-ant-') && v.length >= 20,
+    noKeyTooltip: 'Add an OpenAI API key in Settings → Model'
+  }
+}
+
+function isKeyedProvider(id: ProviderId): id is 'claude' | 'openai' {
+  return id === 'claude' || id === 'openai'
+}
 
 interface Props {
   onClose: () => void
@@ -173,9 +208,35 @@ function UiModeOption({
 }
 
 function ModelSection(): JSX.Element {
-  // v1 locks the Active Provider to Claude — the pills exist so the
-  // multi-Provider future is telegraphed, but only Claude is selectable.
+  // Slice 35: the Active Provider stays hardcoded to Claude. Slice 36
+  // wires pill clicks → setActiveProvider(). For now the pill row shows
+  // enabled/disabled state per Provider (gated on keys + availability)
+  // but clicking a non-active pill is a no-op.
   const activeProvider: ProviderId = 'claude'
+
+  // Lifted state — pill enabled/disabled depends on whether a key is
+  // stored for that Provider, and the disabled tooltip text differs by
+  // reason (no key vs unavailable). ApiKeyField calls `onKeyChange`
+  // when it saves or clears a key so the pill row stays in sync.
+  const [keyedProviders, setKeyedProviders] = useState<Set<ProviderId>>(new Set())
+
+  const refreshKeyed = useCallback(async (): Promise<void> => {
+    const next = new Set<ProviderId>()
+    for (const id of PROVIDER_IDS) {
+      try {
+        const mask = await window.api.secrets.getMask(id)
+        if (mask) next.add(id)
+      } catch {
+        // Encryption unavailable / IPC error: leave this Provider as
+        // not-keyed. The ApiKeyField surfaces a more detailed error.
+      }
+    }
+    setKeyedProviders(next)
+  }, [])
+
+  useEffect(() => {
+    void refreshKeyed()
+  }, [refreshKeyed])
 
   return (
     <section className="settings-section" aria-label="Model">
@@ -187,38 +248,78 @@ function ModelSection(): JSX.Element {
             key={id}
             provider={id}
             active={id === activeProvider}
+            hasKey={keyedProviders.has(id)}
           />
         ))}
       </div>
 
-      <ApiKeyField provider={activeProvider} label="Anthropic API key" placeholder="Paste your sk-ant-… key" />
-
-      <p className="settings-helper-link">
-        <a
-          href={ANTHROPIC_CONSOLE_URL}
-          onClick={(e) => {
-            e.preventDefault()
-            void window.api.shell.openExternal(ANTHROPIC_CONSOLE_URL)
-          }}
-        >
-          Get a key →
-        </a>
-      </p>
+      {PROVIDER_IDS.filter((id) => PROVIDERS[id].available && isKeyedProvider(id)).map((id) => (
+        <ProviderKeySection
+          key={id}
+          provider={id as 'claude' | 'openai'}
+          onKeyChange={() => void refreshKeyed()}
+        />
+      ))}
 
       <ModelSelect provider={activeProvider} />
     </section>
   )
 }
 
+function ProviderKeySection({
+  provider,
+  onKeyChange
+}: {
+  provider: 'claude' | 'openai'
+  onKeyChange: () => void
+}): JSX.Element {
+  const config = PROVIDER_KEY_CONFIG[provider]
+  return (
+    <>
+      <ApiKeyField
+        provider={provider}
+        label={config.keyLabel}
+        placeholder={config.placeholder}
+        looksLikeKey={config.looksLikeKey}
+        onKeyChange={onKeyChange}
+      />
+
+      <p className="settings-helper-link">
+        <a
+          href={config.consoleUrl}
+          onClick={(e) => {
+            e.preventDefault()
+            void window.api.shell.openExternal(config.consoleUrl)
+          }}
+        >
+          Get a key →
+        </a>
+      </p>
+    </>
+  )
+}
+
 function ProviderPill({
   provider,
-  active
+  active,
+  hasKey
 }: {
   provider: ProviderId
   active: boolean
+  hasKey: boolean
 }): JSX.Element {
   const descriptor = PROVIDERS[provider]
-  const disabled = !descriptor.available
+  // Pill is enabled iff the Provider is available AND a key is stored.
+  // Slice 35: clicking a non-active enabled pill is still a no-op
+  // (Slice 36 wires the switch); but the visual state is honest about
+  // which Providers are *ready* to be activated.
+  const disabled = !descriptor.available || !hasKey
+  const tooltip = !descriptor.available
+    ? descriptor.comingSoonNote
+    : !hasKey && isKeyedProvider(provider)
+      ? PROVIDER_KEY_CONFIG[provider].noKeyTooltip
+      : undefined
+
   const classes = ['provider-pill']
   if (active) classes.push('provider-pill-active')
   if (disabled) classes.push('provider-pill-disabled')
@@ -230,9 +331,9 @@ function ProviderPill({
       aria-selected={active}
       aria-disabled={disabled}
       className={classes.join(' ')}
-      title={disabled ? descriptor.comingSoonNote : undefined}
+      title={tooltip}
       onClick={() => {
-        /* Pills are presentational. Active Provider is locked to Claude. */
+        /* Slice 35: pill click does not yet switch Active Provider. Slice 36 wires that. */
       }}
     >
       {descriptor.label}
@@ -350,11 +451,17 @@ type ValidationState =
 function ApiKeyField({
   provider,
   label,
-  placeholder
+  placeholder,
+  looksLikeKey,
+  onKeyChange
 }: {
   provider: ProviderId
   label: string
   placeholder: string
+  /** Auto-save trigger — typed value matching this predicate is saved without a Submit. */
+  looksLikeKey: (value: string) => boolean
+  /** Called whenever a key is saved or cleared so the parent's pill state stays in sync. */
+  onKeyChange?: () => void
 }): JSX.Element {
   const [state, setState] = useState<ApiKeyState>({ status: 'loading' })
   const [draft, setDraft] = useState('')
@@ -419,7 +526,10 @@ function ApiKeyField({
       const mask = await window.api.secrets.getMask(provider)
       setState(mask ? { status: 'saved', mask } : { status: 'empty' })
       setDraft('')
-      if (mask) void runValidation()
+      if (mask) {
+        void runValidation()
+        onKeyChange?.()
+      }
     } catch (err) {
       setState({
         status: 'error',
@@ -436,6 +546,7 @@ function ApiKeyField({
       setState({ status: 'empty' })
       setDraft('')
       setValidation({ status: 'idle' })
+      onKeyChange?.()
     } catch (err) {
       const previous: ApiKeyView =
         state.status === 'saved' ? { status: 'saved', mask: state.mask } : { status: 'empty' }
@@ -498,7 +609,7 @@ function ApiKeyField({
         onChange={(e) => {
           const next = e.target.value
           setDraft(next)
-          if (looksLikeAnthropicKey(next)) {
+          if (looksLikeKey(next)) {
             void save(next)
           }
         }}
@@ -560,6 +671,3 @@ function ValidationStatusBanner({
   )
 }
 
-function looksLikeAnthropicKey(value: string): boolean {
-  return value.startsWith('sk-ant-') && value.length >= 20
-}

@@ -20,6 +20,8 @@ import {
   humanizeAnthropicError,
   SchemaViolationError
 } from './models/claude-client'
+import { OpenAIClient } from './models/openai-client'
+import type { ModelClient } from '@shared/types'
 import type { PtyCreateRequest, PtyCreateResponse } from '@shared/pty'
 import { AnalysisOrchestrator } from './analyses/orchestrator'
 import { insertAnalysis, latestForProject } from './analyses/repository'
@@ -284,10 +286,10 @@ function registerIpc(): void {
       if (!isProviderId(provider)) {
         throw new Error('secrets:validate: provider must be a known ProviderId')
       }
-      if (provider !== 'claude') {
-        // OpenAI and Local don't ship a functional client in v1; surface
-        // the same shape so the renderer's switch is uniform.
-        return { ok: false, message: 'Provider not available in v1' }
+      if (provider === 'local') {
+        // Local stays a stub; surface the same envelope so the renderer's
+        // switch is uniform.
+        return { ok: false, message: 'Provider not available' }
       }
       const db = getDatabase()
       let plaintext: string | null
@@ -302,9 +304,7 @@ function registerIpc(): void {
       if (!plaintext) {
         return { ok: false, message: 'No API key saved' }
       }
-      const modelId = getSetting(db, selectedModelSettingKey(provider))
-      const model = isModelId(modelId) ? modelId : 'claude-haiku-4-5'
-      const client = new ClaudeClient(model, plaintext)
+      const client: ModelClient = buildValidationClient(db, provider, plaintext)
       const result = await client.validate()
       const stored: StoredValidation = {
         at: new Date().toISOString(),
@@ -648,6 +648,30 @@ function secretKey(provider: ProviderId): string {
 /** Stable SQLite key shape for the cached validation outcome per Provider. */
 function validationKey(provider: ProviderId): string {
   return `model:${provider}:validation`
+}
+
+/**
+ * Returns the `ModelClient` to use for a `validate()` probe of the
+ * given Provider. Reads the user's selected model from settings, falling
+ * back to each Provider's recommended default. Local is rejected upstream
+ * (no functional client); this helper only dispatches Claude vs OpenAI.
+ *
+ * Slice 35 keeps the analyze path's client selection hardcoded to Claude —
+ * Slice 36's Active Provider switching wires the same factory pattern
+ * into the orchestrator.
+ */
+function buildValidationClient(
+  db: ReturnType<typeof getDatabase>,
+  provider: Exclude<ProviderId, 'local'>,
+  plaintext: string
+): ModelClient {
+  const modelId = getSetting(db, selectedModelSettingKey(provider))
+  if (provider === 'openai') {
+    const model = isModelId(modelId) ? modelId : 'gpt-4o-mini'
+    return new OpenAIClient(model, plaintext)
+  }
+  const model = isModelId(modelId) ? modelId : 'claude-haiku-4-5'
+  return new ClaudeClient(model, plaintext)
 }
 
 /**

@@ -14,6 +14,9 @@ export type ModelId =
   | 'claude-haiku-4-5'
   | 'claude-sonnet-4-6'
   | 'claude-opus-4-7'
+  | 'gpt-4o-mini'
+  | 'gpt-4o'
+  | 'gpt-4-turbo'
 
 export interface ModelDescriptor {
   id: ModelId
@@ -71,9 +74,28 @@ export const PROVIDERS: Readonly<Record<ProviderId, ProviderDescriptor>> = {
   openai: {
     id: 'openai',
     label: 'OpenAI',
-    available: false,
-    comingSoonNote: 'Coming soon',
-    models: []
+    available: true,
+    models: [
+      {
+        id: 'gpt-4o-mini',
+        label: 'GPT-4o mini',
+        subtitle: 'fast & cheap',
+        recommended: true,
+        approxCostPerAnalysisUSD: 0.002
+      },
+      {
+        id: 'gpt-4o',
+        label: 'GPT-4o',
+        subtitle: 'balanced',
+        approxCostPerAnalysisUSD: 0.025
+      },
+      {
+        id: 'gpt-4-turbo',
+        label: 'GPT-4 Turbo',
+        subtitle: 'most capable, most $$',
+        approxCostPerAnalysisUSD: 0.08
+      }
+    ]
   },
   local: {
     id: 'local',
