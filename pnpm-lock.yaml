@@ -44,6 +44,9 @@ importers:
       node-pty:
         specifier: ^1.1.0
         version: 1.1.0
+      openai:
+        specifier: ^6.45.0
+        version: 6.45.0(zod@4.4.3)
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -1963,6 +1966,26 @@ packages:
 
   oniguruma-to-es@4.3.6:
     resolution: {integrity: sha512-csuQ9x3Yr0cEIs/Zgx/OEt9iBw9vqIunAPQkx19R/fiMq2oGVTgcMqO/V3Ybqefr1TBvosI6jU539ksaBULJyA==}
+
+  openai@6.45.0:
+    resolution: {integrity: sha512-5DQVNErssk0afNpTTHUm/qZPU4iKR9OYdNid8Ib4puq4gHNNvGWZht2zY4h9a8JMF949Ik6m8gQutllVPbjdnw==}
+    peerDependencies:
+      '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
+      '@smithy/hash-node': '>=4.3.0 <5'
+      '@smithy/signature-v4': '>=5.4.0 <6'
+      ws: ^8.18.0
+      zod: ^3.25 || ^4.0
+    peerDependenciesMeta:
+      '@aws-sdk/credential-provider-node':
+        optional: true
+      '@smithy/hash-node':
+        optional: true
+      '@smithy/signature-v4':
+        optional: true
+      ws:
+        optional: true
+      zod:
+        optional: true
 
   ora@5.4.1:
     resolution: {integrity: sha512-5b6Y85tPxZZ7QytO+BQzysW31HJku27cRIlkbAXaNx+BdcVi+LlRFmVXzeF6a7JCwJpyw5c4b+YSVImQIrBpuQ==}
@@ -4762,6 +4785,10 @@ snapshots:
       oniguruma-parser: 0.12.2
       regex: 6.1.0
       regex-recursion: 6.0.2
+
+  openai@6.45.0(zod@4.4.3):
+    optionalDependencies:
+      zod: 4.4.3
 
   ora@5.4.1:
     dependencies:

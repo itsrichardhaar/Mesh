@@ -203,16 +203,22 @@ async function runGitActivity(
 
 // --- Wire-level prompt rendering -----------------------------------------
 
-const SYSTEM_PROMPT = `You are Mesh's daily-summary assistant.
+/**
+ * Provider-agnostic instructions describing the task and the desired
+ * three-section output. Each `ModelClient` appends its own output-format
+ * directive before sending — Claude's `CLAUDE_OUTPUT_FORMAT_SUFFIX`
+ * speaks "tool_use", OpenAI's `OPENAI_OUTPUT_FORMAT_SUFFIX` speaks
+ * "Native Structured Outputs". Exported for snapshot tests that pin
+ * the rendered wire prompts per provider.
+ */
+export const SYSTEM_PROMPT = `You are Mesh's daily-summary assistant.
 
 You receive a digest of one Project's recent Claude Code Sessions and produce a three-section briefing. Stay grounded in the digest — do not invent activity that isn't reflected in it. Be concrete about file paths, libraries, and decisions; avoid generic phrasing.
 
 Sections:
 1. Summary of Recent Sessions — one or two paragraphs (markdown) covering what was done, what's working, and what's been deferred.
 2. Next Steps — concrete, ordered actions the user could take next. Each item should be actionable and specific.
-3. Suggested Improvements — observations about the code, workflow, or planning that would compound over time. Each item should call out a specific opportunity, not abstract advice.
-
-Emit your output by calling the \`emit_daily_summary\` tool. Do not respond with prose outside the tool call.`
+3. Suggested Improvements — observations about the code, workflow, or planning that would compound over time. Each item should call out a specific opportunity, not abstract advice.`
 
 function renderWireInput(input: AnalysisInputContext): AnalyzeProjectInput {
   return {

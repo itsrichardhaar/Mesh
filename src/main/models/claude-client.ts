@@ -1,5 +1,4 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { z } from 'zod'
 import type {
   AnalysisOutput,
   AnalyzeProjectInput,
@@ -7,19 +6,23 @@ import type {
   ValidationResult
 } from '@shared/types'
 import type { ModelId } from '@shared/models'
+import {
+  ANALYZE_TOOL_NAME,
+  analysisOutputSchema,
+  SchemaViolationError
+} from './analysis-schema'
+
+export { ANALYZE_TOOL_NAME, SchemaViolationError }
 
 /**
- * Three-section schema Mesh expects back from the LLM, validated with
- * Zod before we hand the result downstream. Lives next to the client
- * because the tool's `input_schema` (the request side) mirrors it.
+ * Output-format directive appended to the system prompt before the
+ * Anthropic call. Lives in the client rather than the orchestrator so
+ * each Provider can own how it asks for structured output — Claude
+ * speaks "tool_use", OpenAI speaks "Native Structured Outputs"
+ * (see `OpenAIClient`).
  */
-const analysisOutputSchema = z.object({
-  summaryMarkdown: z.string().min(1),
-  nextSteps: z.array(z.object({ text: z.string().min(1) })),
-  suggestedImprovements: z.array(z.object({ text: z.string().min(1) }))
-})
-
-export const ANALYZE_TOOL_NAME = 'emit_daily_summary' as const
+export const CLAUDE_OUTPUT_FORMAT_SUFFIX =
+  'Emit your output by calling the `emit_daily_summary` tool. Do not respond with prose outside the tool call.'
 
 /**
  * JSON Schema-shaped object handed to the Anthropic Messages API in
@@ -27,20 +30,6 @@ export const ANALYZE_TOOL_NAME = 'emit_daily_summary' as const
  * so the response can't pass the LLM-side schema check but fail Zod
  * (modulo bugs Zod catches that JSON Schema misses).
  */
-/**
- * Thrown when the LLM's tool-use response fails Zod validation.
- * The retry path in `analyzeProject` catches this once and re-prompts
- * with the validation message appended; if the retry also fails, the
- * error is re-thrown and the IPC layer writes a `status: 'failed'`
- * row per Slice 12's recovery flow.
- */
-export class SchemaViolationError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'SchemaViolationError'
-  }
-}
-
 export const ANALYZE_TOOL_INPUT_SCHEMA = {
   type: 'object',
   properties: {
@@ -152,7 +141,7 @@ export class ClaudeClient implements ModelClient {
       system: [
         {
           type: 'text',
-          text: input.systemPrompt,
+          text: `${input.systemPrompt}\n\n${CLAUDE_OUTPUT_FORMAT_SUFFIX}`,
           cache_control: { type: 'ephemeral' }
         }
       ],

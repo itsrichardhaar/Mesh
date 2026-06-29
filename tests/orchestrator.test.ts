@@ -174,7 +174,10 @@ describe('AnalysisOrchestrator', () => {
     expect(result.output).toEqual(FIXED_OUTPUT)
     expect(result.sourceSessionCount).toBe(1)
     expect(calls).toHaveLength(1)
-    expect(calls[0]!.systemPrompt).toMatch(/emit_daily_summary/)
+    // Slice 34: orchestrator's prompt is now provider-agnostic. The
+    // "emit_daily_summary" tool reference moved into ClaudeClient as a
+    // suffix. Assert on a stable orchestrator-owned phrase instead.
+    expect(calls[0]!.systemPrompt).toMatch(/daily-summary assistant/)
     expect(calls[0]!.userPrompt).toMatch(/Demo/)
     expect(calls[0]!.userPrompt).toMatch(/Sessions/)
   })
