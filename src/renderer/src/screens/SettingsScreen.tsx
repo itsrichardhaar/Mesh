@@ -208,11 +208,26 @@ function UiModeOption({
 }
 
 function ModelSection(): JSX.Element {
-  // Slice 35: the Active Provider stays hardcoded to Claude. Slice 36
-  // wires pill clicks → setActiveProvider(). For now the pill row shows
-  // enabled/disabled state per Provider (gated on keys + availability)
-  // but clicking a non-active pill is a no-op.
-  const activeProvider: ProviderId = 'claude'
+  // Slice 36: Active Provider is now a real setting (`active_provider`)
+  // driven by pill clicks. Defaults to `'claude'` when no row exists
+  // (backward-compatible with v0.3.x installs). Subscribes to the live
+  // change event so other surfaces (Analyze button subtitle) and this
+  // pill row stay in sync.
+  const [activeProvider, setActiveProviderState] = useState<ProviderId>('claude')
+
+  useEffect(() => {
+    let cancelled = false
+    void window.api.settings.getActiveProvider().then((p) => {
+      if (!cancelled) setActiveProviderState(p)
+    })
+    const unsub = window.api.settings.onActiveProviderChanged((p) => {
+      setActiveProviderState(p)
+    })
+    return () => {
+      cancelled = true
+      unsub()
+    }
+  }, [])
 
   // Lifted state — pill enabled/disabled depends on whether a key is
   // stored for that Provider, and the disabled tooltip text differs by
@@ -249,6 +264,7 @@ function ModelSection(): JSX.Element {
             provider={id}
             active={id === activeProvider}
             hasKey={keyedProviders.has(id)}
+            onActivate={() => void window.api.settings.setActiveProvider(id)}
           />
         ))}
       </div>
@@ -302,17 +318,20 @@ function ProviderKeySection({
 function ProviderPill({
   provider,
   active,
-  hasKey
+  hasKey,
+  onActivate
 }: {
   provider: ProviderId
   active: boolean
   hasKey: boolean
+  onActivate: () => void
 }): JSX.Element {
   const descriptor = PROVIDERS[provider]
   // Pill is enabled iff the Provider is available AND a key is stored.
-  // Slice 35: clicking a non-active enabled pill is still a no-op
-  // (Slice 36 wires the switch); but the visual state is honest about
-  // which Providers are *ready* to be activated.
+  // Clicking the currently-active pill is a no-op; clicking an enabled
+  // non-active pill switches Active Provider via the IPC. UI updates
+  // from the live `onActiveProviderChanged` event (not optimistically)
+  // so the highlight always matches persisted state.
   const disabled = !descriptor.available || !hasKey
   const tooltip = !descriptor.available
     ? descriptor.comingSoonNote
@@ -333,7 +352,8 @@ function ProviderPill({
       className={classes.join(' ')}
       title={tooltip}
       onClick={() => {
-        /* Slice 35: pill click does not yet switch Active Provider. Slice 36 wires that. */
+        if (disabled || active) return
+        onActivate()
       }}
     >
       {descriptor.label}

@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { ArrowRight, FileText, Lightbulb, ListChecks, Plus, type LucideIcon } from 'lucide-react'
 import type { Project, ProjectStats, StoredAnalysis } from '@shared/types'
 import { findModel } from '@shared/models'
+import { useActiveProviderModel } from '../hooks/useActiveProviderModel'
 import { relativeTime } from '../util/relativeTime'
 import { tildify } from '../util/tildify'
 
@@ -208,6 +209,10 @@ function AnalyzeBar({
   onAnalyze: () => void
 }): JSX.Element {
   const view = pickBarView(analysis, run)
+  // Slice 36: "via Provider · Model" subtitle inside the button so the
+  // user can glance-check what's about to run before clicking. Live-
+  // updates when Active Provider or selected Model changes in Settings.
+  const activeBlurb = useActiveProviderModel()
   return (
     <div className={`analyze-bar analyze-bar-${view.tone}`} role={view.role}>
       {view.tone === 'info' && (
@@ -226,8 +231,15 @@ function AnalyzeBar({
               : undefined
           }
         >
-          <Plus size={14} aria-hidden="true" />
-          {view.action}
+          <span className="analyze-bar-action-main">
+            <Plus size={14} aria-hidden="true" />
+            {view.action}
+          </span>
+          {activeBlurb && activeBlurb.modelLabel && (
+            <span className="analyze-bar-action-meta">
+              via {activeBlurb.providerLabel} · {activeBlurb.modelLabel}
+            </span>
+          )}
         </button>
       )}
     </div>

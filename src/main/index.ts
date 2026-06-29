@@ -20,7 +20,7 @@ import {
   humanizeAnthropicError,
   SchemaViolationError
 } from './models/claude-client'
-import { OpenAIClient } from './models/openai-client'
+import { humanizeOpenAIError, OpenAIClient } from './models/openai-client'
 import type { ModelClient } from '@shared/types'
 import type { PtyCreateRequest, PtyCreateResponse } from '@shared/pty'
 import { AnalysisOrchestrator } from './analyses/orchestrator'
@@ -59,7 +59,12 @@ import {
   SecretsVaultUnavailableError,
   setSecret
 } from './secrets/vault'
-import { getSetting, setSetting } from './settings/repository'
+import {
+  getActiveProvider,
+  getSetting,
+  setActiveProvider,
+  setSetting
+} from './settings/repository'
 
 const CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects')
 
@@ -215,6 +220,31 @@ function registerIpc(): void {
         throw new Error('settings:set: value must be a string')
       }
       setSetting(getDatabase(), key, value)
+      // Slice 36: any per-Provider model selection change (e.g. `model:claude`,
+      // `model:openai`) emits so the Analyze button subtitle can update live.
+      // The cached-validation snapshot keys (`model:<provider>:validation`)
+      // are intentionally excluded — they're persistence, not a user-visible
+      // choice. The Active Provider key has its own dedicated channel below.
+      if (/^model:(claude|openai|local)$/.test(key)) {
+        mainWindow?.webContents.send('settings:model-changed', key)
+      }
+    }
+  )
+
+  ipcMain.handle('settings:get-active-provider', (): ProviderId => {
+    return getActiveProvider(getDatabase())
+  })
+
+  ipcMain.handle(
+    'settings:set-active-provider',
+    (_event, provider: unknown): void => {
+      if (!isProviderId(provider)) {
+        throw new Error('settings:set-active-provider: provider must be a known ProviderId')
+      }
+      setActiveProvider(getDatabase(), provider)
+      // Live-update subscribers (Settings → Model pill row, Analyze button
+      // subtitle) — see Slice 36 implementation notes.
+      mainWindow?.webContents.send('settings:active-provider-changed', provider)
     }
   )
 
@@ -393,10 +423,19 @@ function registerIpc(): void {
         hidden: aug?.hidden ?? false
       }
 
-      // Load the user's selected model + decrypted key.
+      // Slice 36: resolve which Provider's client to use from the
+      // Active Provider setting. Mismatches between Active Provider
+      // and stored keys surface here as preflight errors per the
+      // existing Slice 12 error envelope.
+      const activeProvider = getActiveProvider(db)
+      if (activeProvider === 'local') {
+        throw new Error(
+          'Local provider is not yet available. Switch to Claude or OpenAI in Settings → Model.'
+        )
+      }
       let plaintextKey: string | null
       try {
-        plaintextKey = getSecret(db, encryptionBackend, secretKey('claude'))
+        plaintextKey = getSecret(db, encryptionBackend, secretKey(activeProvider))
       } catch (err) {
         if (err instanceof SecretsVaultUnavailableError) {
           throw new Error('Encryption unavailable; cannot read stored key')
@@ -404,11 +443,12 @@ function registerIpc(): void {
         throw err
       }
       if (!plaintextKey) {
-        throw new Error('No Anthropic API key saved. Add one in Settings → Model.')
+        const keyLabel = activeProvider === 'openai' ? 'OpenAI' : 'Anthropic'
+        throw new Error(`No ${keyLabel} API key saved. Add one in Settings → Model.`)
       }
-      const modelSetting = getSetting(db, selectedModelSettingKey('claude'))
-      const model = isModelId(modelSetting) ? modelSetting : 'claude-haiku-4-5'
-      const client = new ClaudeClient(model, plaintextKey)
+      const client = buildValidationClient(db, activeProvider, plaintextKey)
+      const provider = activeProvider
+      const model = client.model
 
       const orchestrator = new AnalysisOrchestrator({
         claudeProjectsDir: CLAUDE_PROJECTS_DIR,
@@ -422,7 +462,7 @@ function registerIpc(): void {
           encodedPath,
           generatedAt,
           status: 'ok',
-          provider: 'claude',
+          provider,
           model,
           sourceSessionCount: result.sourceSessionCount,
           lastAnalyzedSha: result.lastAnalyzedSha,
@@ -439,8 +479,8 @@ function registerIpc(): void {
           encodedPath,
           generatedAt,
           status: 'failed',
-          errorMessage: humanizeAnalyzeError(err),
-          provider: 'claude',
+          errorMessage: humanizeAnalyzeError(err, provider),
+          provider,
           model
         })
       }
@@ -676,16 +716,20 @@ function buildValidationClient(
 
 /**
  * Translate any orchestrator/model failure into a short, human-facing
- * string for the `error_message` column. Anthropic SDK errors route
- * through the existing humanizer; schema-violation failures get a
- * dedicated, actionable message instead of leaking Zod's path string.
+ * string for the `error_message` column. Routes status-bearing SDK
+ * errors through the active Provider's humanizer (Anthropic / OpenAI
+ * map slightly different status codes to different canned strings);
+ * schema-violation failures get a dedicated, actionable message
+ * instead of leaking Zod's path string.
  */
-function humanizeAnalyzeError(err: unknown): string {
+function humanizeAnalyzeError(err: unknown, provider: ProviderId): string {
   if (err instanceof SchemaViolationError) {
     return 'The model returned an invalid format after one retry. Try again, or pick a different Model in Settings.'
   }
   if (err && typeof err === 'object' && 'status' in (err as Record<string, unknown>)) {
-    return humanizeAnthropicError(err)
+    return provider === 'openai'
+      ? humanizeOpenAIError(err)
+      : humanizeAnthropicError(err)
   }
   if (err instanceof Error && err.message.length > 0) {
     return err.message.length > 200 ? err.message.slice(0, 197) + '…' : err.message

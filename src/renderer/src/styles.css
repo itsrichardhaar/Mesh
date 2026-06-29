@@ -980,9 +980,12 @@ button {
 }
 
 .analyze-bar-action {
+  /* Slice 36: button stacks main label + "via Provider · Model" subtitle
+     vertically. flex-column instead of flex-row keeps the click target
+     unchanged — only the visual contents reflow. */
   display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  flex-direction: column;
+  align-items: flex-start;
   flex-shrink: 0;
   padding: 5px 10px;
   font-size: var(--text-xs);
@@ -992,6 +995,23 @@ button {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   cursor: pointer;
+}
+
+.analyze-bar-action-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.analyze-bar-action-meta {
+  /* Subtle, muted, single-line. Reads as "context for the button"
+     rather than a separate control. */
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: var(--weight-regular);
+  color: var(--text-muted);
+  white-space: nowrap;
+  letter-spacing: 0.01em;
 }
 
 .analyze-bar-action:hover:not(:disabled) {

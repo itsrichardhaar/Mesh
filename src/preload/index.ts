@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { MeshApi } from '@shared/api'
 import type { PtyDataEvent, PtyExitEvent } from '@shared/pty'
+import type { ProviderId } from '@shared/types'
 
 function subscribe(channel: string, cb: () => void): () => void {
   const handler = (): void => cb()
@@ -32,7 +33,13 @@ const api: MeshApi = {
   },
   settings: {
     get: (key) => ipcRenderer.invoke('settings:get', key),
-    set: (key, value) => ipcRenderer.invoke('settings:set', key, value)
+    set: (key, value) => ipcRenderer.invoke('settings:set', key, value),
+    getActiveProvider: () => ipcRenderer.invoke('settings:get-active-provider'),
+    setActiveProvider: (provider) =>
+      ipcRenderer.invoke('settings:set-active-provider', provider),
+    onActiveProviderChanged: (cb) =>
+      subscribeArg<ProviderId>('settings:active-provider-changed', cb),
+    onModelChanged: (cb) => subscribeArg<string>('settings:model-changed', cb)
   },
   theme: {
     setSource: (source) => ipcRenderer.send('theme:set-source', source)

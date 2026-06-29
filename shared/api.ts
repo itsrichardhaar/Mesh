@@ -59,6 +59,35 @@ export interface MeshApi {
   settings: {
     get(key: string): Promise<string | null>
     set(key: string, value: string): Promise<void>
+
+    /**
+     * Read the currently Active Provider. Defaults to `'claude'` when
+     * no `active_provider` row has been written — backward-compatible
+     * with v0.3.x installs. v4 Slice 36.
+     */
+    getActiveProvider(): Promise<ProviderId>
+
+    /**
+     * Persist the user's Active Provider choice. Validates the value
+     * at the boundary; out-of-shape values reject. Fires
+     * `onActiveProviderChanged` on all live subscribers. v4 Slice 36.
+     */
+    setActiveProvider(provider: ProviderId): Promise<void>
+
+    /**
+     * Live notification of Active Provider changes. The renderer's
+     * Settings panel and Analyze button subtitle subscribe so the UI
+     * updates without polling. Returns an unsubscribe. v4 Slice 36.
+     */
+    onActiveProviderChanged(cb: (provider: ProviderId) => void): () => void
+
+    /**
+     * Live notification of per-Provider Model selection changes — fires
+     * when any `model:{provider}` key is written. The Analyze button
+     * subtitle subscribes so picking a different Model in Settings
+     * updates the subtitle without page refresh. v4 Slice 36.
+     */
+    onModelChanged(cb: (key: string) => void): () => void
   }
 
   /**

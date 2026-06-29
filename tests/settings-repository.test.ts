@@ -1,7 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
 import { runMigrations } from '@main/db/migrations'
-import { getSetting, setSetting } from '@main/settings/repository'
+import {
+  ACTIVE_PROVIDER_KEY,
+  getActiveProvider,
+  getSetting,
+  setActiveProvider,
+  setSetting
+} from '@main/settings/repository'
 
 describe('settings repository', () => {
   let db: Database.Database
@@ -41,6 +47,48 @@ describe('settings repository', () => {
       .get('hybrid') as { value: string | null; value_blob: Buffer | null }
     expect(row.value).toBe('now-a-string')
     expect(row.value_blob).toBeNull()
+  })
+
+  /**
+   * Slice 36 — Active Provider switching. Repository-level guarantees:
+   * default when absent, round-trip persistence, type validation at
+   * the boundary. The IPC layer wraps these; renderer subscribers see
+   * the `settings:active-provider-changed` event channel.
+   */
+  describe('active_provider (Slice 36)', () => {
+    it('defaults to claude when no row exists (v0.3.x backward compat)', () => {
+      expect(getActiveProvider(db)).toBe('claude')
+    })
+
+    it('round-trips a written value', () => {
+      setActiveProvider(db, 'openai')
+      expect(getActiveProvider(db)).toBe('openai')
+    })
+
+    it('writes under the stable ACTIVE_PROVIDER_KEY', () => {
+      setActiveProvider(db, 'openai')
+      expect(getSetting(db, ACTIVE_PROVIDER_KEY)).toBe('openai')
+    })
+
+    it('falls back to claude when the stored value is corrupt', () => {
+      // Simulate a corrupted row that bypasses the setter's guard.
+      setSetting(db, ACTIVE_PROVIDER_KEY, 'gpt-99-mythical')
+      expect(getActiveProvider(db)).toBe('claude')
+    })
+
+    it('rejects out-of-shape values at the setter boundary', () => {
+      expect(() => setActiveProvider(db, 'not-a-provider' as never)).toThrow(
+        /must be a known ProviderId/
+      )
+      expect(() => setActiveProvider(db, 42 as never)).toThrow(/must be a known ProviderId/)
+      expect(() => setActiveProvider(db, null as never)).toThrow(/must be a known ProviderId/)
+    })
+
+    it('overwrites on second set', () => {
+      setActiveProvider(db, 'openai')
+      setActiveProvider(db, 'claude')
+      expect(getActiveProvider(db)).toBe('claude')
+    })
   })
 
   it('refreshes updated_at on overwrite', async () => {

@@ -1,4 +1,8 @@
 import type Database from 'better-sqlite3'
+import { isProviderId, type ProviderId } from '@shared/types'
+
+/** Stable SQLite key for the user's Active Provider selection (v4 Slice 36). */
+export const ACTIVE_PROVIDER_KEY = 'active_provider'
 
 /**
  * Read a single setting's string value, or `null` if no row exists for
@@ -26,4 +30,31 @@ export function setSetting(db: Database.Database, key: string, value: string): v
        value_blob = NULL,
        updated_at = excluded.updated_at`
   ).run({ key, value })
+}
+
+/**
+ * Read the user's Active Provider. Defaults to `'claude'` when no row
+ * exists (backward-compatible with v0.3.x installs) or when the stored
+ * value is corrupt (not a known `ProviderId`). Slice 36.
+ */
+export function getActiveProvider(db: Database.Database): ProviderId {
+  const stored = getSetting(db, ACTIVE_PROVIDER_KEY)
+  return isProviderId(stored) ? stored : 'claude'
+}
+
+/**
+ * Write the user's Active Provider. Validates the value is a known
+ * `ProviderId` at the boundary; out-of-shape values throw rather than
+ * silently corrupting the setting. Slice 36.
+ */
+export function setActiveProvider(
+  db: Database.Database,
+  provider: ProviderId
+): void {
+  if (!isProviderId(provider)) {
+    throw new Error(
+      `setActiveProvider: provider must be a known ProviderId (got ${String(provider)})`
+    )
+  }
+  setSetting(db, ACTIVE_PROVIDER_KEY, provider)
 }
