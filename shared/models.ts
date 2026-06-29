@@ -72,14 +72,14 @@ export const PROVIDERS: Readonly<Record<ProviderId, ProviderDescriptor>> = {
     id: 'openai',
     label: 'OpenAI',
     available: false,
-    comingSoonNote: 'Coming in v1.1',
+    comingSoonNote: 'Coming soon',
     models: []
   },
   local: {
     id: 'local',
     label: 'Local',
     available: false,
-    comingSoonNote: 'Coming in v1.1',
+    comingSoonNote: 'Coming soon',
     models: []
   }
 }

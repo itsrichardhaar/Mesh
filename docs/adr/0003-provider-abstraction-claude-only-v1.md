@@ -12,3 +12,9 @@ The Model Settings modal shows three Provider pills (`Claude` / `OpenAI` / `Loca
 - A reader who opens the app and clicks `OpenAI` will see a tooltip, not a broken state — the disabled affordance is the contract
 - The `analyses` table stores `provider` and `model` columns from day one so historical Analyses remain attributable when more Providers go live
 - Switching the Active Provider is a v1.1 capability; v1 effectively pins the user to Claude after first-time setup
+
+## Update — 2026-06-29
+
+The "v1.1" references in this ADR reflect then-current planning. v1.1 never happened: v2 went straight to a different polish pass, and v3 is an internal-hardening pass that ships no new Providers. Functional OpenAI + Local Providers are now candidates for v4+ per [`PRD-v3.md`](../PRD-v3.md)'s "Out of Scope" section — no committed version.
+
+The ADR's actual decision — provider abstraction in code; only Claude functional; OpenAI/Local pills present but disabled — **remains in force**. The `ModelClient` interface, the disabled-pill UI affordance, and the `provider` + `model` columns on the `analyses` table are unchanged. Live code comments and UI tooltip strings have been rephrased from "Coming in v1.1" to "Coming soon" so they don't chase versions through code when plans shift again.

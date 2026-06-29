@@ -7,8 +7,8 @@ import type {
 
 /**
  * Stub Provider implementation. `LocalClient` targets self-hosted
- * OpenAI-compatible servers (Ollama, etc.) and lands in v1.1. Settings
- * disables the pill until then; every method throws.
+ * OpenAI-compatible servers (Ollama, etc.). Functional support is
+ * deferred; Settings disables the pill until then and every method throws.
  */
 export class LocalClient implements ModelClient {
   readonly provider = 'local' as const
@@ -19,10 +19,10 @@ export class LocalClient implements ModelClient {
   ) {}
 
   async validate(): Promise<ValidationResult> {
-    throw new Error('LocalClient: not implemented in v1')
+    throw new Error('LocalClient: not implemented')
   }
 
   async analyzeProject(_input: AnalyzeProjectInput): Promise<AnalysisOutput> {
-    throw new Error('LocalClient: not implemented in v1')
+    throw new Error('LocalClient: not implemented')
   }
 }

@@ -232,7 +232,7 @@ function ProviderPill({
       className={classes.join(' ')}
       title={disabled ? descriptor.comingSoonNote : undefined}
       onClick={() => {
-        /* v1: pills are presentational. Active Provider is locked to Claude. */
+        /* Pills are presentational. Active Provider is locked to Claude. */
       }}
     >
       {descriptor.label}

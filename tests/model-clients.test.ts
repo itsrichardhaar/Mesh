@@ -245,13 +245,13 @@ describe.each([
   ['OpenAIClient', (): OpenAIClient => new OpenAIClient('gpt-4o-mini')],
   ['LocalClient', (): LocalClient => new LocalClient('llama3.1:8b')]
 ])('%s stub', (_name, make) => {
-  it('validate() throws "not implemented in v1"', async () => {
-    await expect(make().validate()).rejects.toThrow(/not implemented in v1/)
+  it('validate() throws "not implemented"', async () => {
+    await expect(make().validate()).rejects.toThrow(/not implemented/)
   })
 
-  it('analyzeProject() throws "not implemented in v1"', async () => {
+  it('analyzeProject() throws "not implemented"', async () => {
     await expect(
       make().analyzeProject({ systemPrompt: '', userPrompt: '' })
-    ).rejects.toThrow(/not implemented in v1/)
+    ).rejects.toThrow(/not implemented/)
   })
 })

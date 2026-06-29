@@ -1,5 +1,7 @@
 # Mesh v1 — Product Requirements Document
 
+> **Update — 2026-06-29.** This is the v1 PRD. v1 shipped (tag `v0.1.0`). Current source of truth for what Mesh is becoming is split across [`PRD-v2.md`](./PRD-v2.md) (v2 — design system, IA, polish; shipped as `v0.2.0`) and [`PRD-v3.md`](./PRD-v3.md) (v3 — internal hardening; shipping as `v0.3.0`). The body of this file is preserved as the v1 historical record — references to "v1.1" within it reflect then-current planning; v1.1 never happened (v2 went straight to a different polish pass), and the candidates listed there are now distributed across v4+ and Go-Public per `PRD-v3.md`'s "Out of Scope" section.
+
 > Glossary terms (**Mesh**, **Project**, **Session**, **Analysis**, **Analyze**, **Pty Tab**, **Home Screen**, **Workspace Screen**, **Mode Tab**, **Provider**, **Active Provider**, **Model**, **Stats Row**, **Activity**, **Hidden**, **Source-Missing**, **Sidechain**, **Encoded Path**, **Source Path**) are defined in [`/CONTEXT.md`](../CONTEXT.md). Architecturally load-bearing decisions are recorded in [`/docs/adr/`](./adr/).
 
 ## Problem Statement

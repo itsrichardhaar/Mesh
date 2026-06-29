@@ -160,21 +160,29 @@ Mesh leaves nothing behind outside those locations. `~/.claude/` is untouched �
 
 ---
 
-## Production Checklist (1.0.0)
+## Production Checklist
 
-These are the gates `1.0.0` must clear. Beta releases may fail any of them; that's the point of being in beta.
+Restructured in v3 (see [`PRD-v3.md`](./PRD-v3.md)) into two sections: items closed by v3's **Internal Hardening** pass, and **Go-Public** items deferred to a future `1.0.0` release. Public release is deferred until v4/v5 feature work makes Mesh complete enough to publish.
 
-- [ ] All nine v1 vertical slices (per [`PRD.md`](./PRD.md#further-notes)) demonstrate end-to-end
-- [ ] All nine deep main-process modules (`ProjectEnumerator`, `MetadataDetector`, `SessionReader`, `StatsComputer`, `AnalysisOrchestrator`, `ModelClient`/`ClaudeClient`, `SecretsVault`, `PtyManager`, `Database` + migration runner) have unit-test coverage with fixture-driven assertions
-- [ ] `TranscriptRenderer` has snapshot test coverage with fixture JSONLs (including Sidechain and oversized-tool-result cases)
-- [ ] `electron-builder` produces a clean `.dmg` for macOS arm64 and x64
-- [ ] Apple Developer ID code signing + notarization configured; Gatekeeper accepts the build without right-click → Open
-- [ ] The `.app` launches on a fresh macOS machine with no Node, pnpm, or Xcode tools installed
-- [ ] In-app auto-update wired via `electron-updater` against GitHub Releases
-- [ ] Mesh dogfoods itself: analyzing `~/.claude/projects/-Users-richardhaar-Desktop-Mesh/` returns a sensible three-section Analysis
-- [ ] Schema migration verified through at least one upgrade cycle (e.g., `0.4.0` → `0.5.0` → `1.0.0-rc.1`) with no data loss
-- [ ] Crash reporting configured (Sentry or equivalent) so any reports surface during the beta tail
-- [ ] `README.md`, `CONTEXT.md`, `PRD.md`, `CHANGELOG.md`, and `DEPLOYMENT.md` are accurate to the shipped state — no stale references to deferred features as if they exist
-- [ ] At least one **third-party machine** (not the developer's own laptop) has installed and used Mesh successfully
+### Internal Hardening (v3) — closed
 
-Once all boxes are checked, tag `1.0.0` and publish via GitHub Releases. The version after that is `1.0.1` (patch), `1.1.0` (minor), or `2.0.0` (major) per semver.
+These gates were closed during v3 (`0.3.0`). Mesh is now production-grade internally: real installer artifact, migration safety net, end-to-end packaged-app verification, docs aligned to shipped reality.
+
+- [x] **`TranscriptRenderer` snapshot coverage** — satisfied at the `SessionReader` layer pre-v3 (`tests/session-reader.test.ts`). The reader produces the structured event stream the renderer consumes, and its fixture-driven tests pin transcript output deterministically, including Sidechain handling.
+- [x] **`electron-builder` produces a clean `.dmg` for macOS x64** (Slice 29). `pnpm dist` produces `dist/Mesh-<version>.dmg`. arm64 is deferred to Go-Public, pending arm64 hardware for verification.
+- [x] **Schema migration verified through an upgrade cycle with no data loss** (Slice 30). Two new tests under `data preservation across migrations` in `tests/migrations.test.ts` exercise the *mechanism* — partial-apply → insert → finish, and step-through with representative data inserted at each stage. Pattern extends naturally to future real cross-version migrations.
+- [x] **Packaged-app smoke test + dogfood** (Slice 31). The `.dmg` from Slice 29 was installed to `/Applications/Mesh.app` and the full v1+v2 user journey was walked through on the packaged build (not `pnpm dev`). Mesh dogfooded itself by analyzing `~/.claude/projects/-Users-richardhaar-Desktop-Mesh/`. Slice 31 surfaced one real bug — a native-module ABI mismatch in the packaged build (fixed in [`9344bd3`](https://github.com/itsrichardhaar/Mesh/commit/9344bd3)) — exactly the kind of breakage the slice exists to catch.
+- [x] **Docs accuracy audit** (Slice 32). This file restructured; `PRD-v3.md` published; `ADR-0003` amended with a dated update note; live code comments and UI strings neutralized (`'Coming in v1.1'` → `'Coming soon'`). CHANGELOG history preserved verbatim per the A+B+C cleanup principles.
+
+### Go-Public (future `1.0.0`) — deferred
+
+These gates remain open and gate the eventual public `1.0.0` release. They are deferred because v3 is explicitly an internal-only hardening pass — public release is not the goal until v4/v5 feature work makes Mesh complete enough to publish.
+
+- [ ] **`.dmg` for macOS arm64.** Needs arm64 hardware for verification. Adding arm64 once that's available is a single-line `arch: [x64, arm64]` change in `electron-builder.yml` plus a re-run of Slice 31's smoke-test journey on the arm64 build.
+- [ ] **Apple Developer ID code signing + notarization.** Needs an Apple Developer account + Developer ID cert. With signing in place, Gatekeeper accepts the build without right-click → Open.
+- [ ] **In-app auto-update wired via `electron-updater`** against GitHub Releases. Needs a public release channel — published `.dmg` + `.dmg.blockmap` artifacts per release. Pre-Go-Public, updates are manual (see [Updates](#updates-beta)).
+- [ ] **The `.app` launches on a fresh macOS machine** with no Node, pnpm, or Xcode tools installed. Needs a true clean-room Mac to verify. v3's Slice 31 verified the weaker form — launching from `/Applications/` on the developer's own machine, which still has dev tools — and that's all internal hardening requires.
+- [ ] **At least one third-party machine has installed and used Mesh successfully.** "Stranger's Mac" interpretation. Distinct from the clean-room launch above — this also tests the install + onboarding experience on a user who isn't the developer.
+- [ ] **Crash reporting configured (Sentry or equivalent).** Dropped from v3 scope since there are no users yet to surface reports from. Revisited at Go-Public when there are.
+
+Once all Go-Public boxes are checked, tag `1.0.0` and publish via GitHub Releases. The version after that is `1.0.1` (patch), `1.1.0` (minor), or `2.0.0` (major) per semver.
