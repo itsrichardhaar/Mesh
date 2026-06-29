@@ -15,6 +15,9 @@ The stable `1.0.0` release ships once every item in the
 
 ## [Unreleased]
 
+### Fixed
+- **Top bar Mesh icon path in packaged build (#33).** Discovered during Slice 31's smoke test of the unsigned `.dmg` from Slice 29: the Mesh icon in the top bar rendered as a broken-image glyph in the installed `.app`, even though it worked correctly in `pnpm dev`. Root cause: two absolute-path references — `src="/icon.png"` in `src/renderer/src/components/TopBar.tsx:35` and `href="/icon.png"` in `src/renderer/index.html:7`. Vite's dev server serves `public/` at root so `/icon.png` resolved fine, but in the packaged build the renderer loads via `file://` and `/icon.png` resolved to the filesystem root (`file:///icon.png`), which doesn't exist. Fixed by switching both references to relative paths (`./icon.png`); with a relative URL the browser resolves against the document's own location and `public/icon.png` is copied next to `index.html` at Vite build time.
+
 ### Added
 - **Slice 30: Schema migration upgrade-cycle data-preservation test.** Closes the gap the v3 Production Checklist flagged for migration safety. The existing 6 migration tests covered fresh-apply, idempotency, tracking, and transactional rollback, but none started from a *populated intermediate state* — i.e., none exercised "applying new migrations on top of real data doesn't lose any." Two new tests added to `tests/migrations.test.ts` under a `data preservation across migrations` describe block:
   - **Partial apply → insert → finish:** apply only `0000_init + 0001_projects`, insert a Project row, then apply the remaining migrations. Assert the Project row is still queryable AND the new `settings` + `analyses` tables exist.

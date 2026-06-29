@@ -32,7 +32,7 @@ export function TopBar({ onGoHome, onOpenSettings }: Props): JSX.Element {
         aria-label="Mesh — go to home"
         title="Home"
       >
-        <img className="top-bar-icon" src="/icon.png" alt="" width={20} height={20} />
+        <img className="top-bar-icon" src="./icon.png" alt="" width={20} height={20} />
         <span className="top-bar-wordmark">Mesh</span>
       </button>
       <div className="top-bar-spacer" />
