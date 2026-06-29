@@ -90,6 +90,7 @@ After Slice 32 lands: `package.json` 0.2.0 → 0.3.0, CHANGELOG `[Unreleased]` �
 Everything PRD-v2's "Out of Scope" list contains stays deferred. v3 ships zero of those items. Specifically:
 
 **Deferred to a future minor release (v4, v5, or later):**
+> Update — 2026-06-29: Functional OpenAI provider landed in v4 (`v0.4.0`), per [PRD-v4](./PRD-v4.md). The line below is preserved as v3-era history.
 - Functional OpenAI provider (`ClaudeClient` remains the only implementation)
 - Functional Local provider
 - Scheduled / cron-based Analysis
