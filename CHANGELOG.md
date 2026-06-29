@@ -15,6 +15,8 @@ The stable `1.0.0` release ships once every item in the
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-06-29
+
 ### Added
 - **Slice 28: Scrollbars + focus + motion capstone.** Final v2 polish slice — cross-cutting concerns applied once, everywhere. Thin (8px) custom scrollbars across the app: Webkit `::-webkit-scrollbar` pseudo-elements + Firefox `scrollbar-width: thin` / `scrollbar-color`. Thumb uses `--border-subtle` by default, lifts to `--text-muted` on hover. The `border: 2px solid transparent; background-clip: padding-box` trick gives the thumb visual breathing room without a separate inset. Monaco's custom scrollbar tuned to match (8px via the `scrollbar` editor option, `useShadows: false` for a calmer look). xterm uses the browser's native scrollbar so picks up the global rules automatically.
 - Global `:focus-visible` rule introduced at the document root — 2px `--accent` outline with `--radius-sm` corners, 2px offset. Per-component focus rules (top bar buttons, card title links, etc.) still win on specificity, so the global is a safety net for any focusable element that doesn't define its own.
