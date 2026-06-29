@@ -9,11 +9,13 @@ Mesh is currently in **beta**. Pre-1.0 versions (`0.x.y`) may include breaking
 changes between releases — the SQLite schema, IPC contracts, the `ModelClient`
 interface, and the Analysis output schema are all free to change until `1.0.0`.
 The stable `1.0.0` release ships once every item in the
-[Production Checklist](./docs/DEPLOYMENT.md#production-checklist-100) passes.
+[Production Checklist](./docs/DEPLOYMENT.md#production-checklist) passes.
 
 ---
 
 ## [Unreleased]
+
+## [0.3.0] — 2026-06-29
 
 ### Fixed
 - **Native module ABI mismatch in packaged build (Slice 31).** Discovered during Slice 31's smoke test: the installed `.app` showed a menu bar but no window. Launching from a terminal (`/Applications/Mesh.app/Contents/MacOS/Mesh`) surfaced the swallowed error — `better-sqlite3` was loaded against `NODE_MODULE_VERSION 127` (host Node 22) while the embedded Electron 33.4.11 expects `NODE_MODULE_VERSION 130` (its Node 20.18.3). Root cause: `pnpm test` and `pnpm test:watch` run `pnpm rebuild:node` first, which retargets `better-sqlite3` + `node-pty` to the host Node ABI; the `package` / `dist` scripts didn't rebuild for Electron before packaging, so whatever ABI the `.node` was last built against got packed verbatim. Two-part fix: (1) `package.json` — `package` and `dist` now run `pnpm rebuild:electron` before electron-builder, matching the guard `dev` already has; (2) `src/main/index.ts` — added a `.catch()` to the `app.whenReady().then(...)` chain that calls `dialog.showErrorBox` and `app.exit(1)` so any future init failure surfaces a real error message instead of leaving the app with a menu bar and no window.
