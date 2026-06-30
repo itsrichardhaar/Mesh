@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import type { Project, ProjectStats, StoredAnalysis } from '@shared/types'
+import { useProjectIndicator } from '../hooks/useLiveSessions'
 import { relativeTime } from '../util/relativeTime'
+import { ActivitySpinner } from './ActivitySpinner'
 
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000
 const MAX_CARDS = 12
@@ -47,8 +49,8 @@ export function ProjectCards({ projects, onSelect, onOpenWorkspace }: Props): JS
   }
 
   return (
-    <section className="project-cards-section" aria-label="Active projects">
-      <h2 className="project-cards-heading">Active Projects</h2>
+    <section className="project-cards-section" aria-label="Recent projects">
+      <h2 className="project-cards-heading">Recent Projects</h2>
       <ul className="project-cards-grid" role="list">
         {visible.map((p) => (
           <li key={p.encodedPath}>
@@ -71,6 +73,7 @@ function ProjectCard({
 }): JSX.Element {
   const [stats, setStats] = useState<ProjectStats | null>(null)
   const [analysis, setAnalysis] = useState<StoredAnalysis | null | undefined>(undefined)
+  const { isLive, isActive } = useProjectIndicator(project.encodedPath)
 
   useEffect(() => {
     let cancelled = false
@@ -93,7 +96,7 @@ function ProjectCard({
         : `Analyzed ${relativeTime(analysis.generatedAt)}`
 
   return (
-    <article className="project-card">
+    <article className={`project-card${isLive ? ' project-card-live' : ''}`}>
       <h3 className="project-card-title">
         <button
           type="button"
@@ -103,6 +106,7 @@ function ProjectCard({
         >
           {project.name}
         </button>
+        {isActive && <ActivitySpinner size="small" ariaLabel="Project active" />}
       </h3>
       <p className="project-card-metrics">
         <span>{relativeTime(project.activity)}</span>

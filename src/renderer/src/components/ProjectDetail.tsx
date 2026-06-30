@@ -3,6 +3,7 @@ import { ArrowRight, FileText, Lightbulb, ListChecks, Plus, type LucideIcon } fr
 import type { Project, ProjectStats, StoredAnalysis } from '@shared/types'
 import { findModel } from '@shared/models'
 import { useActiveProviderModel } from '../hooks/useActiveProviderModel'
+import { useProjectIndicator } from '../hooks/useLiveSessions'
 import { relativeTime } from '../util/relativeTime'
 import { tildify } from '../util/tildify'
 import { ActivitySpinner } from './ActivitySpinner'
@@ -43,6 +44,7 @@ export function ProjectDetail({ project, onBack, onOpenWorkspace }: Props): JSX.
   const [stats, setStats] = useState<StatsState>({ status: 'loading' })
   const [analysis, setAnalysis] = useState<AnalysisState>({ status: 'loading' })
   const [run, setRun] = useState<RunState>({ status: 'idle' })
+  const { isLive, isActive } = useProjectIndicator(project.encodedPath)
 
   useEffect(() => {
     let cancelled = false
@@ -137,8 +139,13 @@ export function ProjectDetail({ project, onBack, onOpenWorkspace }: Props): JSX.
           Open Workspace <ArrowRight size={14} aria-hidden="true" />
         </button>
       </div>
-      <header className="project-detail-header">
-        <h1 className="project-detail-name">{project.name}</h1>
+      <header
+        className={`project-detail-header${isLive ? ' project-detail-header-live' : ''}`}
+      >
+        <h1 className="project-detail-name">
+          <span>{project.name}</span>
+          {isActive && <ActivitySpinner size="small" ariaLabel="Project active" />}
+        </h1>
         <span
           className="project-detail-path"
           title={project.sourcePath}

@@ -508,6 +508,23 @@ button {
   opacity: 0.6;
 }
 
+/* Slice 40 (v5): "this Project has ≥1 live Pty Tab" tint on the sidebar
+   row. Lives under the selection tint (selection wins via order); both
+   tints use slight transparency so the green stays readable when both
+   apply. */
+.project-row-live {
+  background: var(--mesh-live-bg);
+}
+
+.project-row-live:hover {
+  background: var(--mesh-live-bg);
+}
+
+.project-row-live.project-row-selected,
+.project-row-live.project-row-selected:hover {
+  background: var(--accent-soft);
+}
+
 .project-name {
   font-weight: var(--weight-medium);
   color: var(--text-primary);
@@ -655,11 +672,26 @@ button {
   box-shadow: var(--shadow-sm);
 }
 
+/* Slice 40 (v5): "this Project has ≥1 live Pty Tab" tint on the grid
+   card. Subtle background + border tint shares the same CSS variables
+   with the sidebar and Session row treatments. */
+.project-card-live {
+  background: var(--mesh-live-bg);
+  border-color: var(--mesh-live-border);
+}
+
+.project-card-live:hover {
+  border-color: var(--mesh-live-border);
+}
+
 .project-card-title {
   margin: 0;
   font-size: var(--text-lg);
   font-weight: var(--weight-semibold);
   line-height: var(--line-tight);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .project-card-title-link {
@@ -864,6 +896,20 @@ button {
   gap: 12px;
   margin-bottom: 24px;
   min-width: 0;
+  padding: 12px 14px;
+  margin-left: -14px;
+  margin-right: -14px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+}
+
+/* Slice 40 (v5): "this Project has ≥1 live Pty Tab" tint on the Project
+   Detail pane's header bar. The negative left/right margins above let
+   the tint bleed to the edge of the detail container without disturbing
+   the existing baseline alignment. */
+.project-detail-header-live {
+  background: var(--mesh-live-bg);
+  border-color: var(--mesh-live-border);
 }
 
 .project-detail-name {
@@ -873,6 +919,9 @@ button {
   letter-spacing: var(--tracking-tight);
   color: var(--text-primary);
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .project-detail-path {

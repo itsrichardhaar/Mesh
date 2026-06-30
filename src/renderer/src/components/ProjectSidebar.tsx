@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { Project } from '@shared/types'
 import type { ProjectListState } from '../hooks/useProjectList'
+import { useProjectIndicator } from '../hooks/useLiveSessions'
+import { ActivitySpinner } from './ActivitySpinner'
 
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000
 
@@ -168,44 +170,70 @@ function SidebarBody({
   }
   return (
     <ul className="project-list" role="list">
-      {visible.map((p) => {
-        const idle = isIdle(p)
-        const classes = ['project-row']
-        if (p.encodedPath === selectedEncodedPath) classes.push('project-row-selected')
-        if (p.sourceMissing) classes.push('project-row-missing')
-        if (idle) classes.push('project-row-idle')
-        if (p.hidden) classes.push('project-row-hidden')
-        return (
-          <li key={p.encodedPath}>
-            <button
-              type="button"
-              className={classes.join(' ')}
-              onClick={() => onSelect(p.encodedPath)}
-              onDoubleClick={() => {
-                if (!p.sourceMissing) onOpen(p)
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !p.sourceMissing) {
-                  e.preventDefault()
-                  onOpen(p)
-                }
-              }}
-              onContextMenu={(e) => onContextMenu(e, p)}
-              title={p.sourceMissing ? 'Source folder no longer exists on disk' : undefined}
-            >
-              <span className="project-name">{p.name}</span>
-              {p.sourceMissing ? (
-                <span className="sidebar-pill sidebar-pill-missing">Source missing</span>
-              ) : idle ? (
-                <span className="sidebar-pill sidebar-pill-idle">Idle</span>
-              ) : (
-                <span className="project-activity">{formatRelative(p.activity)}</span>
-              )}
-            </button>
-          </li>
-        )
-      })}
+      {visible.map((p) => (
+        <ProjectRow
+          key={p.encodedPath}
+          project={p}
+          isSelected={p.encodedPath === selectedEncodedPath}
+          onSelect={onSelect}
+          onOpen={onOpen}
+          onContextMenu={onContextMenu}
+        />
+      ))}
     </ul>
+  )
+}
+
+function ProjectRow({
+  project: p,
+  isSelected,
+  onSelect,
+  onOpen,
+  onContextMenu
+}: {
+  project: Project
+  isSelected: boolean
+  onSelect: (encodedPath: string) => void
+  onOpen: (project: Project) => void
+  onContextMenu: (e: React.MouseEvent, project: Project) => void
+}): JSX.Element {
+  const { isLive, isActive } = useProjectIndicator(p.encodedPath)
+  const idle = isIdle(p)
+  const classes = ['project-row']
+  if (isSelected) classes.push('project-row-selected')
+  if (p.sourceMissing) classes.push('project-row-missing')
+  if (idle) classes.push('project-row-idle')
+  if (p.hidden) classes.push('project-row-hidden')
+  if (isLive) classes.push('project-row-live')
+  return (
+    <li>
+      <button
+        type="button"
+        className={classes.join(' ')}
+        onClick={() => onSelect(p.encodedPath)}
+        onDoubleClick={() => {
+          if (!p.sourceMissing) onOpen(p)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !p.sourceMissing) {
+            e.preventDefault()
+            onOpen(p)
+          }
+        }}
+        onContextMenu={(e) => onContextMenu(e, p)}
+        title={p.sourceMissing ? 'Source folder no longer exists on disk' : undefined}
+      >
+        <span className="project-name">{p.name}</span>
+        {isActive && <ActivitySpinner size="small" ariaLabel="Project active" />}
+        {p.sourceMissing ? (
+          <span className="sidebar-pill sidebar-pill-missing">Source missing</span>
+        ) : idle ? (
+          <span className="sidebar-pill sidebar-pill-idle">Idle</span>
+        ) : (
+          <span className="project-activity">{formatRelative(p.activity)}</span>
+        )}
+      </button>
+    </li>
   )
 }
 
