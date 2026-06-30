@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { MeshApi } from '@shared/api'
 import type { PtyDataEvent, PtyExitEvent } from '@shared/pty'
-import type { ProviderId } from '@shared/types'
+import type { Notification, ProviderId } from '@shared/types'
 
 function subscribe(channel: string, cb: () => void): () => void {
   const handler = (): void => cb()
@@ -80,6 +80,16 @@ const api: MeshApi = {
     list: () => ipcRenderer.invoke('pty:list'),
     onData: (cb) => subscribeArg<PtyDataEvent>('pty:data', cb),
     onExit: (cb) => subscribeArg<PtyExitEvent>('pty:exit', cb)
+  },
+  notifications: {
+    list: () => ipcRenderer.invoke('notifications:list'),
+    markRead: (id) => ipcRenderer.invoke('notifications:mark-read', id),
+    markAllRead: (opts) => ipcRenderer.invoke('notifications:mark-all-read', opts ?? {}),
+    clearAll: (opts) => ipcRenderer.invoke('notifications:clear-all', opts ?? {}),
+    setForegroundPty: (ptyId) => ipcRenderer.invoke('notifications:set-foreground-pty', ptyId),
+    onCreated: (cb) => subscribeArg<Notification>('notifications:created', cb),
+    onUpdated: (cb) => subscribeArg<{ ids: string[] }>('notifications:updated', cb),
+    onCleared: (cb) => subscribeArg<{ encodedPath: string | null }>('notifications:cleared', cb)
   }
 }
 

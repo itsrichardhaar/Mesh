@@ -10,6 +10,7 @@ import type {
 } from './pty'
 import type { SessionSummary, TranscriptEntry } from './sessions'
 import type {
+  Notification,
   Project,
   ProjectPatch,
   ProjectStats,
@@ -211,5 +212,26 @@ export interface MeshApi {
     list(encodedPath: string): Promise<SessionSummary[]>
     readTranscript(encodedPath: string, sessionId: string): Promise<TranscriptEntry[]>
     onChanged(cb: (encodedPath: string) => void): () => void
+  }
+
+  /**
+   * v5 / Slice 41: persistent notifications surface. The main-process
+   * idle detector inserts rows when a live Pty Tab transitions from
+   * active to idle while not foregrounded; the renderer reads them via
+   * `list` and subscribes to lifecycle events via `onCreated` /
+   * `onUpdated` / `onCleared`. `setForegroundPty` informs main of the
+   * currently-foregrounded Pty Tab so it can suppress notifications
+   * the user can already see.
+   */
+  notifications: {
+    list(): Promise<Notification[]>
+    markRead(id: string): Promise<void>
+    markAllRead(opts?: { encodedPath?: string; sessionId?: string }): Promise<void>
+    clearAll(opts?: { encodedPath?: string }): Promise<void>
+    /** Pass `null` when no Pty Tab is foregrounded (Workspace hidden, etc.). */
+    setForegroundPty(ptyId: string | null): Promise<void>
+    onCreated(cb: (notification: Notification) => void): () => void
+    onUpdated(cb: (event: { ids: string[] }) => void): () => void
+    onCleared(cb: (event: { encodedPath: string | null }) => void): () => void
   }
 }

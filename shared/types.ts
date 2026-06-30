@@ -151,3 +151,52 @@ export interface ModelClient {
 export interface ProjectPatch {
   hidden?: boolean
 }
+
+// --- Notifications (v5 / Slice 41) ----------------------------------------
+
+/**
+ * A persistent record of a moment that may need user attention in a
+ * Project's Pty Tab. Created by the main-process idle detector when a
+ * live Pty Tab transitions from active to idle (no PTY output for ≥ 8 s)
+ * while the user is not currently looking at that Pty Tab. Surfaced as
+ * a top-right toast on creation (Slice 42) and as a row in the bell-
+ * icon dropdown until read or cleared. 7-day retention sweep on app
+ * boot keeps the table small.
+ */
+export interface Notification {
+  /** UUID — stable primary key. */
+  id: string
+  /** ISO 8601 timestamp when the notification was created. */
+  createdAt: string
+  /** Project this notification belongs to. */
+  encodedPath: string
+  /** Session this notification belongs to. */
+  sessionId: string
+  /**
+   * The Pty Tab that triggered this notification, when known. May be
+   * null on read if the PTY has since exited and the row has outlived
+   * its underlying process.
+   */
+  ptyId: string | null
+  /**
+   * Discriminator for future notification subtypes. v1 ships only
+   * `'idle'`; pattern matchers (v6+) may emit `'approval'`, `'complete'`,
+   * `'question'`, etc. Stored as a free-form string in SQLite so adding
+   * a value is a code change, not a migration. The renderer treats
+   * unknown kinds as `'idle'` (graceful degradation).
+   */
+  kind: NotificationKind
+  /** Human-readable label rendered in the toast + dropdown row. */
+  labelText: string
+  /** ISO 8601 timestamp when the notification was read; null = unread. */
+  readAt: string | null
+}
+
+/**
+ * String alias for notification subtypes. Open-ended on purpose — future
+ * kinds become string literals without a schema migration. The renderer
+ * falls back to the `'idle'` label/icon for any kind it doesn't recognize.
+ */
+export type NotificationKind = 'idle' | (string & { __brand?: 'notification-kind' })
+
+export const KNOWN_NOTIFICATION_KINDS: readonly NotificationKind[] = ['idle']

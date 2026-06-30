@@ -3,6 +3,7 @@ import init0000 from './migrations/0000_init.sql?raw'
 import projects0001 from './migrations/0001_projects.sql?raw'
 import settings0002 from './migrations/0002_settings.sql?raw'
 import analyses0003 from './migrations/0003_analyses.sql?raw'
+import notifications0004 from './migrations/0004_notifications.sql?raw'
 
 export interface Migration {
   id: string
@@ -13,7 +14,8 @@ export const MIGRATIONS: readonly Migration[] = [
   { id: '0000_init', sql: init0000 },
   { id: '0001_projects', sql: projects0001 },
   { id: '0002_settings', sql: settings0002 },
-  { id: '0003_analyses', sql: analyses0003 }
+  { id: '0003_analyses', sql: analyses0003 },
+  { id: '0004_notifications', sql: notifications0004 }
 ]
 
 const TRACKING_TABLE_SQL = `

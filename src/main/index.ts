@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, safeStorage, shell } from 'electron'
+import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -29,6 +30,14 @@ import { resolveClaudeBinary } from './pty/claude-resolver'
 import { PtyManager } from './pty/manager'
 import { getDatabase, initDatabase } from './db'
 import { runMigrations } from './db/migrations'
+import { IdleDetector } from './notifications/idle-detector'
+import {
+  clearAll as clearAllNotifications,
+  deleteOlderThan as deleteOldNotifications,
+  listNotifications,
+  markAllRead as markAllNotificationsRead,
+  markRead as markNotificationRead
+} from './notifications/repository'
 import { FileReadError, readProjectFile } from './files/file-reader'
 import {
   closeAll as closeAllWatchers,
@@ -73,6 +82,17 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url))
 let mainWindow: BrowserWindow | null = null
 let isQuitting = false
 const ptyManager = new PtyManager()
+
+/**
+ * v5 / Slice 41: notification subsystem. The idle detector watches each
+ * Pty Tab's activity stream and fires `notifications:created` events
+ * when a live tab transitions to idle while not foregrounded. Lazily
+ * constructed in `app.whenReady` so the database exists first.
+ */
+let idleDetector: IdleDetector | null = null
+
+/** Days of notification history retained — older rows swept at boot. */
+const NOTIFICATION_RETENTION_DAYS = 7
 
 // In production builds, `electron-builder` embeds `build/icon.icns` into the
 // `.app` bundle (configured in `electron-builder.yml`), so the dock icon
@@ -580,11 +600,18 @@ function registerIpc(): void {
         rows,
         onData: (id, data) => {
           mainWindow?.webContents.send('pty:data', { ptyId: id, data })
+          idleDetector?.onPtyData(id)
         },
         onExit: (id, exitCode) => {
           mainWindow?.webContents.send('pty:exit', { ptyId: id, exitCode })
+          idleDetector?.onPtyExit(id)
         }
       })
+      // Slice 41 (v5): register the PTY's metadata with the idle
+      // detector so subsequent activity / exit events can be
+      // attributed to the right Project + Session. Unregistration
+      // happens automatically inside `onPtyExit`.
+      idleDetector?.registerPty(ptyId, req.encodedPath, req.sessionId)
       return { ok: true, ptyId }
     }
   )
@@ -678,6 +705,76 @@ function registerIpc(): void {
       }
     }
   )
+
+  // --- Notifications (Slice 41, v5) ---------------------------------------
+
+  ipcMain.handle('notifications:list', () => {
+    return listNotifications(getDatabase())
+  })
+
+  ipcMain.handle('notifications:mark-read', (_event, id: unknown): void => {
+    if (typeof id !== 'string' || id.length === 0) {
+      throw new Error('notifications:mark-read: id must be a non-empty string')
+    }
+    const at = new Date().toISOString()
+    const { updated } = markNotificationRead(getDatabase(), id, at)
+    if (updated.length > 0) {
+      mainWindow?.webContents.send('notifications:updated', { ids: updated })
+    }
+  })
+
+  ipcMain.handle(
+    'notifications:mark-all-read',
+    (
+      _event,
+      opts: unknown
+    ): void => {
+      const scope =
+        opts && typeof opts === 'object'
+          ? (opts as { encodedPath?: unknown; sessionId?: unknown })
+          : {}
+      const encodedPath =
+        typeof scope.encodedPath === 'string' && scope.encodedPath.length > 0
+          ? scope.encodedPath
+          : undefined
+      const sessionId =
+        typeof scope.sessionId === 'string' && scope.sessionId.length > 0
+          ? scope.sessionId
+          : undefined
+      const at = new Date().toISOString()
+      const { updated } = markAllNotificationsRead(
+        getDatabase(),
+        { encodedPath, sessionId },
+        at
+      )
+      if (updated.length > 0) {
+        mainWindow?.webContents.send('notifications:updated', { ids: updated })
+      }
+    }
+  )
+
+  ipcMain.handle('notifications:clear-all', (_event, opts: unknown): void => {
+    const scope =
+      opts && typeof opts === 'object' ? (opts as { encodedPath?: unknown }) : {}
+    const encodedPath =
+      typeof scope.encodedPath === 'string' && scope.encodedPath.length > 0
+        ? scope.encodedPath
+        : undefined
+    const { cleared } = clearAllNotifications(getDatabase(), { encodedPath })
+    if (cleared > 0) {
+      mainWindow?.webContents.send('notifications:cleared', { encodedPath: encodedPath ?? null })
+    }
+  })
+
+  ipcMain.handle(
+    'notifications:set-foreground-pty',
+    (_event, ptyId: unknown): void => {
+      if (ptyId !== null && (typeof ptyId !== 'string' || ptyId.length === 0)) {
+        throw new Error('notifications:set-foreground-pty: ptyId must be a non-empty string or null')
+      }
+      idleDetector?.setForegroundPty(ptyId as string | null)
+    }
+  )
 }
 
 /** Stable SQLite key shape for per-Provider secrets. */
@@ -769,6 +866,28 @@ app.whenReady().then(() => {
   const db = initDatabase()
   runMigrations(db)
   smokeTestSafeStorage()
+
+  // Slice 41 (v5): wire the notification subsystem. The idle detector
+  // emits via `mainWindow.webContents.send` (resolved lazily because
+  // the window doesn't exist yet at this point). 7-day retention
+  // sweep runs once at boot so the table stays small without user
+  // intervention.
+  idleDetector = new IdleDetector({
+    db,
+    now: () => Date.now(),
+    scheduleTimeout: (cb, ms) => setTimeout(cb, ms),
+    cancelTimeout: (timer) => clearTimeout(timer as NodeJS.Timeout),
+    emit: (channel, payload) => mainWindow?.webContents.send(channel, payload),
+    generateId: () => randomUUID()
+  })
+  const retentionCutoff = new Date(
+    Date.now() - NOTIFICATION_RETENTION_DAYS * 24 * 60 * 60 * 1000
+  ).toISOString()
+  const { cleared: retentionCleared } = deleteOldNotifications(db, retentionCutoff)
+  if (retentionCleared > 0) {
+    console.log(`[mesh] notifications: retention sweep cleared ${retentionCleared} rows older than ${NOTIFICATION_RETENTION_DAYS} days`)
+  }
+
   registerIpc()
   applyPersistedTheme()
   buildApplicationMenu(() => mainWindow)
@@ -827,4 +946,5 @@ app.on('before-quit', (event) => {
   void closeAllWatchers()
   void closeAllSessionWatchers()
   ptyManager.closeAll()
+  idleDetector?.shutdown()
 })

@@ -82,9 +82,13 @@ describe('runMigrations', () => {
          VALUES (?, ?, ?)`
       ).run('-Users-foo-bar', '/Users/foo/bar', 'bar')
 
-      // Stage 3: apply remaining migrations (settings + analyses).
+      // Stage 3: apply remaining migrations (settings + analyses + notifications).
       const result = runMigrations(db)
-      expect(result.applied).toEqual(['0002_settings', '0003_analyses'])
+      expect(result.applied).toEqual([
+        '0002_settings',
+        '0003_analyses',
+        '0004_notifications'
+      ])
 
       // Stage 4: the Project row is still there...
       const row = db
@@ -97,10 +101,14 @@ describe('runMigrations', () => {
       // ...and the new tables exist.
       const tables = db
         .prepare(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('settings', 'analyses')"
+          "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('settings', 'analyses', 'notifications')"
         )
         .all() as Array<{ name: string }>
-      expect(tables.map((t) => t.name).sort()).toEqual(['analyses', 'settings'])
+      expect(tables.map((t) => t.name).sort()).toEqual([
+        'analyses',
+        'notifications',
+        'settings'
+      ])
     })
 
     it('preserves data inserted at each migration step when stepping through the chain', () => {
@@ -128,7 +136,7 @@ describe('runMigrations', () => {
 
       // Apply migration 0003; insert an analysis pointing at the earlier
       // Project.
-      runMigrations(db, MIGRATIONS)
+      runMigrations(db, MIGRATIONS.slice(0, 4))
       db.prepare(
         `INSERT INTO analyses (
            encoded_path, generated_at, status, provider, model,
@@ -140,6 +148,23 @@ describe('runMigrations', () => {
         '# Summary',
         JSON.stringify([{ text: 'Next' }]),
         JSON.stringify([{ text: 'Improve' }])
+      )
+
+      // Apply migration 0004; insert a Notification pointing at the
+      // earlier Project + Session.
+      runMigrations(db, MIGRATIONS)
+      db.prepare(
+        `INSERT INTO notifications
+           (id, created_at, encoded_path, session_id, pty_id, kind, label_text, read_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`
+      ).run(
+        'n1',
+        '2026-06-30T10:00:00.000Z',
+        '-step-project',
+        'sess-step',
+        'pty-step',
+        'idle',
+        'Agent is idle'
       )
 
       // After the full chain has applied, every piece of data inserted
@@ -170,11 +195,40 @@ describe('runMigrations', () => {
       expect(analysis.status).toBe('ok')
       expect(analysis.auto_name).toBe('project')
 
-      // All four migration ids should be recorded.
+      const notification = db
+        .prepare(
+          `SELECT n.kind, n.session_id, p.auto_name
+           FROM notifications n
+           JOIN projects p ON p.encoded_path = n.encoded_path
+           WHERE n.id = ?`
+        )
+        .get('n1') as { kind: string; session_id: string; auto_name: string }
+      expect(notification.kind).toBe('idle')
+      expect(notification.session_id).toBe('sess-step')
+      expect(notification.auto_name).toBe('project')
+
+      // All five migration ids should be recorded.
       const applied = db
         .prepare('SELECT id FROM _applied_migrations ORDER BY id')
         .all() as Array<{ id: string }>
       expect(applied.map((r) => r.id)).toEqual(MIGRATIONS.map((m) => m.id))
+    })
+
+    it('0004_notifications creates the table + both expected indexes', () => {
+      runMigrations(db)
+      const tables = db
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='notifications'")
+        .all() as Array<{ name: string }>
+      expect(tables).toHaveLength(1)
+      const indexes = db
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='notifications' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+        )
+        .all() as Array<{ name: string }>
+      expect(indexes.map((i) => i.name)).toEqual([
+        'idx_notifications_recent',
+        'idx_notifications_unread'
+      ])
     })
   })
 })

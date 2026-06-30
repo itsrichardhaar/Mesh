@@ -75,6 +75,20 @@ export function WorkspaceScreen({
     return off
   }, [visible])
 
+  // Slice 41 (v5): tell main which Pty Tab the user is currently
+  // foregrounded on so the idle detector can suppress notifications
+  // they'd see anyway. Null when this Workspace is hidden, when no
+  // tab is active, or when the active tab hasn't yet been assigned a
+  // ptyId (still spawning).
+  useEffect(() => {
+    if (!visible) {
+      void window.api.notifications.setForegroundPty(null)
+      return
+    }
+    const active = tabs.find((t) => t.slotId === activePtySlotId)
+    void window.api.notifications.setForegroundPty(active?.ptyId ?? null)
+  }, [visible, activePtySlotId, tabs])
+
   const handleFileSelect = (relPath: string): void => {
     setSelectedFileRelPath(relPath)
     if (mode !== 'editor') setMode('editor')
