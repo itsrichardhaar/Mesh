@@ -101,9 +101,6 @@ function ProjectCard({
           {project.name}
         </button>
       </h3>
-      {project.autoSubtitle && (
-        <p className="project-card-subtitle">{project.autoSubtitle}</p>
-      )}
       <p className="project-card-metrics">
         <span>{relativeTime(project.activity)}</span>
         <span aria-hidden="true">·</span>

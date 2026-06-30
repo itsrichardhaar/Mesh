@@ -15,6 +15,9 @@ The stable `1.0.0` release ships once every item in the
 
 ## [Unreleased]
 
+### Changed
+- **Project stack subtitle removed from the UI.** The auto-detected `autoSubtitle` (e.g., `React · TypeScript`, `Python`, `Rust`, `HTML`) no longer renders on the Home Screen sidebar cards, Project Detail header, or Workspace title bar. The tags didn't fully represent multi-language Electron / SQLite / multi-stack projects like Mesh itself and added noise without proportional signal. **Detection and storage are preserved** — `auto_subtitle` still populates in the `projects` table and the `metadata-detector.ts` subsystem runs unchanged, so the data is available if a future feature (filtering, search, sort-by-stack) needs it. The three JSX render sites and three orphan CSS rules (`project-card-subtitle`, `project-detail-subtitle`, `workspace-title-subtitle`) are removed.
+
 ## [0.4.0] — 2026-06-29
 
 ### Added

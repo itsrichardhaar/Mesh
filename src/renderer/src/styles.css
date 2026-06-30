@@ -695,12 +695,6 @@ button {
   outline-offset: -2px;
 }
 
-.project-card-subtitle {
-  margin: 0;
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-}
-
 .project-card-metrics {
   margin: 0;
   font-size: var(--text-xs);
@@ -893,12 +887,6 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
-}
-
-.project-detail-subtitle {
-  font-size: var(--text-base);
-  color: var(--text-secondary);
-  flex-shrink: 0;
 }
 
 .stats-row {
@@ -1593,11 +1581,6 @@ button {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
-}
-
-.workspace-title-subtitle {
-  font-size: 12px;
-  color: var(--text-muted);
 }
 
 .workspace-header-spacer {

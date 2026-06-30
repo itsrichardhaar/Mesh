@@ -144,9 +144,6 @@ export function ProjectDetail({ project, onBack, onOpenWorkspace }: Props): JSX.
         >
           {tildify(project.sourcePath)}
         </span>
-        {project.autoSubtitle && (
-          <span className="project-detail-subtitle">{project.autoSubtitle}</span>
-        )}
       </header>
 
       <StatsRow project={project} state={stats} />

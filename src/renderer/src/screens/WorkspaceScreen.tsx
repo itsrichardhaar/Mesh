@@ -155,9 +155,6 @@ export function WorkspaceScreen({ project, visible, onBack }: Props): JSX.Elemen
         </button>
         <div className="workspace-title">
           <span className="workspace-title-name">{project.name}</span>
-          {project.autoSubtitle && (
-            <span className="workspace-title-subtitle">{project.autoSubtitle}</span>
-          )}
         </div>
         <div className="workspace-header-spacer" />
       </header>
