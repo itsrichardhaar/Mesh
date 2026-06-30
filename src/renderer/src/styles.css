@@ -1549,7 +1549,10 @@ button {
 }
 
 .workspace-body-tree-collapsed {
-  grid-template-columns: 36px 1fr;
+  /* Files sidebar fully hidden — the aside is display:none via `hidden`
+     and the old re-expand strip is gone, so the content area takes the
+     full width as a single grid column. */
+  grid-template-columns: 1fr;
 }
 
 .workspace-tree-column,
