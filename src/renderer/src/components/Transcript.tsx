@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { ChevronsDown } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
-import { Virtuoso } from 'react-virtuoso'
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import type {
   TranscriptEntry,
   TranscriptMessage,
@@ -28,6 +29,17 @@ interface Props {
 export function Transcript({ encodedPath, sessionId, onResume }: Props): JSX.Element {
   const [entries, setEntries] = useState<TranscriptEntry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const virtuosoRef = useRef<VirtuosoHandle>(null)
+
+  const scrollToBottom = (): void => {
+    virtuosoRef.current?.scrollToIndex({
+      index: 'LAST',
+      align: 'end',
+      behavior: 'smooth'
+    })
+  }
+
+  const canScroll = !error && entries !== null && entries.length > 0
 
   useEffect(() => {
     let cancelled = false
@@ -60,6 +72,17 @@ export function Transcript({ encodedPath, sessionId, onResume }: Props): JSX.Ele
       <div className="transcript-toolbar">
         <button
           type="button"
+          className="transcript-jump-bottom"
+          onClick={scrollToBottom}
+          disabled={!canScroll}
+          aria-label="Jump to bottom of transcript"
+          title="Jump to bottom"
+        >
+          <ChevronsDown size={14} aria-hidden="true" />
+          <span>Jump to bottom</span>
+        </button>
+        <button
+          type="button"
           className="transcript-resume"
           onClick={() => onResume(sessionId)}
         >
@@ -77,6 +100,7 @@ export function Transcript({ encodedPath, sessionId, onResume }: Props): JSX.Ele
       )}
       {!error && entries && entries.length > 0 && (
         <Virtuoso
+          ref={virtuosoRef}
           className="transcript-scroll"
           data={entries}
           computeItemKey={(_, item) => keyFor(item)}
