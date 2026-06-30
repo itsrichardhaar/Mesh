@@ -139,7 +139,6 @@ export function App(): JSX.Element {
                 visible={screen === 'workspace'}
                 onBack={goHome}
                 treeCollapsed={files.collapsed}
-                onToggleTreeCollapsed={files.toggle}
               />
             )}
             {screen === 'settings' && <SettingsScreen onClose={closeSettings} />}

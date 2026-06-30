@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { Project } from '@shared/types'
 import { FileTree } from '../components/FileTree'
 import { FileViewer } from '../components/FileViewer'
@@ -14,9 +13,12 @@ interface Props {
   project: Project
   visible: boolean
   onBack: () => void
-  /** Files-sidebar collapse state, lifted to App.tsx so the top bar can toggle it. */
+  /**
+   * Files-sidebar collapse state, lifted to App.tsx and toggled
+   * exclusively from the top-bar sidebar button. WorkspaceScreen reads
+   * the value to decide whether to render the file tree column.
+   */
   treeCollapsed: boolean
-  onToggleTreeCollapsed: () => void
 }
 
 interface PtySlot {
@@ -47,8 +49,7 @@ export function WorkspaceScreen({
   project,
   visible,
   onBack,
-  treeCollapsed,
-  onToggleTreeCollapsed
+  treeCollapsed
 }: Props): JSX.Element {
   const [showHidden, setShowHidden] = useState(false)
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
@@ -56,7 +57,6 @@ export function WorkspaceScreen({
   const [ptyTabs, setPtyTabs] = useState<PtySlot[]>([])
   const [activePtySlotId, setActivePtySlotId] = useState<string | null>(null)
   const { mode, setMode } = useWorkspaceMode(project.encodedPath)
-  const toggleTreeCollapsed = onToggleTreeCollapsed
 
   // Reset Project-scoped state on Project switch so we don't leak
   // selections/tabs across.
@@ -174,17 +174,7 @@ export function WorkspaceScreen({
           hidden={treeCollapsed}
         >
           <div className="workspace-column-header">
-            <button
-              type="button"
-              className="workspace-tree-toggle"
-              onClick={toggleTreeCollapsed}
-              aria-label="Collapse file tree"
-              aria-expanded={true}
-              title="Collapse file tree"
-            >
-              <ChevronLeft size={14} aria-hidden="true" />
-              <span>Files</span>
-            </button>
+            <span className="workspace-tree-heading">Files</span>
             <button
               type="button"
               className={`workspace-hidden-toggle${showHidden ? ' workspace-hidden-toggle-on' : ''}`}
@@ -201,19 +191,6 @@ export function WorkspaceScreen({
             onFileSelect={handleFileSelect}
           />
         </aside>
-
-        {treeCollapsed && (
-          <button
-            type="button"
-            className="workspace-tree-toggle workspace-tree-toggle-collapsed"
-            onClick={toggleTreeCollapsed}
-            aria-label="Expand file tree"
-            aria-expanded={false}
-            title="Show file tree"
-          >
-            <ChevronRight size={14} aria-hidden="true" />
-          </button>
-        )}
 
         <section className="workspace-content-area" aria-label="Workspace content">
           <ModeTabs mode={mode} onChange={setMode} />
