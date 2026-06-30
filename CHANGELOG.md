@@ -15,6 +15,8 @@ The stable `1.0.0` release ships once every item in the
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-06-29
+
 ### Added
 - **Slice 37: ADR-0005 + ADR-0003 amendment + PRD-v4 + docs alignment.** Closing slice of v4. Three pieces of docs/text work, mirroring v3's Slice 32 pattern:
   - **New `docs/adr/0005-openai-as-second-functional-provider.md`** records the affirmative v4 decision: abstraction proven; `OpenAIClient` ships as a real `ModelClient`; Active Provider is a global setting (`active_provider`); Native Structured Outputs is the OpenAI-side schema strategy; catalog is 3-tier non-reasoning; pill click switches Active Provider. Referenced ADR-0003 as predecessor in the "Considered Options" and "Consequences" sections. Captures the v4 planning grilling session's Q2/Q3/Q4 resolutions in ADR form.
