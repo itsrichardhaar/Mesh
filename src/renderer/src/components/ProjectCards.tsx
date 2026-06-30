@@ -47,13 +47,16 @@ export function ProjectCards({ projects, onSelect, onOpenWorkspace }: Props): JS
   }
 
   return (
-    <ul className="project-cards-grid" role="list">
-      {visible.map((p) => (
-        <li key={p.encodedPath}>
-          <ProjectCard project={p} onSelect={onSelect} onOpenWorkspace={onOpenWorkspace} />
-        </li>
-      ))}
-    </ul>
+    <section className="project-cards-section" aria-label="Active projects">
+      <h2 className="project-cards-heading">Active Projects</h2>
+      <ul className="project-cards-grid" role="list">
+        {visible.map((p) => (
+          <li key={p.encodedPath}>
+            <ProjectCard project={p} onSelect={onSelect} onOpenWorkspace={onOpenWorkspace} />
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
