@@ -61,6 +61,10 @@ _Avoid_: Terminal (ambiguous between transcript view and live pty)
 **Resume** (verb):
 The action that opens a Pty Tab for a recorded Session. Default click behavior on a Session row is read-only transcript view; Resume is an explicit click in the transcript pane.
 
+**Notification**:
+A persistent record of a moment that may need user attention in a Project's Pty Tab. Created when a live Pty Tab transitions from active to idle (no PTY output for ≥ 8 seconds) while the user is not currently looking at that Pty Tab. Stored in SQLite with 7-day retention. Surfaced as a top-right toast on creation and as a row in the top-bar bell dropdown until read or cleared. v5 ships one Notification `kind` (`idle`); future kinds (`approval`, `complete`, etc.) add via pattern matching without schema changes.
+_Avoid_: Alert, popup, banner (when referring to the persistent record)
+
 ### Providers and models
 
 **Provider**:

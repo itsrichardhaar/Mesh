@@ -118,6 +118,7 @@ Everything PRD-v3's "Out of Scope" list contains stays deferred, minus the OpenA
 
 **Deferred to v5:**
 - **Scheduled / cron-based Analysis** — explicitly named as the v5 feature per the v4 planning Q1 split. Brings its own decision tree (always-on vs OS-scheduled, catch-up semantics, notifications, throttling, per-Project vs global).
+  - *Update — 2026-06-30:* v5 shipped active-session indicators + in-window notifications (per PRD-v5.md) instead; Scheduled Analysis moves to v6. The line above is preserved as v4-era history. The notification subsystem v5 introduced is deliberately designed to receive Scheduled Analysis run-completion events when v6 lands — same `notifications` table, same toast, same dropdown.
 
 **Deferred to v6 or later:**
 - Functional Local Provider (Ollama and OpenAI-compatible self-hosted servers)
