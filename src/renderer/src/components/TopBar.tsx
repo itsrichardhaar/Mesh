@@ -1,4 +1,6 @@
 import { Moon, PanelLeft, Settings, Sun } from 'lucide-react'
+import type { JumpToSessionInput } from './NotificationsBell'
+import { NotificationsBell } from './NotificationsBell'
 import { useTheme } from '../theme/ThemeProvider'
 
 interface Props {
@@ -12,6 +14,8 @@ interface Props {
    * applies (Settings) — the toggle button is hidden in that case.
    */
   sidebarState: 'open' | 'closed' | null
+  /** v5 / Slice 42: passed through to `<NotificationsBell>` for "Jump to session" rows. */
+  onJumpToSession: (input: JumpToSessionInput) => Promise<void> | void
 }
 
 /**
@@ -35,7 +39,8 @@ export function TopBar({
   onToggleSettings,
   settingsOpen,
   onToggleSidebar,
-  sidebarState
+  sidebarState,
+  onJumpToSession
 }: Props): JSX.Element {
   const { effective, setPreference } = useTheme()
   const toggleTheme = (): void => {
@@ -64,6 +69,7 @@ export function TopBar({
         </button>
       )}
       <div className="top-bar-spacer" />
+      <NotificationsBell onJumpToSession={onJumpToSession} />
       <button
         type="button"
         className="top-bar-action"

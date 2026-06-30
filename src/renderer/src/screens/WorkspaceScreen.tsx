@@ -23,6 +23,27 @@ interface Props {
    * the value to decide whether to render the file tree column.
    */
   treeCollapsed: boolean
+  /**
+   * v5 / Slice 42: one-shot "land on this session's tab" instruction
+   * from a notification's Jump button. `null` when no jump is pending.
+   * The `key` changes on every jump (including repeats to the same
+   * session) so the consuming effect re-fires.
+   */
+  pendingJump: PendingJump | null
+  onPendingJumpConsumed: () => void
+}
+
+/**
+ * v5 / Slice 42: payload of a Jump-to-session instruction from a
+ * notification toast or dropdown row. `encodedPath` is checked at the
+ * App level so this WorkspaceScreen only receives jumps targeted at it.
+ */
+export interface PendingJump {
+  encodedPath: string
+  sessionId: string
+  ptyId: string | null
+  /** Monotonic key so duplicate jumps to the same session still trigger. */
+  key: number
 }
 
 let nextSlotCounter = 0
@@ -48,7 +69,9 @@ export function WorkspaceScreen({
   project,
   visible,
   onBack,
-  treeCollapsed
+  treeCollapsed,
+  pendingJump,
+  onPendingJumpConsumed
 }: Props): JSX.Element {
   const [showHidden, setShowHidden] = useState(false)
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
@@ -88,6 +111,30 @@ export function WorkspaceScreen({
     const active = tabs.find((t) => t.slotId === activePtySlotId)
     void window.api.notifications.setForegroundPty(active?.ptyId ?? null)
   }, [visible, activePtySlotId, tabs])
+
+  // Slice 42 (v5): consume Jump-to-session instructions. Prefer the
+  // tab whose ptyId matches (most precise — same agent the user was
+  // notified about). Fall back to any tab for the same sessionId
+  // (the agent may have been re-spawned). If no live tab exists,
+  // surface the Session's transcript view.
+  useEffect(() => {
+    if (!pendingJump) return
+    if (pendingJump.encodedPath !== project.encodedPath) return
+    const byPty = pendingJump.ptyId
+      ? tabs.find((t) => t.ptyId === pendingJump.ptyId)
+      : undefined
+    const bySession = byPty ?? tabs.find((t) => t.sessionId === pendingJump.sessionId)
+    if (bySession) {
+      setActivePtySlotId(bySession.slotId)
+      setSelectedSessionId(bySession.sessionId)
+    } else {
+      setActivePtySlotId(null)
+      setSelectedSessionId(pendingJump.sessionId)
+    }
+    onPendingJumpConsumed()
+    // Keyed by `pendingJump.key` so repeat jumps to the same session
+    // still trigger.
+  }, [pendingJump?.key, project.encodedPath]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFileSelect = (relPath: string): void => {
     setSelectedFileRelPath(relPath)
