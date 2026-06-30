@@ -12,12 +12,6 @@ export interface JumpToSessionInput {
 
 interface Props {
   onJumpToSession: (input: JumpToSessionInput) => Promise<void> | void
-  /**
-   * Slice 43 (v5) hook: when global mute is active, the bell renders
-   * the `BellOff` variant. Wired in Slice 43; defaults to `false` so
-   * Slice 42 can ship with the always-`Bell` glyph.
-   */
-  globalMute?: boolean
 }
 
 /**
@@ -31,8 +25,16 @@ interface Props {
  * toggle, so it sits to the left of the Light/Dark + Settings buttons
  * as described in the v5 planning grilling session.
  */
-export function NotificationsBell({ onJumpToSession, globalMute = false }: Props): JSX.Element {
-  const { notifications, unreadCount, markAllRead, clearAll, markRead } = useNotifications()
+export function NotificationsBell({ onJumpToSession }: Props): JSX.Element {
+  const {
+    notifications,
+    unreadCount,
+    markAllRead,
+    clearAll,
+    markRead,
+    globalMute,
+    setGlobalMute
+  } = useNotifications()
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -100,6 +102,15 @@ export function NotificationsBell({ onJumpToSession, globalMute = false }: Props
               <button
                 type="button"
                 className="notifications-dropdown-action"
+                onClick={() => void setGlobalMute(!globalMute)}
+                aria-pressed={globalMute}
+                title={globalMute ? 'Resume notifications' : 'Pause notifications'}
+              >
+                {globalMute ? 'Resume' : 'Pause'}
+              </button>
+              <button
+                type="button"
+                className="notifications-dropdown-action"
                 onClick={() => void markAllRead()}
                 disabled={unreadCount === 0}
               >
@@ -115,6 +126,11 @@ export function NotificationsBell({ onJumpToSession, globalMute = false }: Props
               </button>
             </div>
           </header>
+          {globalMute && (
+            <p className="notifications-dropdown-banner" role="status">
+              Notifications are paused. New rows still appear here while muted.
+            </p>
+          )}
           <div className="notifications-dropdown-body">
             {notifications.length === 0 ? (
               <p className="notifications-dropdown-empty">No notifications yet.</p>

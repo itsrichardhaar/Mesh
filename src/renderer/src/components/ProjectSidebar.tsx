@@ -15,6 +15,7 @@ function isIdle(project: Project): boolean {
 interface ContextMenuState {
   encodedPath: string
   hidden: boolean
+  muteNotifications: boolean
   x: number
   y: number
 }
@@ -46,6 +47,16 @@ export function ProjectSidebar({
       refresh()
     } catch (err) {
       console.error('Failed to toggle hidden:', err)
+    }
+  }
+
+  const handleToggleMute = async (encodedPath: string, muted: boolean): Promise<void> => {
+    setMenu(null)
+    try {
+      await window.api.projects.update(encodedPath, { muteNotifications: !muted })
+      refresh()
+    } catch (err) {
+      console.error('Failed to toggle mute:', err)
     }
   }
 
@@ -90,7 +101,13 @@ export function ProjectSidebar({
             onContextMenu={(e, p) => {
               e.preventDefault()
               e.stopPropagation()
-              setMenu({ encodedPath: p.encodedPath, hidden: p.hidden, x: e.clientX, y: e.clientY })
+              setMenu({
+                encodedPath: p.encodedPath,
+                hidden: p.hidden,
+                muteNotifications: p.muteNotifications,
+                x: e.clientX,
+                y: e.clientY
+              })
             }}
           />
 
@@ -109,7 +126,9 @@ export function ProjectSidebar({
           x={menu.x}
           y={menu.y}
           hidden={menu.hidden}
-          onAction={() => void handleToggleHidden(menu.encodedPath, menu.hidden)}
+          muteNotifications={menu.muteNotifications}
+          onToggleHidden={() => void handleToggleHidden(menu.encodedPath, menu.hidden)}
+          onToggleMute={() => void handleToggleMute(menu.encodedPath, menu.muteNotifications)}
           onDismiss={() => setMenu(null)}
         />
       )}
@@ -261,13 +280,17 @@ function ContextMenu({
   x,
   y,
   hidden,
-  onAction,
+  muteNotifications,
+  onToggleHidden,
+  onToggleMute,
   onDismiss
 }: {
   x: number
   y: number
   hidden: boolean
-  onAction: () => void
+  muteNotifications: boolean
+  onToggleHidden: () => void
+  onToggleMute: () => void
   onDismiss: () => void
 }): JSX.Element {
   const menuRef = useRef<HTMLDivElement>(null)
@@ -298,8 +321,21 @@ function ContextMenu({
       style={{ left: x, top: y }}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <button type="button" className="context-menu-item" role="menuitem" onClick={onAction}>
+      <button
+        type="button"
+        className="context-menu-item"
+        role="menuitem"
+        onClick={onToggleHidden}
+      >
         {hidden ? 'Unhide' : 'Hide'}
+      </button>
+      <button
+        type="button"
+        className="context-menu-item"
+        role="menuitem"
+        onClick={onToggleMute}
+      >
+        {muteNotifications ? 'Resume notifications' : 'Pause notifications'}
       </button>
     </div>
   )

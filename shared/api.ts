@@ -230,8 +230,24 @@ export interface MeshApi {
     clearAll(opts?: { encodedPath?: string }): Promise<void>
     /** Pass `null` when no Pty Tab is foregrounded (Workspace hidden, etc.). */
     setForegroundPty(ptyId: string | null): Promise<void>
+    /** Slice 43 (v5): global mute toggle. */
+    getGlobalMute(): Promise<boolean>
+    setGlobalMute(value: boolean): Promise<void>
+    /** Slice 43 (v5): per-Project mute lookup. The setter lives on `projects.update`. */
+    getProjectMute(encodedPath: string): Promise<boolean>
     onCreated(cb: (notification: Notification) => void): () => void
     onUpdated(cb: (event: { ids: string[] }) => void): () => void
     onCleared(cb: (event: { encodedPath: string | null }) => void): () => void
+    /**
+     * Slice 43 (v5): fires when either global or per-Project mute
+     * changes. `scope: 'global'` carries the new boolean; `scope:
+     * 'project'` carries the encodedPath + new boolean.
+     */
+    onMuteChanged(
+      cb: (event:
+        | { scope: 'global'; value: boolean }
+        | { scope: 'project'; encodedPath: string; value: boolean }
+      ) => void
+    ): () => void
   }
 }

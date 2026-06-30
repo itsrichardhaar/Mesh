@@ -49,6 +49,7 @@ import { listProjects } from './projects/enumerator'
 import { detect } from './projects/metadata-detector'
 import {
   getSourcePath,
+  isProjectMuted,
   readAugmentation,
   updateProject,
   upsertDetectedMetadata,
@@ -70,8 +71,10 @@ import {
 } from './secrets/vault'
 import {
   getActiveProvider,
+  getGlobalNotificationsMute,
   getSetting,
   setActiveProvider,
+  setGlobalNotificationsMute,
   setSetting
 } from './settings/repository'
 
@@ -195,7 +198,8 @@ function registerIpc(): void {
         ...p,
         name: aug?.autoName ?? p.name,
         autoSubtitle: aug?.autoSubtitle ?? null,
-        hidden: aug?.hidden ?? false
+        hidden: aug?.hidden ?? false,
+        muteNotifications: aug?.muteNotifications ?? false
       }
     })
   })
@@ -209,7 +213,18 @@ function registerIpc(): void {
       if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) {
         throw new Error('projects:update: patch must be an object')
       }
-      updateProject(getDatabase(), encodedPath, patch as ProjectPatch)
+      const typedPatch = patch as ProjectPatch
+      updateProject(getDatabase(), encodedPath, typedPatch)
+      // Slice 43 (v5): emit a mute-changed event when the patch toggled
+      // per-Project mute. Renderer subscribers (notifications hook,
+      // context menu) react without needing a separate IPC round-trip.
+      if (typedPatch.muteNotifications !== undefined) {
+        mainWindow?.webContents.send('notifications:mute-changed', {
+          scope: 'project',
+          encodedPath,
+          value: typedPatch.muteNotifications
+        })
+      }
     }
   )
 
@@ -440,7 +455,8 @@ function registerIpc(): void {
         ...base,
         name: aug?.autoName ?? base.name,
         autoSubtitle: aug?.autoSubtitle ?? null,
-        hidden: aug?.hidden ?? false
+        hidden: aug?.hidden ?? false,
+        muteNotifications: aug?.muteNotifications ?? false
       }
 
       // Slice 36: resolve which Provider's client to use from the
@@ -775,6 +791,34 @@ function registerIpc(): void {
       idleDetector?.setForegroundPty(ptyId as string | null)
     }
   )
+
+  // Slice 43 (v5): mute controls. Two surfaces, one detector — both
+  // read by the configureMuteCheck closure on every fire so toggles
+  // apply instantly. Renderer subscribes to `notifications:mute-changed`
+  // so the Settings checkbox + dropdown quick-action + per-Project
+  // popover stay in sync.
+
+  ipcMain.handle('notifications:get-global-mute', (): boolean => {
+    return getGlobalNotificationsMute(getDatabase())
+  })
+
+  ipcMain.handle('notifications:set-global-mute', (_event, value: unknown): void => {
+    if (typeof value !== 'boolean') {
+      throw new Error('notifications:set-global-mute: value must be a boolean')
+    }
+    setGlobalNotificationsMute(getDatabase(), value)
+    mainWindow?.webContents.send('notifications:mute-changed', {
+      scope: 'global',
+      value
+    })
+  })
+
+  ipcMain.handle('notifications:get-project-mute', (_event, encodedPath: unknown): boolean => {
+    if (typeof encodedPath !== 'string' || encodedPath.length === 0) {
+      throw new Error('notifications:get-project-mute: encodedPath must be a non-empty string')
+    }
+    return isProjectMuted(getDatabase(), encodedPath)
+  })
 }
 
 /** Stable SQLite key shape for per-Provider secrets. */
@@ -880,6 +924,14 @@ app.whenReady().then(() => {
     emit: (channel, payload) => mainWindow?.webContents.send(channel, payload),
     generateId: () => randomUUID()
   })
+  // Slice 43 (v5): mute-check reads live state from SQLite on each
+  // fire so toggle changes apply immediately without any cache
+  // invalidation. Storage still happens unconditionally inside the
+  // detector — only the toast event is suppressed.
+  idleDetector.configureMuteCheck(() => ({
+    global: getGlobalNotificationsMute(db),
+    project: (encodedPath: string) => isProjectMuted(db, encodedPath)
+  }))
   const retentionCutoff = new Date(
     Date.now() - NOTIFICATION_RETENTION_DAYS * 24 * 60 * 60 * 1000
   ).toISOString()

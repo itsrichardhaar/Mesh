@@ -4,6 +4,9 @@ import { isProviderId, type ProviderId } from '@shared/types'
 /** Stable SQLite key for the user's Active Provider selection (v4 Slice 36). */
 export const ACTIVE_PROVIDER_KEY = 'active_provider'
 
+/** Slice 43 (v5): global notifications-mute toggle. Stored as `'1'` / `'0'`. */
+export const NOTIFICATIONS_GLOBAL_MUTE_KEY = 'notifications_global_mute'
+
 /**
  * Read a single setting's string value, or `null` if no row exists for
  * the key. Encrypted secrets (Slice 7) live in `value_blob` and have
@@ -57,4 +60,18 @@ export function setActiveProvider(
     )
   }
   setSetting(db, ACTIVE_PROVIDER_KEY, provider)
+}
+
+/**
+ * v5 / Slice 43: global notifications-mute toggle. Stored as the
+ * literal string `'1'` (muted) or `'0'` (active). Defaults to `false`
+ * (notifications fire) when no row exists or when the stored value is
+ * corrupt — same backward-compat principle as `getActiveProvider`.
+ */
+export function getGlobalNotificationsMute(db: Database.Database): boolean {
+  return getSetting(db, NOTIFICATIONS_GLOBAL_MUTE_KEY) === '1'
+}
+
+export function setGlobalNotificationsMute(db: Database.Database, value: boolean): void {
+  setSetting(db, NOTIFICATIONS_GLOBAL_MUTE_KEY, value ? '1' : '0')
 }

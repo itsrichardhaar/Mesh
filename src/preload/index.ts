@@ -87,9 +87,18 @@ const api: MeshApi = {
     markAllRead: (opts) => ipcRenderer.invoke('notifications:mark-all-read', opts ?? {}),
     clearAll: (opts) => ipcRenderer.invoke('notifications:clear-all', opts ?? {}),
     setForegroundPty: (ptyId) => ipcRenderer.invoke('notifications:set-foreground-pty', ptyId),
+    getGlobalMute: () => ipcRenderer.invoke('notifications:get-global-mute'),
+    setGlobalMute: (value) => ipcRenderer.invoke('notifications:set-global-mute', value),
+    getProjectMute: (encodedPath) =>
+      ipcRenderer.invoke('notifications:get-project-mute', encodedPath),
     onCreated: (cb) => subscribeArg<Notification>('notifications:created', cb),
     onUpdated: (cb) => subscribeArg<{ ids: string[] }>('notifications:updated', cb),
-    onCleared: (cb) => subscribeArg<{ encodedPath: string | null }>('notifications:cleared', cb)
+    onCleared: (cb) => subscribeArg<{ encodedPath: string | null }>('notifications:cleared', cb),
+    onMuteChanged: (cb) =>
+      subscribeArg<
+        | { scope: 'global'; value: boolean }
+        | { scope: 'project'; encodedPath: string; value: boolean }
+      >('notifications:mute-changed', cb)
   }
 }
 

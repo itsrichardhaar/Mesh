@@ -18,7 +18,8 @@ const PROJECT: Project = {
   autoSubtitle: null,
   activity: '2026-06-25T20:00:00.000Z',
   sourceMissing: false,
-  hidden: false
+  hidden: false,
+  muteNotifications: false
 }
 
 function makeClient(

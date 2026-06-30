@@ -82,21 +82,29 @@ describe('runMigrations', () => {
          VALUES (?, ?, ?)`
       ).run('-Users-foo-bar', '/Users/foo/bar', 'bar')
 
-      // Stage 3: apply remaining migrations (settings + analyses + notifications).
+      // Stage 3: apply remaining migrations.
       const result = runMigrations(db)
       expect(result.applied).toEqual([
         '0002_settings',
         '0003_analyses',
-        '0004_notifications'
+        '0004_notifications',
+        '0005_project_mute_notifications'
       ])
 
       // Stage 4: the Project row is still there...
       const row = db
-        .prepare('SELECT source_path, auto_name FROM projects WHERE encoded_path = ?')
-        .get('-Users-foo-bar') as { source_path: string; auto_name: string } | undefined
+        .prepare(
+          'SELECT source_path, auto_name, mute_notifications FROM projects WHERE encoded_path = ?'
+        )
+        .get('-Users-foo-bar') as
+        | { source_path: string; auto_name: string; mute_notifications: number }
+        | undefined
       expect(row).toBeDefined()
       expect(row?.source_path).toBe('/Users/foo/bar')
       expect(row?.auto_name).toBe('bar')
+      // ...and the new mute_notifications column got the default for the
+      // pre-existing row.
+      expect(row?.mute_notifications).toBe(0)
 
       // ...and the new tables exist.
       const tables = db
@@ -152,7 +160,7 @@ describe('runMigrations', () => {
 
       // Apply migration 0004; insert a Notification pointing at the
       // earlier Project + Session.
-      runMigrations(db, MIGRATIONS)
+      runMigrations(db, MIGRATIONS.slice(0, 5))
       db.prepare(
         `INSERT INTO notifications
            (id, created_at, encoded_path, session_id, pty_id, kind, label_text, read_at)
@@ -166,6 +174,13 @@ describe('runMigrations', () => {
         'idle',
         'Agent is idle'
       )
+
+      // Apply migration 0005; toggle per-Project mute on the earlier
+      // Project to exercise the new column.
+      runMigrations(db, MIGRATIONS)
+      db.prepare(
+        `UPDATE projects SET mute_notifications = 1 WHERE encoded_path = ?`
+      ).run('-step-project')
 
       // After the full chain has applied, every piece of data inserted
       // along the way is still queryable and joins cleanly.
@@ -197,17 +212,23 @@ describe('runMigrations', () => {
 
       const notification = db
         .prepare(
-          `SELECT n.kind, n.session_id, p.auto_name
+          `SELECT n.kind, n.session_id, p.auto_name, p.mute_notifications
            FROM notifications n
            JOIN projects p ON p.encoded_path = n.encoded_path
            WHERE n.id = ?`
         )
-        .get('n1') as { kind: string; session_id: string; auto_name: string }
+        .get('n1') as {
+        kind: string
+        session_id: string
+        auto_name: string
+        mute_notifications: number
+      }
       expect(notification.kind).toBe('idle')
       expect(notification.session_id).toBe('sess-step')
       expect(notification.auto_name).toBe('project')
+      expect(notification.mute_notifications).toBe(1)
 
-      // All five migration ids should be recorded.
+      // All six migration ids should be recorded.
       const applied = db
         .prepare('SELECT id FROM _applied_migrations ORDER BY id')
         .all() as Array<{ id: string }>

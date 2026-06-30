@@ -5,7 +5,8 @@ import {
   upsertDiscovered,
   readAugmentation,
   updateProject,
-  upsertDetectedMetadata
+  upsertDetectedMetadata,
+  isProjectMuted
 } from '@main/projects/repository'
 import type { DiscoveredProject } from '@main/projects/enumerator'
 
@@ -76,7 +77,8 @@ describe('projects repository', () => {
         hidden: false,
         autoName: 'Fresh',
         autoSubtitle: null,
-        lastMetadataDetectedAt: null
+        lastMetadataDetectedAt: null,
+        muteNotifications: false
       })
     })
 
@@ -107,7 +109,8 @@ describe('projects repository', () => {
         hidden: false,
         autoName: 'AI OS Dashboard',
         autoSubtitle: 'Next.js',
-        lastMetadataDetectedAt: '2026-06-24T00:00:00.000Z'
+        lastMetadataDetectedAt: '2026-06-24T00:00:00.000Z',
+        muteNotifications: false
       })
     })
 
@@ -176,6 +179,44 @@ describe('projects repository', () => {
         .prepare('SELECT encoded_path FROM projects WHERE encoded_path = ?')
         .get('-ghost')
       expect(row).toBeUndefined()
+    })
+
+    it('updates the muteNotifications flag (Slice 43)', () => {
+      upsertDiscovered(db, [discovered('-m', '/m', 'M')])
+      updateProject(db, '-m', { muteNotifications: true })
+      const row = db
+        .prepare('SELECT mute_notifications FROM projects WHERE encoded_path = ?')
+        .get('-m') as { mute_notifications: number }
+      expect(row.mute_notifications).toBe(1)
+    })
+
+    it('hidden and muteNotifications are orthogonal in a single patch (Slice 43)', () => {
+      upsertDiscovered(db, [discovered('-mh', '/mh', 'MH')])
+      updateProject(db, '-mh', { hidden: true, muteNotifications: true })
+      const row = db
+        .prepare('SELECT hidden, mute_notifications FROM projects WHERE encoded_path = ?')
+        .get('-mh') as { hidden: number; mute_notifications: number }
+      expect(row.hidden).toBe(1)
+      expect(row.mute_notifications).toBe(1)
+    })
+  })
+
+  describe('isProjectMuted (Slice 43)', () => {
+    it('returns false for unknown encodedPath', () => {
+      expect(isProjectMuted(db, '-never')).toBe(false)
+    })
+
+    it('returns false by default for a freshly-inserted Project', () => {
+      upsertDiscovered(db, [discovered('-fresh', '/fresh', 'Fresh')])
+      expect(isProjectMuted(db, '-fresh')).toBe(false)
+    })
+
+    it('returns true after setting muteNotifications via updateProject', () => {
+      upsertDiscovered(db, [discovered('-m', '/m', 'M')])
+      updateProject(db, '-m', { muteNotifications: true })
+      expect(isProjectMuted(db, '-m')).toBe(true)
+      updateProject(db, '-m', { muteNotifications: false })
+      expect(isProjectMuted(db, '-m')).toBe(false)
     })
   })
 })

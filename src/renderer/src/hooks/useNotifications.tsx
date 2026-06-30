@@ -19,6 +19,9 @@ interface ContextValue {
   clearAll: (opts?: { encodedPath?: string }) => Promise<void>
   /** Re-fetch the list from main. Useful after the renderer suspects desync. */
   refresh: () => Promise<void>
+  /** Slice 43 (v5): global mute state + setter. */
+  globalMute: boolean
+  setGlobalMute: (value: boolean) => Promise<void>
 }
 
 const NotificationsContext = createContext<ContextValue | null>(null)
@@ -38,6 +41,7 @@ const NotificationsContext = createContext<ContextValue | null>(null)
  */
 export function NotificationsProvider({ children }: { children: ReactNode }): JSX.Element {
   const [notifications, setNotifications] = useState<ReadonlyArray<Notification>>([])
+  const [globalMute, setGlobalMuteState] = useState(false)
 
   const refresh = useCallback(async (): Promise<void> => {
     const next = await window.api.notifications.list()
@@ -46,6 +50,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }): JS
 
   useEffect(() => {
     void refresh()
+    void window.api.notifications.getGlobalMute().then(setGlobalMuteState)
     const offCreated = window.api.notifications.onCreated(() => {
       void refresh()
     })
@@ -55,10 +60,17 @@ export function NotificationsProvider({ children }: { children: ReactNode }): JS
     const offCleared = window.api.notifications.onCleared(() => {
       void refresh()
     })
+    const offMute = window.api.notifications.onMuteChanged((event) => {
+      if (event.scope === 'global') setGlobalMuteState(event.value)
+      // Per-project mute changes don't affect this hook's state — the
+      // Project objects themselves carry `muteNotifications`, and the
+      // context menu / Project list refreshes through `projects.list`.
+    })
     return () => {
       offCreated()
       offUpdated()
       offCleared()
+      offMute()
     }
   }, [refresh])
 
@@ -77,14 +89,30 @@ export function NotificationsProvider({ children }: { children: ReactNode }): JS
     await window.api.notifications.clearAll(opts)
   }, [])
 
+  const setGlobalMute = useCallback(async (value: boolean): Promise<void> => {
+    await window.api.notifications.setGlobalMute(value)
+    // The mute-changed event will refresh `globalMute` state — keep
+    // this method's promise tied to the IPC round-trip so callers can
+    // disable buttons during the in-flight write.
+  }, [])
+
   const unreadCount = useMemo(
     () => notifications.filter((n) => n.readAt === null).length,
     [notifications]
   )
 
   const value = useMemo<ContextValue>(
-    () => ({ notifications, unreadCount, markRead, markAllRead, clearAll, refresh }),
-    [notifications, unreadCount, markRead, markAllRead, clearAll, refresh]
+    () => ({
+      notifications,
+      unreadCount,
+      markRead,
+      markAllRead,
+      clearAll,
+      refresh,
+      globalMute,
+      setGlobalMute
+    }),
+    [notifications, unreadCount, markRead, markAllRead, clearAll, refresh, globalMute, setGlobalMute]
   )
 
   return (

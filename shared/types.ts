@@ -17,6 +17,13 @@ export interface Project {
   sourceMissing: boolean
   /** True when the user has flagged this Project as hidden in the sidebar. */
   hidden: boolean
+  /**
+   * v5 / Slice 43: when true, the idle detector still inserts
+   * notifications for this Project (the dropdown surfaces them) but
+   * suppresses the `notifications:created` toast event. Matches macOS
+   * DND behavior — silencing the toast, not the record.
+   */
+  muteNotifications: boolean
 }
 
 /**
@@ -145,11 +152,12 @@ export interface ModelClient {
 
 /**
  * Patch shape accepted by the `projects.update` IPC. Each key maps to a
- * single column on the `projects` table. Slice 3 exposes `hidden`; later
- * slices add more updatable fields here.
+ * single column on the `projects` table. Slice 3 exposes `hidden`;
+ * Slice 43 (v5) adds `muteNotifications`.
  */
 export interface ProjectPatch {
   hidden?: boolean
+  muteNotifications?: boolean
 }
 
 // --- Notifications (v5 / Slice 41) ----------------------------------------

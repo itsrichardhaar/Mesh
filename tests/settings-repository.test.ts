@@ -3,9 +3,12 @@ import Database from 'better-sqlite3'
 import { runMigrations } from '@main/db/migrations'
 import {
   ACTIVE_PROVIDER_KEY,
+  NOTIFICATIONS_GLOBAL_MUTE_KEY,
   getActiveProvider,
+  getGlobalNotificationsMute,
   getSetting,
   setActiveProvider,
+  setGlobalNotificationsMute,
   setSetting
 } from '@main/settings/repository'
 
@@ -102,5 +105,39 @@ describe('settings repository', () => {
       .prepare('SELECT updated_at FROM settings WHERE key = ?')
       .get('theme') as { updated_at: string }
     expect(second.updated_at >= first.updated_at).toBe(true)
+  })
+
+  describe('global notifications mute (Slice 43)', () => {
+    it('defaults to false when no row exists', () => {
+      expect(getGlobalNotificationsMute(db)).toBe(false)
+    })
+
+    it('round-trips a true value', () => {
+      setGlobalNotificationsMute(db, true)
+      expect(getGlobalNotificationsMute(db)).toBe(true)
+    })
+
+    it('round-trips a false value', () => {
+      setGlobalNotificationsMute(db, true)
+      setGlobalNotificationsMute(db, false)
+      expect(getGlobalNotificationsMute(db)).toBe(false)
+    })
+
+    it('uses a stable settings key', () => {
+      setGlobalNotificationsMute(db, true)
+      expect(getSetting(db, NOTIFICATIONS_GLOBAL_MUTE_KEY)).toBe('1')
+    })
+
+    it('falls back to false on any non-1 stored value', () => {
+      setSetting(db, NOTIFICATIONS_GLOBAL_MUTE_KEY, 'maybe')
+      expect(getGlobalNotificationsMute(db)).toBe(false)
+    })
+
+    it('overwrites on second set', () => {
+      setGlobalNotificationsMute(db, true)
+      setGlobalNotificationsMute(db, true)
+      setGlobalNotificationsMute(db, false)
+      expect(getGlobalNotificationsMute(db)).toBe(false)
+    })
   })
 })

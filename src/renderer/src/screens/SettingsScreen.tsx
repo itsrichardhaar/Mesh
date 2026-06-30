@@ -15,6 +15,7 @@ import {
   type ModelId
 } from '@shared/models'
 import { PROVIDER_IDS } from '@shared/types'
+import { useNotifications } from '../hooks/useNotifications'
 import { useTheme } from '../theme/ThemeProvider'
 import { useUiMode } from '../theme/UiModeProvider'
 import { relativeTime } from '../util/relativeTime'
@@ -81,8 +82,32 @@ export function SettingsScreen({ onClose }: Props): JSX.Element {
       <div className="settings-body">
         <AppearanceSection />
         <ModelSection />
+        <NotificationsSection />
       </div>
     </div>
+  )
+}
+
+function NotificationsSection(): JSX.Element {
+  const { globalMute, setGlobalMute } = useNotifications()
+  return (
+    <section className="settings-section" aria-label="Notifications">
+      <h2>Notifications</h2>
+      <label className="settings-toggle">
+        <input
+          type="checkbox"
+          checked={globalMute}
+          onChange={(e) => void setGlobalMute(e.target.checked)}
+        />
+        <span>
+          <span className="settings-toggle-label">Pause notifications</span>
+          <span className="settings-toggle-help">
+            New notifications still appear in the dropdown while paused — only
+            top-right toasts are suppressed.
+          </span>
+        </span>
+      </label>
+    </section>
   )
 }
 

@@ -14,9 +14,14 @@ export interface ProjectAugmentation {
   autoName: string | null
   autoSubtitle: string | null
   lastMetadataDetectedAt: string | null
+  /** Slice 43 (v5): when true, idle-detector toasts for this Project are suppressed. */
+  muteNotifications: boolean
 }
 
-const ALLOWED_PATCH_KEYS: ReadonlySet<keyof ProjectPatch> = new Set(['hidden'])
+const ALLOWED_PATCH_KEYS: ReadonlySet<keyof ProjectPatch> = new Set([
+  'hidden',
+  'muteNotifications'
+])
 
 /**
  * Insert or update one row per Project discovered on disk. Filesystem-derived
@@ -64,7 +69,8 @@ export function readAugmentation(
               hidden,
               auto_name AS autoName,
               auto_subtitle AS autoSubtitle,
-              last_metadata_detected_at AS lastMetadataDetectedAt
+              last_metadata_detected_at AS lastMetadataDetectedAt,
+              mute_notifications AS muteNotifications
          FROM projects`
     )
     .all() as Array<{
@@ -73,6 +79,7 @@ export function readAugmentation(
     autoName: string | null
     autoSubtitle: string | null
     lastMetadataDetectedAt: string | null
+    muteNotifications: number
   }>
 
   const map = new Map<string, ProjectAugmentation>()
@@ -81,10 +88,27 @@ export function readAugmentation(
       hidden: row.hidden === 1,
       autoName: row.autoName,
       autoSubtitle: row.autoSubtitle,
-      lastMetadataDetectedAt: row.lastMetadataDetectedAt
+      lastMetadataDetectedAt: row.lastMetadataDetectedAt,
+      muteNotifications: row.muteNotifications === 1
     })
   }
   return map
+}
+
+/**
+ * Slice 43 (v5): O(1) check for one Project's mute state. Used by
+ * the idle detector's mute-check closure on each fire so the read is
+ * always fresh (no caching). Returns `false` for unknown Projects so
+ * notifications still flow for newly-discovered ones.
+ */
+export function isProjectMuted(
+  db: Database.Database,
+  encodedPath: string
+): boolean {
+  const row = db
+    .prepare('SELECT mute_notifications FROM projects WHERE encoded_path = ?')
+    .get(encodedPath) as { mute_notifications: number } | undefined
+  return row?.mute_notifications === 1
 }
 
 /**
@@ -149,6 +173,10 @@ export function updateProject(
     if (key === 'hidden' && patch.hidden !== undefined) {
       sets.push('hidden = @hidden')
       params.hidden = patch.hidden ? 1 : 0
+    }
+    if (key === 'muteNotifications' && patch.muteNotifications !== undefined) {
+      sets.push('mute_notifications = @mute_notifications')
+      params.mute_notifications = patch.muteNotifications ? 1 : 0
     }
   }
 
