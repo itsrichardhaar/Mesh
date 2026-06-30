@@ -269,6 +269,15 @@ button {
   outline-offset: 1px;
 }
 
+/* Pressed state for toggle buttons that reflect a screen-level mode
+   (e.g. gear when Settings is open). Subtle filled treatment so the
+   user can tell at a glance whether the destination is already
+   showing. */
+.top-bar-action-active {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
 /* --- Home Screen layout --------------------------------------------------- */
 
 .home-screen {
@@ -1047,9 +1056,6 @@ button {
 }
 
 .settings-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   padding: 24px 48px;
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -1059,22 +1065,6 @@ button {
   font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.01em;
-  color: var(--text-primary);
-}
-
-.settings-close {
-  -webkit-app-region: no-drag;
-  padding: 6px 14px;
-  font-size: 12px;
-  font-weight: 500;
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  background: var(--bg-surface);
-  color: var(--text-secondary);
-}
-
-.settings-close:hover {
-  background: var(--bg-elevated);
   color: var(--text-primary);
 }
 

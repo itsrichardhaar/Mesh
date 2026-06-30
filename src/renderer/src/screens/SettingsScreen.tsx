@@ -76,14 +76,6 @@ export function SettingsScreen({ onClose }: Props): JSX.Element {
     <div className="settings-screen" role="dialog" aria-label="Settings">
       <header className="settings-header">
         <h1>Settings</h1>
-        <button
-          type="button"
-          className="settings-close"
-          onClick={onClose}
-          aria-label="Close settings"
-        >
-          Close
-        </button>
       </header>
 
       <div className="settings-body">

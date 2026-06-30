@@ -49,6 +49,19 @@ export function App(): JSX.Element {
     setScreen(previousScreen.current)
   }, [])
 
+  /**
+   * Gear icon in the top bar — opens Settings from any other screen,
+   * or closes Settings if it's already open. Single affordance, two
+   * directions; replaces the in-Settings "Close" button.
+   */
+  const toggleSettings = useCallback(() => {
+    setScreen((current) => {
+      if (current === 'settings') return previousScreen.current
+      previousScreen.current = current as NonSettingsScreen
+      return 'settings'
+    })
+  }, [])
+
   const openWorkspace = useCallback((project: Project) => {
     setWorkspaceProject(project)
     setScreen('workspace')
@@ -104,7 +117,8 @@ export function App(): JSX.Element {
       <UiModeProvider>
         <div className="app-shell">
           <TopBar
-            onOpenSettings={openSettings}
+            onToggleSettings={toggleSettings}
+            settingsOpen={screen === 'settings'}
             onToggleSidebar={onToggleSidebar}
             sidebarState={sidebarToggleState}
           />
