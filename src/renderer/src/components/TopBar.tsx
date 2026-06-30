@@ -1,9 +1,15 @@
-import { Moon, Settings, Sun } from 'lucide-react'
+import { Moon, PanelLeft, PanelLeftClose, Settings, Sun } from 'lucide-react'
 import { useTheme } from '../theme/ThemeProvider'
 
 interface Props {
-  onGoHome: () => void
   onOpenSettings: () => void
+  /** Toggle the active screen's sidebar (Home → projects; Workspace → files). */
+  onToggleSidebar: () => void
+  /**
+   * Current sidebar state for the active screen. `null` when no sidebar
+   * applies (Settings) — the toggle button is hidden in that case.
+   */
+  sidebarState: 'open' | 'closed' | null
 }
 
 /**
@@ -13,8 +19,14 @@ interface Props {
  *
  * The traffic-light spacer reserves room for macOS's hiddenInset window
  * controls. On other platforms the spacer is empty and harmless.
+ *
+ * The left-most action — formerly a Mesh wordmark + "go home" button —
+ * is now a sidebar toggle. It targets the active screen's sidebar
+ * (projects on Home, files on Workspace) and is hidden in Settings.
+ * Back-to-home navigation lives on the in-view "‹ Home" buttons in
+ * ProjectDetail and WorkspaceScreen.
  */
-export function TopBar({ onGoHome, onOpenSettings }: Props): JSX.Element {
+export function TopBar({ onOpenSettings, onToggleSidebar, sidebarState }: Props): JSX.Element {
   const { effective, setPreference } = useTheme()
   const toggleTheme = (): void => {
     // Binary flip — top-bar toggle always pins to an explicit value.
@@ -22,19 +34,25 @@ export function TopBar({ onGoHome, onOpenSettings }: Props): JSX.Element {
     setPreference(effective === 'dark' ? 'light' : 'dark')
   }
 
+  const sidebarOpen = sidebarState === 'open'
+  const SidebarIcon = sidebarOpen ? PanelLeftClose : PanelLeft
+  const sidebarLabel = sidebarOpen ? 'Hide sidebar' : 'Show sidebar'
+
   return (
     <header className="top-bar" aria-label="App chrome">
       <div className="top-bar-traffic-lights" aria-hidden="true" />
-      <button
-        type="button"
-        className="top-bar-home"
-        onClick={onGoHome}
-        aria-label="Mesh — go to home"
-        title="Home"
-      >
-        <img className="top-bar-icon" src="./icon.png" alt="" width={20} height={20} />
-        <span className="top-bar-wordmark">Mesh</span>
-      </button>
+      {sidebarState !== null && (
+        <button
+          type="button"
+          className="top-bar-action"
+          onClick={onToggleSidebar}
+          aria-label={sidebarLabel}
+          aria-pressed={sidebarOpen}
+          title={sidebarLabel}
+        >
+          <SidebarIcon size={16} />
+        </button>
+      )}
       <div className="top-bar-spacer" />
       <button
         type="button"

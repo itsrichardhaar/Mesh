@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Project } from '@shared/types'
 import { TopBar } from './components/TopBar'
+import { useFileTreeCollapsed } from './hooks/useFileTreeCollapsed'
+import { useProjectsSidebarCollapsed } from './hooks/useProjectsSidebarCollapsed'
 import { HomeScreen } from './screens/HomeScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { WorkspaceScreen } from './screens/WorkspaceScreen'
@@ -20,6 +22,21 @@ export function App(): JSX.Element {
   // `previousScreen` is whatever non-Settings screen was active when
   // Settings opened — that's where Esc / ⌘W returns us to.
   const previousScreen = useRef<NonSettingsScreen>('home')
+
+  // Sidebar collapse state — lifted here so the top-bar sidebar-toggle
+  // button can target whichever sidebar belongs to the active screen.
+  // Home Screen's projects sidebar and Workspace's files sidebar each
+  // persist their state under their own settings key.
+  const projects = useProjectsSidebarCollapsed()
+  const files = useFileTreeCollapsed()
+  const onToggleSidebar = useCallback(() => {
+    if (screen === 'workspace') {
+      files.toggle()
+    } else if (screen === 'home') {
+      projects.toggle()
+    }
+    // Settings has no sidebar; the toggle is hidden in that state.
+  }, [screen, files, projects])
 
   const openSettings = useCallback(() => {
     setScreen((current) => {
@@ -71,11 +88,26 @@ export function App(): JSX.Element {
     return offBack
   }, [screen, closeSettings, goHome])
 
+  const sidebarToggleState: 'open' | 'closed' | null =
+    screen === 'home'
+      ? projects.collapsed
+        ? 'closed'
+        : 'open'
+      : screen === 'workspace'
+        ? files.collapsed
+          ? 'closed'
+          : 'open'
+        : null
+
   return (
     <ThemeProvider>
       <UiModeProvider>
         <div className="app-shell">
-          <TopBar onGoHome={goHome} onOpenSettings={openSettings} />
+          <TopBar
+            onOpenSettings={openSettings}
+            onToggleSidebar={onToggleSidebar}
+            sidebarState={sidebarToggleState}
+          />
           <div className="app-screens">
             <div hidden={screen !== 'home'}>
               <HomeScreen
@@ -83,6 +115,7 @@ export function App(): JSX.Element {
                 onOpenSettings={openSettings}
                 selectedEncodedPath={homeSelection}
                 onSelect={setHomeSelection}
+                sidebarCollapsed={projects.collapsed}
               />
             </div>
             {workspaceProject && (
@@ -91,6 +124,8 @@ export function App(): JSX.Element {
                 project={workspaceProject}
                 visible={screen === 'workspace'}
                 onBack={goHome}
+                treeCollapsed={files.collapsed}
+                onToggleTreeCollapsed={files.toggle}
               />
             )}
             {screen === 'settings' && <SettingsScreen onClose={closeSettings} />}

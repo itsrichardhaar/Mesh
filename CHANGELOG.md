@@ -16,6 +16,11 @@ The stable `1.0.0` release ships once every item in the
 ## [Unreleased]
 
 ### Changed
+- **Top bar Mesh icon + wordmark replaced with a context-aware sidebar toggle.** The left-most top-bar action is now a `PanelLeft` / `PanelLeftClose` icon button that toggles the active screen's sidebar — Home Screen toggles the projects sidebar, Workspace toggles the files sidebar. Hidden when Settings is active (no sidebar applies). Back-to-Home navigation still lives on the in-view `‹ Home` buttons in `ProjectDetail` and `WorkspaceScreen`, so the removed "Mesh → home" affordance is redundant.
+  - New `useProjectsSidebarCollapsed` hook mirrors `useFileTreeCollapsed` (Slice 23) — persisted via the `settings` table under `home.projectsSidebarCollapsed`, async hydration, defaults to expanded. Both hooks are now called at the `App` level so the top bar can target whichever sidebar belongs to the active screen.
+  - `WorkspaceScreen` accepts `treeCollapsed` + `onToggleTreeCollapsed` as props instead of calling `useFileTreeCollapsed` internally. The existing per-view tree-toggle strip remains as a secondary affordance — both targets the same lifted state.
+  - `HomeScreen` accepts a `sidebarCollapsed` prop and conditionally renders the `ProjectSidebar`. `.detail-pane` is already `flex: 1`, so the layout fills the available width naturally when the sidebar is hidden — no new CSS state required beyond a `home-screen-body-sidebar-collapsed` hook class for future styling.
+  - Orphan `.top-bar-home` / `.top-bar-icon` / `.top-bar-wordmark` CSS rules removed.
 - **Project stack subtitle removed from the UI.** The auto-detected `autoSubtitle` (e.g., `React · TypeScript`, `Python`, `Rust`, `HTML`) no longer renders on the Home Screen sidebar cards, Project Detail header, or Workspace title bar. The tags didn't fully represent multi-language Electron / SQLite / multi-stack projects like Mesh itself and added noise without proportional signal. **Detection and storage are preserved** — `auto_subtitle` still populates in the `projects` table and the `metadata-detector.ts` subsystem runs unchanged, so the data is available if a future feature (filtering, search, sort-by-stack) needs it. The three JSX render sites and three orphan CSS rules (`project-card-subtitle`, `project-detail-subtitle`, `workspace-title-subtitle`) are removed.
 
 ## [0.4.0] — 2026-06-29

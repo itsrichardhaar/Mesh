@@ -234,42 +234,6 @@ button {
   flex-shrink: 0;
 }
 
-.top-bar-home {
-  -webkit-app-region: no-drag;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font: inherit;
-  cursor: pointer;
-}
-
-.top-bar-home:hover {
-  background: var(--bg-elevated);
-}
-
-.top-bar-home:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-.top-bar-icon {
-  width: 20px;
-  height: 20px;
-  display: block;
-  border-radius: var(--radius-sm);
-}
-
-.top-bar-wordmark {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  letter-spacing: var(--tracking-tight);
-}
-
 .top-bar-spacer {
   flex: 1;
   height: 100%;

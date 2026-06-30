@@ -10,13 +10,16 @@ interface Props {
   onOpenSettings: () => void
   selectedEncodedPath: string | null
   onSelect: (encodedPath: string | null) => void
+  /** Hide the projects sidebar — toggled from the top-bar sidebar button. */
+  sidebarCollapsed: boolean
 }
 
 export function HomeScreen({
   onOpenWorkspace,
   onOpenSettings,
   selectedEncodedPath,
-  onSelect
+  onSelect,
+  sidebarCollapsed
 }: Props): JSX.Element {
   const { state, refresh } = useProjectList()
 
@@ -28,14 +31,18 @@ export function HomeScreen({
   return (
     <div className="home-screen">
       <OnboardingBanner onOpenSettings={onOpenSettings} />
-      <div className="home-screen-body">
-        <ProjectSidebar
-          state={state}
-          refresh={refresh}
-          selectedEncodedPath={selectedEncodedPath}
-          onSelect={onSelect}
-          onOpen={onOpenWorkspace}
-        />
+      <div
+        className={`home-screen-body${sidebarCollapsed ? ' home-screen-body-sidebar-collapsed' : ''}`}
+      >
+        {!sidebarCollapsed && (
+          <ProjectSidebar
+            state={state}
+            refresh={refresh}
+            selectedEncodedPath={selectedEncodedPath}
+            onSelect={onSelect}
+            onOpen={onOpenWorkspace}
+          />
+        )}
         <main className="detail-pane" aria-label="Project detail">
           {selected ? (
             <ProjectDetail

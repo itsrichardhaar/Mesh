@@ -8,13 +8,15 @@ import { PtyTabBar, type PtyTab } from '../components/PtyTabBar'
 import { PtyView } from '../components/PtyView'
 import { SessionsList } from '../components/SessionsList'
 import { Transcript } from '../components/Transcript'
-import { useFileTreeCollapsed } from '../hooks/useFileTreeCollapsed'
 import { useWorkspaceMode } from '../hooks/useWorkspaceMode'
 
 interface Props {
   project: Project
   visible: boolean
   onBack: () => void
+  /** Files-sidebar collapse state, lifted to App.tsx so the top bar can toggle it. */
+  treeCollapsed: boolean
+  onToggleTreeCollapsed: () => void
 }
 
 interface PtySlot {
@@ -41,14 +43,20 @@ function nextSlotId(): string {
  * tabs stay DOM-mounted with `display: none` so scrollback survives
  * tab switches and Home round-trips.
  */
-export function WorkspaceScreen({ project, visible, onBack }: Props): JSX.Element {
+export function WorkspaceScreen({
+  project,
+  visible,
+  onBack,
+  treeCollapsed,
+  onToggleTreeCollapsed
+}: Props): JSX.Element {
   const [showHidden, setShowHidden] = useState(false)
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [selectedFileRelPath, setSelectedFileRelPath] = useState<string | null>(null)
   const [ptyTabs, setPtyTabs] = useState<PtySlot[]>([])
   const [activePtySlotId, setActivePtySlotId] = useState<string | null>(null)
   const { mode, setMode } = useWorkspaceMode(project.encodedPath)
-  const { collapsed: treeCollapsed, toggle: toggleTreeCollapsed } = useFileTreeCollapsed()
+  const toggleTreeCollapsed = onToggleTreeCollapsed
 
   // Reset Project-scoped state on Project switch so we don't leak
   // selections/tabs across.
