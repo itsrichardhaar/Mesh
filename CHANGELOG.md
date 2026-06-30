@@ -15,6 +15,9 @@ The stable `1.0.0` release ships once every item in the
 
 ## [Unreleased]
 
+### Changed
+- **Live-indicator visibility tuned for reduced color vision.** The `live + idle` state was previously signaled by background tint alone (`--mesh-live-bg`), which sat close to hover (`--bg-elevated`) and selected (`--accent-soft`) tones for users with red-green color deficiency. List rows (Project sidebar, Workspace Sessions list) now carry a **3px solid-green left accent bar** — a shape cue that survives any color-vision condition. A new `--mesh-live-accent` CSS variable (saturated solid green, `#4a9b6c` light / `#6ec894` dark) is introduced for the bar and for the card / detail-header borders, so the surfaces where color is the only cue use a more distinguishable green. `--mesh-live-bg` opacity bumped from `0.10`/`0.12` to `0.16`/`0.22` (light/dark) for higher contrast against neutral backgrounds. Live + selected on a sidebar row keeps the orange selection tint while preserving the green left bar — two orthogonal signals readable at once.
+
 ### Added
 - **Slice 40 (v5): Project-level indicators on Home Screen + "Active Projects" → "Recent Projects" rename.** Second slice of v5. Wires `useProjectIndicator(encodedPath)` (introduced in Slice 39's hook surface, previously unused) into three Home Screen surfaces so the user can spot live agent work without leaving the Home Screen:
   - **`ProjectSidebar` items** — subtle green tint on rows whose Project has ≥1 live Pty Tab; `<ActivitySpinner size="small" />` between the project name and the activity-time pill while any of that Project's tabs is currently producing output. Sticky selection tint still wins via class ordering; the green stays readable underneath via the slight transparency of `--mesh-live-bg`.

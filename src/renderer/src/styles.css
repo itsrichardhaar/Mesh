@@ -24,12 +24,17 @@
   --accent: #d97757;
   --accent-fg: #ffffff;
   --accent-soft: #fbeee8;
-  /* Slice 39 (v5): "has a live Pty Tab" surface tint. Subtle green tone
-     reused across Session rows, Project sidebar items, ProjectCards
-     tiles, and the Project Detail header. The matching `--mesh-live-border`
-     is for the row's border treatment when both selected and live. */
-  --mesh-live-bg: rgba(80, 160, 110, 0.10);
-  --mesh-live-border: rgba(80, 160, 110, 0.45);
+  /* Slice 39/40 (v5): "has a live Pty Tab" surface tint. Subtle green tone
+     reused across Session rows, Project sidebar items, ProjectCards tiles,
+     and the Project Detail header.
+     `--mesh-live-bg` is the soft surface fill;
+     `--mesh-live-accent` is the saturated solid green used for left accent
+     bars on list rows and the card/header borders — a non-color shape cue
+     so the "live" state remains distinguishable from hover/selected even
+     under red-green color vision deficiency. */
+  --mesh-live-bg: rgba(80, 160, 110, 0.16);
+  --mesh-live-border: rgba(80, 160, 110, 0.55);
+  --mesh-live-accent: #4a9b6c;
   --shadow-popover: 0 6px 24px rgba(0, 0, 0, 0.08);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
@@ -48,8 +53,9 @@
   --accent: #d97757;
   --accent-fg: #1a1814;
   --accent-soft: #3a2920;
-  --mesh-live-bg: rgba(110, 190, 140, 0.12);
-  --mesh-live-border: rgba(110, 190, 140, 0.42);
+  --mesh-live-bg: rgba(110, 190, 140, 0.22);
+  --mesh-live-border: rgba(110, 190, 140, 0.55);
+  --mesh-live-accent: #6ec894;
   --shadow-popover: 0 6px 24px rgba(0, 0, 0, 0.4);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.35);
@@ -509,11 +515,14 @@ button {
 }
 
 /* Slice 40 (v5): "this Project has ≥1 live Pty Tab" tint on the sidebar
-   row. Lives under the selection tint (selection wins via order); both
-   tints use slight transparency so the green stays readable when both
-   apply. */
+   row. The 3px solid-green left bar is a non-color shape cue so the
+   live state remains distinguishable from hover/selected under
+   red-green color vision deficiency. Padding compensates by 3px so
+   the row's text alignment is unchanged. */
 .project-row-live {
   background: var(--mesh-live-bg);
+  border-left: 3px solid var(--mesh-live-accent);
+  padding-left: 13px;
 }
 
 .project-row-live:hover {
@@ -523,6 +532,8 @@ button {
 .project-row-live.project-row-selected,
 .project-row-live.project-row-selected:hover {
   background: var(--accent-soft);
+  /* Live left-bar persists under selection — it's an orthogonal signal
+     so the user can read both states at once. */
 }
 
 .project-name {
@@ -673,15 +684,16 @@ button {
 }
 
 /* Slice 40 (v5): "this Project has ≥1 live Pty Tab" tint on the grid
-   card. Subtle background + border tint shares the same CSS variables
-   with the sidebar and Session row treatments. */
+   card. Uses the saturated `--mesh-live-accent` for the border so the
+   live state is distinguishable from neutral cards under reduced
+   color vision; the soft `--mesh-live-bg` fills the surface. */
 .project-card-live {
   background: var(--mesh-live-bg);
-  border-color: var(--mesh-live-border);
+  border-color: var(--mesh-live-accent);
 }
 
 .project-card-live:hover {
-  border-color: var(--mesh-live-border);
+  border-color: var(--mesh-live-accent);
 }
 
 .project-card-title {
@@ -904,12 +916,13 @@ button {
 }
 
 /* Slice 40 (v5): "this Project has ≥1 live Pty Tab" tint on the Project
-   Detail pane's header bar. The negative left/right margins above let
-   the tint bleed to the edge of the detail container without disturbing
-   the existing baseline alignment. */
+   Detail pane's header bar. Uses the saturated `--mesh-live-accent`
+   for the border so the header reads as live at a glance even under
+   reduced color vision. The negative left/right margins on the parent
+   selector let the tint bleed to the edge of the detail container. */
 .project-detail-header-live {
   background: var(--mesh-live-bg);
-  border-color: var(--mesh-live-border);
+  border-color: var(--mesh-live-accent);
 }
 
 .project-detail-name {
@@ -1892,12 +1905,17 @@ button {
   border-color: var(--accent);
 }
 
-/* Slice 39 (v5): sticky "session has a live Pty Tab" tint. Stacks under
-   the selection tint — when both apply, selection still wins on border
-   and the green stays visible underneath via the slight transparency. */
+/* Slice 39 (v5): sticky "session has a live Pty Tab" tint. The 3px
+   solid-green left bar adds a non-color shape cue so the live state
+   stays readable under red-green color vision deficiency. The session
+   card's existing border + 8px radius are preserved; the bar is a
+   thicker overlay on the left edge. Padding compensates by 3px so
+   text alignment is unchanged. */
 .session-card-live {
   background: var(--mesh-live-bg);
   border-color: var(--mesh-live-border);
+  border-left: 3px solid var(--mesh-live-accent);
+  padding-left: 9px;
 }
 
 .session-card-live:hover {
@@ -1909,6 +1927,8 @@ button {
 .session-card-live.session-card-selected:hover {
   background: var(--accent-soft);
   border-color: var(--accent);
+  /* Live left-bar persists — orthogonal signal to selection. */
+  border-left-color: var(--mesh-live-accent);
 }
 
 .session-card-header {
