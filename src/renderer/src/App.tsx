@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Project } from '@shared/types'
 import { TopBar } from './components/TopBar'
 import { useFileTreeCollapsed } from './hooks/useFileTreeCollapsed'
+import { LiveSessionsProvider } from './hooks/useLiveSessions'
 import { useProjectsSidebarCollapsed } from './hooks/useProjectsSidebarCollapsed'
 import { HomeScreen } from './screens/HomeScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
@@ -115,6 +116,7 @@ export function App(): JSX.Element {
   return (
     <ThemeProvider>
       <UiModeProvider>
+        <LiveSessionsProvider>
         <div className="app-shell">
           <TopBar
             onToggleSettings={toggleSettings}
@@ -144,6 +146,7 @@ export function App(): JSX.Element {
             {screen === 'settings' && <SettingsScreen onClose={closeSettings} />}
           </div>
         </div>
+        </LiveSessionsProvider>
       </UiModeProvider>
     </ThemeProvider>
   )

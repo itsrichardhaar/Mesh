@@ -5,6 +5,7 @@ import { findModel } from '@shared/models'
 import { useActiveProviderModel } from '../hooks/useActiveProviderModel'
 import { relativeTime } from '../util/relativeTime'
 import { tildify } from '../util/tildify'
+import { ActivitySpinner } from './ActivitySpinner'
 
 type StatsState =
   | { status: 'loading' }
@@ -212,9 +213,7 @@ function AnalyzeBar({
   const activeBlurb = useActiveProviderModel()
   return (
     <div className={`analyze-bar analyze-bar-${view.tone}`} role={view.role}>
-      {view.tone === 'info' && (
-        <span className="analyze-bar-spinner" aria-hidden="true" />
-      )}
+      {view.tone === 'info' && <ActivitySpinner size="small" ariaLabel="Analyzing" />}
       <span className="analyze-bar-message">{view.message}</span>
       {view.action && (
         <button

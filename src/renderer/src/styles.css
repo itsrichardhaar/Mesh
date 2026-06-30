@@ -24,6 +24,12 @@
   --accent: #d97757;
   --accent-fg: #ffffff;
   --accent-soft: #fbeee8;
+  /* Slice 39 (v5): "has a live Pty Tab" surface tint. Subtle green tone
+     reused across Session rows, Project sidebar items, ProjectCards
+     tiles, and the Project Detail header. The matching `--mesh-live-border`
+     is for the row's border treatment when both selected and live. */
+  --mesh-live-bg: rgba(80, 160, 110, 0.10);
+  --mesh-live-border: rgba(80, 160, 110, 0.45);
   --shadow-popover: 0 6px 24px rgba(0, 0, 0, 0.08);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
@@ -42,6 +48,8 @@
   --accent: #d97757;
   --accent-fg: #1a1814;
   --accent-soft: #3a2920;
+  --mesh-live-bg: rgba(110, 190, 140, 0.12);
+  --mesh-live-border: rgba(110, 190, 140, 0.42);
   --shadow-popover: 0 6px 24px rgba(0, 0, 0, 0.4);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.35);
@@ -944,14 +952,25 @@ button {
   border-color: rgba(232, 138, 138, 0.45);
 }
 
-.analyze-bar-spinner {
-  width: 12px;
-  height: 12px;
+.activity-spinner {
+  display: inline-block;
   border-radius: 50%;
   border: 2px solid var(--border-subtle);
   border-top-color: var(--accent);
   animation: mesh-spin 0.8s linear infinite;
   flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.activity-spinner-small {
+  width: 12px;
+  height: 12px;
+}
+
+.activity-spinner-medium {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
 }
 
 .analyze-bar-action {
@@ -1820,6 +1839,25 @@ button {
 
 .session-card-selected,
 .session-card-selected:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+/* Slice 39 (v5): sticky "session has a live Pty Tab" tint. Stacks under
+   the selection tint — when both apply, selection still wins on border
+   and the green stays visible underneath via the slight transparency. */
+.session-card-live {
+  background: var(--mesh-live-bg);
+  border-color: var(--mesh-live-border);
+}
+
+.session-card-live:hover {
+  background: var(--mesh-live-bg);
+  border-color: var(--mesh-live-border);
+}
+
+.session-card-live.session-card-selected,
+.session-card-live.session-card-selected:hover {
   background: var(--accent-soft);
   border-color: var(--accent);
 }
