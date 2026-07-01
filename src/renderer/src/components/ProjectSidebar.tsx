@@ -3,7 +3,14 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { Project } from '@shared/types'
 import type { ProjectListState } from '../hooks/useProjectList'
 import { useProjectIndicator } from '../hooks/useLiveSessions'
+import { useSidebarWidth } from '../hooks/useSidebarWidth'
 import { ActivitySpinner } from './ActivitySpinner'
+import { SidebarResizeHandle } from './SidebarResizeHandle'
+
+const PROJECTS_SIDEBAR_WIDTH_KEY = 'home.projectsSidebarWidth'
+const PROJECTS_SIDEBAR_MIN_WIDTH = 200
+const PROJECTS_SIDEBAR_MAX_WIDTH = 520
+const PROJECTS_SIDEBAR_DEFAULT_WIDTH = 260
 
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000
 
@@ -39,6 +46,11 @@ export function ProjectSidebar({
   const [showHidden, setShowHidden] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
+  const { width, setWidth } = useSidebarWidth(PROJECTS_SIDEBAR_WIDTH_KEY, {
+    defaultWidth: PROJECTS_SIDEBAR_DEFAULT_WIDTH,
+    min: PROJECTS_SIDEBAR_MIN_WIDTH,
+    max: PROJECTS_SIDEBAR_MAX_WIDTH
+  })
 
   const handleToggleHidden = async (encodedPath: string, hidden: boolean): Promise<void> => {
     setMenu(null)
@@ -61,7 +73,14 @@ export function ProjectSidebar({
   }
 
   return (
-    <aside className="sidebar" aria-label="Projects">
+    <aside className="sidebar" aria-label="Projects" style={{ width }}>
+      <SidebarResizeHandle
+        width={width}
+        min={PROJECTS_SIDEBAR_MIN_WIDTH}
+        max={PROJECTS_SIDEBAR_MAX_WIDTH}
+        onResize={setWidth}
+        ariaLabel="Resize Projects sidebar"
+      />
       <header className="sidebar-header">
         <button
           type="button"

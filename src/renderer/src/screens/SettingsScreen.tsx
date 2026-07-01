@@ -91,7 +91,10 @@ export function SettingsScreen({ onClose }: Props): JSX.Element {
 function NotificationsSection(): JSX.Element {
   const { globalMute, setGlobalMute } = useNotifications()
   return (
-    <section className="settings-section" aria-label="Notifications">
+    <section
+      className="settings-section settings-section-notifications"
+      aria-label="Notifications"
+    >
       <h2>Notifications</h2>
       <label className="settings-toggle">
         <input
@@ -116,7 +119,10 @@ function AppearanceSection(): JSX.Element {
   const { mode, setMode, ready: uiModeReady } = useUiMode()
 
   return (
-    <section className="settings-section" aria-label="Appearance">
+    <section
+      className="settings-section settings-section-appearance"
+      aria-label="Appearance"
+    >
       <h2>Appearance</h2>
       <fieldset className="theme-options" disabled={!ready}>
         <legend className="visually-hidden">Theme</legend>
@@ -271,7 +277,7 @@ function ModelSection(): JSX.Element {
   }, [refreshKeyed])
 
   return (
-    <section className="settings-section" aria-label="Model">
+    <section className="settings-section settings-section-model" aria-label="Model">
       <h2>Model</h2>
 
       <div className="provider-pills" role="tablist" aria-label="Provider">

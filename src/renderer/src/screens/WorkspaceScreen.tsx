@@ -11,7 +11,14 @@ import {
   useLiveSessionsActions,
   useLiveTabsForProject
 } from '../hooks/useLiveSessions'
+import { useSidebarWidth } from '../hooks/useSidebarWidth'
 import { useWorkspaceMode } from '../hooks/useWorkspaceMode'
+import { SidebarResizeHandle } from '../components/SidebarResizeHandle'
+
+const FILE_TREE_WIDTH_KEY = 'workspace.fileTreeWidth'
+const FILE_TREE_MIN_WIDTH = 180
+const FILE_TREE_MAX_WIDTH = 520
+const FILE_TREE_DEFAULT_WIDTH = 250
 
 interface Props {
   project: Project
@@ -81,6 +88,14 @@ export function WorkspaceScreen({
 
   const tabs = useLiveTabsForProject(project.encodedPath)
   const { addTab, setPtyId } = useLiveSessionsActions()
+  const { width: treeWidth, setWidth: setTreeWidth } = useSidebarWidth(
+    FILE_TREE_WIDTH_KEY,
+    {
+      defaultWidth: FILE_TREE_DEFAULT_WIDTH,
+      min: FILE_TREE_MIN_WIDTH,
+      max: FILE_TREE_MAX_WIDTH
+    }
+  )
 
   // Reset per-Workspace UI state on Project switch so selections don't
   // bleed across. Tab registry itself persists at provider level — only
@@ -207,12 +222,26 @@ export function WorkspaceScreen({
         <div className="workspace-header-spacer" />
       </header>
 
-      <div className={`workspace-body${treeCollapsed ? ' workspace-body-tree-collapsed' : ''}`}>
+      <div
+        className={`workspace-body${treeCollapsed ? ' workspace-body-tree-collapsed' : ''}`}
+        style={
+          treeCollapsed ? undefined : { gridTemplateColumns: `${treeWidth}px 1fr` }
+        }
+      >
         <aside
           className="workspace-tree-column"
           aria-label="File tree column"
           hidden={treeCollapsed}
         >
+          {!treeCollapsed && (
+            <SidebarResizeHandle
+              width={treeWidth}
+              min={FILE_TREE_MIN_WIDTH}
+              max={FILE_TREE_MAX_WIDTH}
+              onResize={setTreeWidth}
+              ariaLabel="Resize file tree"
+            />
+          )}
           <div className="workspace-column-header">
             <span className="workspace-tree-heading">Files</span>
             <button

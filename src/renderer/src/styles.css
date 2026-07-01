@@ -6,60 +6,120 @@
  * Component CSS below never references hex / rgba directly — only
  * `var(--token)` so theme switching is automatic.
  *
- * v2 adds a UI Mode dimension. `[data-ui-mode='mono']` (set by
- * UiModeProvider) flips `--font-ui` to monospace, tightens `--radius-base`,
- * and nudges `--tracking-normal` wider for the CLI feel.
+ * v5.1 palette aligns Mesh to the Cursor design system:
+ *   - warm cream canvas + warm near-black ink (no pure white / pure black)
+ *   - Cursor Orange (#f54e00) as the single brand accent, used scarcely
+ *   - hairline-only depth (shadows exist but minimized to near-hairline)
+ *   - AI-timeline pastels reserved as tokens for future v6 pattern-matcher
+ *     notification kinds (approval / complete / question)
+ *   - display headings shift to weight 400 with negative tracking; body
+ *     stays at 400/500/600 with neutral tracking
+ *
+ * v2 UI Mode dimension. `[data-ui-mode='mono']` (set by UiModeProvider)
+ * flips `--font-ui` to monospace, tightens `--radius-base`, and nudges
+ * `--tracking-normal` wider for the CLI feel.
  */
 
 :root,
 [data-theme='light'] {
-  --bg-canvas: #faf8f4;
+  /* --- Surface (Cursor: warm cream canvas, no pure white as page floor) - */
+  --bg-canvas: #f7f7f4;
   --bg-surface: #ffffff;
-  --bg-elevated: #f5f1ea;
-  --border-subtle: #e8e4dc;
-  --text-primary: #1a1814;
-  --text-secondary: #6b665d;
-  --text-muted: #9a948a;
-  --text-error: #c45c5c;
-  --accent: #d97757;
+  --bg-elevated: #fafaf7;
+  --bg-strong: #e6e5e0;
+  /* App-content pane surface — sits behind the Recent Projects grid and
+     Project Detail view. Slightly darker than the sidebar/canvas so the
+     sidebar reads as "raised chrome" and the content pane reads as
+     "recessed workspace," matching the IDE layering convention (Cursor,
+     VS Code). In light mode this is a warm putty; in dark mode a
+     deeper warm near-black. */
+  --bg-app-content: #ecebe4;
+
+  /* --- Hairlines (three tiers per Cursor spec) ------------------------- */
+  --border-subtle: #e6e5e0;
+  --border-soft: #efeee8;
+  --border-strong: #cfcdc4;
+
+  /* --- Text ink (warm near-black instead of Mesh's cool-warm mix) ------ */
+  --text-primary: #26251e;
+  --text-secondary: #5a5852;
+  --text-muted: #807d72;
+  --text-muted-soft: #a09c92;
+  --text-error: #cf2d56;
+  --text-success: #1f8a65;
+
+  /* --- Brand accent (Cursor Orange, reserved for primary CTAs) --------- */
+  --accent: #f54e00;
+  --accent-active: #d04200;
   --accent-fg: #ffffff;
-  --accent-soft: #fbeee8;
-  /* Slice 39/40 (v5): "has a live Pty Tab" surface tint. Subtle green tone
-     reused across Session rows, Project sidebar items, ProjectCards tiles,
-     and the Project Detail header.
-     `--mesh-live-bg` is the soft surface fill;
-     `--mesh-live-accent` is the saturated solid green used for left accent
-     bars on list rows and the card/header borders — a non-color shape cue
-     so the "live" state remains distinguishable from hover/selected even
-     under red-green color vision deficiency. */
+  /* Derived low-opacity peach for selection tints; keeps identity while
+     acting as a background surface, not a foreground accent. */
+  --accent-soft: #fef0e6;
+
+  /* --- v5 live-indicator (feature-specific, not brand) ----------------- */
   --mesh-live-bg: rgba(80, 160, 110, 0.16);
   --mesh-live-border: rgba(80, 160, 110, 0.55);
   --mesh-live-accent: #4a9b6c;
-  --shadow-popover: 0 6px 24px rgba(0, 0, 0, 0.08);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 6px 24px rgba(0, 0, 0, 0.08);
+
+  /* --- AI-timeline pastels (v6-reserved; tokens introduced now so the
+        v6 pattern-matcher slices already have the colors ready). Scoped
+        to in-product agent-action visualizations only per Cursor spec —
+        never applied as system action colors. */
+  --timeline-thinking: #dfa88f;
+  --timeline-grep: #9fc9a2;
+  --timeline-read: #9fbbe0;
+  --timeline-edit: #c0a8dd;
+  --timeline-done: #c08532;
+
+  /* --- Depth (hairline-only per Cursor spec; shadows minimized so
+        elevated surfaces rely on borders + slight ink shadow, not lift) */
+  --shadow-popover: 0 4px 12px rgba(38, 37, 30, 0.06);
+  --shadow-sm: 0 1px 2px rgba(38, 37, 30, 0.04);
+  --shadow-md: 0 2px 6px rgba(38, 37, 30, 0.05);
+  --shadow-lg: 0 4px 12px rgba(38, 37, 30, 0.06);
 }
 
 [data-theme='dark'] {
-  --bg-canvas: #1a1814;
-  --bg-surface: #25221d;
-  --bg-elevated: #2f2b25;
-  --border-subtle: #3a352e;
-  --text-primary: #f5f1ea;
-  --text-secondary: #b8b0a3;
-  --text-muted: #7a7468;
+  /* Derived dark palette. Cursor's spec is light-only; Mesh retains a
+     dark mode by inverting canvas/ink, preserving Cursor Orange across
+     modes, and keeping timeline pastels at their light values (pastel-
+     on-dark-canvas reads fine and matches the Slack/Linear pattern). */
+  --bg-canvas: #1a1917;
+  --bg-surface: #24231f;
+  --bg-elevated: #2c2b26;
+  --bg-strong: #3a3831;
+  --bg-app-content: #131210;
+
+  --border-subtle: #383731;
+  --border-soft: #2e2d28;
+  --border-strong: #4a4841;
+
+  --text-primary: #f2eee5;
+  --text-secondary: #b8b3a6;
+  --text-muted: #807d72;
+  --text-muted-soft: #6a675d;
   --text-error: #e88a8a;
-  --accent: #d97757;
-  --accent-fg: #1a1814;
-  --accent-soft: #3a2920;
+  --text-success: #6ec996;
+
+  --accent: #f54e00;
+  --accent-active: #d04200;
+  --accent-fg: #ffffff;
+  --accent-soft: #3a2416;
+
   --mesh-live-bg: rgba(110, 190, 140, 0.22);
   --mesh-live-border: rgba(110, 190, 140, 0.55);
   --mesh-live-accent: #6ec894;
-  --shadow-popover: 0 6px 24px rgba(0, 0, 0, 0.4);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 6px 24px rgba(0, 0, 0, 0.4);
+
+  --timeline-thinking: #dfa88f;
+  --timeline-grep: #9fc9a2;
+  --timeline-read: #9fbbe0;
+  --timeline-edit: #c0a8dd;
+  --timeline-done: #c08532;
+
+  --shadow-popover: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.30);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.35);
 }
 
 :root {
@@ -83,6 +143,11 @@
   --line-normal: 1.5;
   --line-relaxed: 1.7;
 
+  /* v5.1 (Cursor aesthetic): display headings use aggressive negative
+     tracking per the Cursor Inter-substitute guidance (~-1.5%). Display
+     stays at weight 400 (see selectors below); tight tracking is what
+     carries the magazine voice, not weight. */
+  --tracking-display: -0.022em;
   --tracking-tight: -0.01em;
   --tracking-normal: 0;
   --tracking-wide: 0.02em;
@@ -387,15 +452,75 @@ button {
 /* --- Sidebar -------------------------------------------------------------- */
 
 .sidebar {
-  width: 260px;
+  /* v5.1: width is dynamic via `useSidebarWidth`; the initial value
+     is applied inline as `style={{ width }}`. The right-edge divider
+     hairline lives inside the resize handle (see
+     `.sidebar-resize-handle`) rather than as a separate border, so
+     hover/active states swap the hairline for the accent line
+     without any gap between them. */
+  position: relative;
   flex-shrink: 0;
-  border-right: 1px solid var(--border-subtle);
   background: var(--bg-canvas);
   overflow-y: auto;
+  overflow-x: hidden;
   padding-top: 12px;
   display: flex;
   flex-direction: column;
   -webkit-app-region: no-drag;
+}
+
+.sidebar-resize-handle {
+  /* 6px-wide hit strip on the sidebar's right edge. At rest, its
+     rightmost 1px renders a `--border-subtle` hairline — that IS the
+     sidebar's visible divider. On hover / active, the rightmost 2px
+     upgrade to a solid accent line at the same edge position, so the
+     transition happens in place with no gap between the neutral
+     border and the highlighted state. */
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 5;
+  -webkit-app-region: no-drag;
+  background: linear-gradient(
+    to right,
+    transparent 0,
+    transparent 5px,
+    var(--border-subtle) 5px,
+    var(--border-subtle) 6px
+  );
+  transition: background var(--duration-fast) var(--ease-default);
+}
+
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle-active {
+  background: linear-gradient(
+    to right,
+    transparent 0,
+    transparent 4px,
+    var(--accent) 4px,
+    var(--accent) 6px
+  );
+}
+
+.sidebar-resize-handle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* While a sidebar drag is in flight, freeze every hover / pointer
+   interaction on the rest of the app so mousemove doesn't trigger
+   :hover on project rows, file tree items, or anything else the
+   cursor happens to cross. The resize handle itself keeps pointer
+   events so the drag completes normally. */
+body.sidebar-resizing * {
+  pointer-events: none !important;
+}
+
+body.sidebar-resizing .sidebar-resize-handle {
+  pointer-events: auto !important;
 }
 
 .sidebar-header {
@@ -637,6 +762,10 @@ button {
   flex: 1;
   padding: 32px 48px 40px;
   overflow-y: auto;
+  /* v5.1 (Cursor aesthetic): content pane is recessed relative to the
+     sidebar chrome. Sidebar sits on --bg-canvas; content pane on the
+     darker --bg-app-content, matching the IDE layering pattern. */
+  background: var(--bg-app-content);
 }
 
 /* --- Home cards (Slice 22) ------------------------------------------------ */
@@ -795,7 +924,9 @@ button {
 .home-empty h2 {
   margin: 0 0 var(--space-2);
   font-size: var(--text-xl);
-  font-weight: var(--weight-semibold);
+  /* v5.1: display voice — weight 400 + negative tracking. */
+  font-weight: var(--weight-regular);
+  letter-spacing: var(--tracking-display);
   color: var(--text-primary);
 }
 
@@ -928,8 +1059,10 @@ button {
 .project-detail-name {
   margin: 0;
   font-size: var(--text-2xl);
-  font-weight: var(--weight-semibold);
-  letter-spacing: var(--tracking-tight);
+  /* v5.1 (Cursor aesthetic): display headings shift to weight 400 with
+     aggressive negative tracking — the "magazine voice" primary rule. */
+  font-weight: var(--weight-regular);
+  letter-spacing: var(--tracking-display);
   color: var(--text-primary);
   flex-shrink: 0;
   display: inline-flex;
@@ -1158,17 +1291,46 @@ button {
 .settings-header h1 {
   margin: 0;
   font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  /* v5.1: display voice — weight 400 + negative tracking. */
+  font-weight: var(--weight-regular);
+  letter-spacing: var(--tracking-display);
   color: var(--text-primary);
 }
 
 .settings-body {
   padding: 32px 48px 48px;
-  max-width: 720px;
-  display: flex;
-  flex-direction: column;
+  max-width: 1200px;
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(360px, 1.4fr);
+  grid-template-areas:
+    'appearance   model'
+    'notifications model';
   gap: 24px;
+  align-items: start;
+}
+
+.settings-section-appearance {
+  grid-area: appearance;
+}
+
+.settings-section-model {
+  grid-area: model;
+}
+
+.settings-section-notifications {
+  grid-area: notifications;
+}
+
+/* At narrow widths the 2-column layout collapses to a single column,
+   preserving the natural render order: Appearance → Model → Notifications. */
+@media (max-width: 900px) {
+  .settings-body {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'appearance'
+      'model'
+      'notifications';
+  }
 }
 
 .settings-section {
@@ -1659,8 +1821,25 @@ button {
   overflow: hidden;
 }
 
+/* v5.1 (Cursor aesthetic): Workspace mirrors Home's raised-vs-recessed
+   layering. The file-tree column stays on --bg-canvas (chrome). The
+   content area to its right — Sessions list + transcript/PTY, and
+   the File Editor pane — sits on --bg-app-content, matching what the
+   Home Screen's .detail-pane does for the Recent Projects grid. The
+   Sessions column inside the content area inherits (transparent),
+   so cards float against the recessed surface. */
+.workspace-content-area {
+  background: var(--bg-app-content);
+}
+
 .workspace-tree-column {
-  border-right: 1px solid var(--border-subtle);
+  /* v5.1: `position: relative` so the SidebarResizeHandle's absolute
+     positioning anchors to the file tree column. `overflow-x: hidden`
+     prevents the handle's edge from producing a phantom bottom
+     scrollbar. The divider hairline lives inside the handle itself
+     (see `.sidebar-resize-handle`) — no `border-right` here. */
+  position: relative;
+  overflow-x: hidden;
 }
 
 .workspace-tree-column[hidden] {
