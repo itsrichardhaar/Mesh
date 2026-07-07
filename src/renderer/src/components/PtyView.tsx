@@ -13,21 +13,11 @@ interface Props {
   /** Fired on every output chunk so the parent can drive the ● activity indicator. */
   onActivity?: () => void
   /**
-   * When the Workspace is hosting multiple tabs (Slice 17), inactive
-   * PtyViews stay mounted with `display: none` so scrollback survives.
-   * The viewport hides itself when `hidden` is true.
+   * Slice 49 (v6): true while this view occupies the Workspace's PTY
+   * pane. The terminal grabs keyboard focus on the transition so
+   * typing lands immediately after a tab switch or Project round-trip.
    */
-  hidden?: boolean
-  /**
-   * Slice 39 (v5): when this view is re-mounting against a PTY that's
-   * already alive in the main process (e.g. after a Project-switch
-   * round-trip kept the tab alive in the App-level registry), the
-   * caller passes the existing ptyId here. PtyView skips `pty.create`
-   * and reconnects to the live stream. xterm's scrollback restarts
-   * fresh — the main-process PTY survives but xterm's in-memory
-   * buffer does not.
-   */
-  existingPtyId?: string | null
+  focused?: boolean
 }
 
 type State =
@@ -41,9 +31,12 @@ type State =
  * pipes its output into xterm, and writes user keystrokes back. The
  * `FitAddon` keeps the terminal matched to the container's pixel
  * dimensions; resize events propagate back to the pty so the child
- * process sees a consistent COLUMNS/LINES. Unmount kills the pty —
- * single-tab semantics in Slice 16; multi-tab persistence lands in
- * Slice 17.
+ * process sees a consistent COLUMNS/LINES.
+ *
+ * Slice 49 (v6, ADR-0008): a PtyView spawns its PTY exactly once, on
+ * mount, and lives for the PTY's whole life — the App-level `PtyHost`
+ * keeps it mounted across navigation, so there is no reconnect path
+ * and xterm's buffer (scrollback) is never rebuilt.
  */
 export function PtyView({
   encodedPath,
@@ -51,8 +44,7 @@ export function PtyView({
   onExit,
   onPtyId,
   onActivity,
-  hidden,
-  existingPtyId
+  focused
 }: Props): JSX.Element {
   const { effective } = useTheme()
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -60,13 +52,7 @@ export function PtyView({
   const fitRef = useRef<FitAddon | null>(null)
   const ptyIdRef = useRef<string | null>(null)
   const writeQueueRef = useRef<string[]>([])
-  // Captured at mount only so the spawn-vs-attach decision is taken
-  // once. If the prop later changes, we ignore it — the PTY this
-  // PtyView is bound to does not change mid-life.
-  const existingPtyIdRef = useRef<string | null>(existingPtyId ?? null)
-  const [state, setState] = useState<State>(
-    existingPtyId ? { status: 'running', ptyId: existingPtyId } : { status: 'spawning' }
-  )
+  const [state, setState] = useState<State>({ status: 'spawning' })
 
   // Single-shot lifecycle effect: build the terminal, request a pty,
   // wire data/exit streams, and tear it all down on unmount. We
@@ -127,46 +113,35 @@ export function PtyView({
     })
 
     const dims = term.cols && term.rows ? { cols: term.cols, rows: term.rows } : { cols: 80, rows: 24 }
-    const existing = existingPtyIdRef.current
-    if (existing) {
-      // Reconnect path — main-process PTY is already alive (Slice 39).
-      // Skip `pty.create`, adopt the ptyId, and inform main of our
-      // current dimensions in case the container resized while
-      // unmounted.
-      ptyIdRef.current = existing
-      setState({ status: 'running', ptyId: existing })
-      void window.api.pty.resize(existing, dims.cols, dims.rows)
-    } else {
-      ;(async () => {
-        try {
-          const result = await window.api.pty.create({
-            encodedPath,
-            sessionId,
-            cols: dims.cols,
-            rows: dims.rows
-          })
-          if (!result.ok) {
-            setState({ status: 'error', code: result.code, message: result.message })
-            return
-          }
-          ptyIdRef.current = result.ptyId
-          setState({ status: 'running', ptyId: result.ptyId })
-          onPtyId?.(result.ptyId)
-          // Drain any input the user typed while the spawn was in flight.
-          const drained = writeQueueRef.current
-          writeQueueRef.current = []
-          for (const chunk of drained) {
-            void window.api.pty.write(result.ptyId, chunk)
-          }
-        } catch (err) {
-          setState({
-            status: 'error',
-            code: 'unknown',
-            message: err instanceof Error ? err.message : String(err)
-          })
+    ;(async () => {
+      try {
+        const result = await window.api.pty.create({
+          encodedPath,
+          sessionId,
+          cols: dims.cols,
+          rows: dims.rows
+        })
+        if (!result.ok) {
+          setState({ status: 'error', code: result.code, message: result.message })
+          return
         }
-      })()
-    }
+        ptyIdRef.current = result.ptyId
+        setState({ status: 'running', ptyId: result.ptyId })
+        onPtyId?.(result.ptyId)
+        // Drain any input the user typed while the spawn was in flight.
+        const drained = writeQueueRef.current
+        writeQueueRef.current = []
+        for (const chunk of drained) {
+          void window.api.pty.write(result.ptyId, chunk)
+        }
+      } catch (err) {
+        setState({
+          status: 'error',
+          code: 'unknown',
+          message: err instanceof Error ? err.message : String(err)
+        })
+      }
+    })()
 
     // Keep the pty's COLUMNS/LINES in sync with the container.
     const observer = new ResizeObserver(() => {
@@ -187,15 +162,13 @@ export function PtyView({
       observer.disconnect()
       offData()
       offExit()
-      // Slice 39 (v5): do NOT kill the PTY on unmount. The PTY's
-      // lifecycle is now decoupled from this React component so tabs
-      // survive Project navigation (WorkspaceScreen is `key`ed by
-      // encodedPath and remounts on switch — without this decoupling
-      // the PTY would die every time the user navigated away).
-      // Explicit kill paths: (1) the close button in PtyTabBar via
-      // `handleTabClose`'s `pty.kill`; (2) the main process's
-      // `closeAll` on app shutdown. The provider's global pty:exit
-      // subscription handles registry cleanup.
+      // Do NOT kill the PTY on unmount. Since Slice 49 the host only
+      // unmounts a PtyView when its tab has already left the registry
+      // (PTY exited or the user closed the tab) or the window is going
+      // away. Explicit kill paths: (1) the close button in PtyTabBar
+      // via `handleTabClose`'s `pty.kill`; (2) the main process's
+      // `closeAll` on app shutdown. The live-sessions pty:exit bridge
+      // handles registry cleanup.
       ptyIdRef.current = null
       term.dispose()
       termRef.current = null
@@ -203,6 +176,13 @@ export function PtyView({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [encodedPath, sessionId])
+
+  // Slice 49 (v6): grab keyboard focus when this view takes the
+  // Workspace's PTY pane, so typing lands immediately after a tab
+  // switch or Project round-trip.
+  useEffect(() => {
+    if (focused) termRef.current?.focus()
+  }, [focused])
 
   // Push theme changes into the live terminal without re-creating
   // it. We listen on the `[data-theme]` attribute itself rather than
@@ -228,7 +208,7 @@ export function PtyView({
   }, [effective])
 
   return (
-    <div className="pty-view" hidden={hidden}>
+    <div className="pty-view">
       {state.status === 'error' && <PtyErrorBanner state={state} />}
       <div ref={containerRef} className="pty-view-terminal" />
       {state.status === 'exited' && (

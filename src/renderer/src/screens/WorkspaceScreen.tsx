@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { Project } from '@shared/types'
 import { FileTree } from '../components/FileTree'
 import { FileViewer } from '../components/FileViewer'
 import { ModeTabs } from '../components/ModeTabs'
 import { PtyTabBar, type PtyTab } from '../components/PtyTabBar'
-import { PtyView } from '../components/PtyView'
 import { SessionsList } from '../components/SessionsList'
 import { Transcript } from '../components/Transcript'
+import { ptyHostStore } from '../state/pty-host'
 import {
   useLiveSessionsActions,
   useLiveTabsForProject
@@ -87,7 +87,7 @@ export function WorkspaceScreen({
   const { mode, setMode } = useWorkspaceMode(project.encodedPath)
 
   const tabs = useLiveTabsForProject(project.encodedPath)
-  const { addTab, setPtyId } = useLiveSessionsActions()
+  const { addTab } = useLiveSessionsActions()
   const { width: treeWidth, setWidth: setTreeWidth } = useSidebarWidth(
     FILE_TREE_WIDTH_KEY,
     {
@@ -106,6 +106,25 @@ export function WorkspaceScreen({
     setSelectedFileRelPath(null)
     setActivePtySlotId(null)
   }, [project.encodedPath])
+
+  // Slice 49 (v6, ADR-0008): register this Workspace's PTY pane as the
+  // PtyHost's mount target, and publish which slot should occupy it.
+  // The callback ref fires with null on unmount (including the `key`ed
+  // remount on Project switch), sending every view back to the host's
+  // holding container until the next Workspace registers.
+  const registerPtyMount = useCallback((node: HTMLDivElement | null): void => {
+    ptyHostStore.getState().setMountNode(node)
+  }, [])
+
+  useEffect(() => {
+    ptyHostStore.getState().setActiveSlot(activePtySlotId)
+  }, [activePtySlotId])
+
+  useEffect(() => {
+    return () => {
+      ptyHostStore.getState().setActiveSlot(null)
+    }
+  }, [])
 
   useEffect(() => {
     if (!visible) return
@@ -279,17 +298,15 @@ export function WorkspaceScreen({
                 onSelect={handleTabSelect}
                 onClose={handleTabClose}
               />
-              {/* All live Pty Tabs stay mounted; only the active one is visible. */}
-              {tabs.map((tab) => (
-                <PtyView
-                  key={tab.slotId}
-                  encodedPath={project.encodedPath}
-                  sessionId={tab.sessionId}
-                  hidden={tab.slotId !== activePtySlotId}
-                  existingPtyId={tab.ptyId}
-                  onPtyId={(ptyId) => setPtyId(tab.slotId, ptyId)}
-                />
-              ))}
+              {/* Slice 49: PtyViews live in the App-level PtyHost and
+                  portal into this pane while their tab is active —
+                  they are never remounted by Workspace navigation. */}
+              <div
+                className="workspace-pty-mount"
+                data-pty-mount="true"
+                ref={registerPtyMount}
+                hidden={activePtySlotId === null}
+              />
               {/* Transcript shows when no tab is active. Selecting a tab
                   hides it; closing the last tab brings it back. */}
               <div

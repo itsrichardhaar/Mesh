@@ -2297,6 +2297,34 @@ body.sidebar-resizing .sidebar-resize-handle {
   display: none;
 }
 
+/* --- Pty host (Slice 49, v6 — ADR-0008) ---------------------------------- */
+
+/* Offscreen home for PtyViews whose tab isn't active in a visible
+   Workspace. display:none (not visibility/clip tricks) — xterm's DOM
+   persists; the ResizeObserver refits on the move back into layout. */
+.pty-host-holding {
+  display: none;
+}
+
+/* Stable per-slot wrapper the host moves between the holding container
+   and the Workspace mount pane. Boxless, so the PtyView inside sizes
+   directly against whichever parent currently holds it. */
+.pty-host-slot {
+  display: contents;
+}
+
+/* The visible Workspace's PTY pane — the mount target PtyHost fills. */
+.workspace-pty-mount {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace-pty-mount[hidden] {
+  display: none;
+}
+
 /* --- Pty view (live xterm) ---------------------------------------------- */
 
 .pty-view {
@@ -2305,10 +2333,6 @@ body.sidebar-resizing .sidebar-resize-handle {
   height: 100%;
   min-height: 0;
   background: var(--bg-canvas);
-}
-
-.pty-view[hidden] {
-  display: none;
 }
 
 .pty-view-terminal {

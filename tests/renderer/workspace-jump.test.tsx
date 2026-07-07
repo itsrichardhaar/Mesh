@@ -2,6 +2,7 @@ import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useEffect, useRef } from 'react'
 import type { Project } from '@shared/types'
+import { PtyHost } from '@renderer/components/PtyHost'
 import { LiveSessionsProvider, useLiveSessionsActions } from '@renderer/hooks/useLiveSessions'
 import { WorkspaceScreen, type PendingJump } from '@renderer/screens/WorkspaceScreen'
 import { meshEmit } from './test-utils'
@@ -21,8 +22,8 @@ import { meshEmit } from './test-utils'
  */
 
 vi.mock('@renderer/components/PtyView', () => ({
-  PtyView: ({ sessionId, hidden }: { sessionId: string; hidden?: boolean }) => (
-    <div data-testid={`pty-view-${sessionId}`} data-hidden={String(Boolean(hidden))} />
+  PtyView: ({ sessionId }: { sessionId: string }) => (
+    <div data-testid={`pty-view-${sessionId}`} />
   )
 }))
 vi.mock('@renderer/components/FileViewer', () => ({
@@ -97,6 +98,9 @@ function Harness({
   return (
     <LiveSessionsProvider>
       <Seeder tabs={tabs} />
+      {/* Slice 49: PtyViews render under the App-level host and portal
+          into the Workspace's mount pane while their tab is active. */}
+      <PtyHost />
       <WorkspaceScreen
         project={PROJECT}
         visible={true}
@@ -116,8 +120,11 @@ const jump = (input: Partial<PendingJump> & { key: number }): PendingJump => ({
   ...input
 })
 
+// Slice 49: "visible" = the view's stable wrapper currently occupies
+// the Workspace's PTY mount pane (inactive views sit in the PtyHost's
+// holding container).
 const ptyVisible = (sessionId: string): boolean =>
-  screen.getByTestId(`pty-view-${sessionId}`).getAttribute('data-hidden') === 'false'
+  screen.getByTestId(`pty-view-${sessionId}`).closest('[data-pty-mount]') !== null
 
 const selectedSession = (): string | null =>
   screen.getByTestId('sessions-list').getAttribute('data-selected')

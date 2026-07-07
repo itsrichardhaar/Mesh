@@ -1,5 +1,6 @@
 import { useCallback, useEffect } from 'react'
 import { NotificationToast } from './components/NotificationToast'
+import { PtyHost } from './components/PtyHost'
 import { TopBar } from './components/TopBar'
 import { useFileTreeCollapsed } from './hooks/useFileTreeCollapsed'
 import { LiveSessionsProvider } from './hooks/useLiveSessions'
@@ -101,6 +102,10 @@ export function App(): JSX.Element {
                 onJumpToSession={jumpToSession}
               />
               <NotificationToast onJumpToSession={jumpToSession} />
+              {/* Slice 49: owns every live PtyView for the renderer's
+                  lifetime; the visible Workspace's PTY pane borrows the
+                  active one via the pty-host store. */}
+              <PtyHost />
               <div className="app-screens">
                 <div hidden={screen !== 'home'}>
                   <HomeScreen

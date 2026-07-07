@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach } from 'vitest'
 import { liveSessionsStore } from '@renderer/hooks/useLiveSessions'
 import { notificationsStore } from '@renderer/hooks/useNotifications'
+import { ptyHostStore } from '@renderer/state/pty-host'
 import { installMeshApi } from './test-utils'
 
 // A fresh typed `window.api` fake before every test — mock overrides and
@@ -17,4 +18,5 @@ beforeEach(() => {
 afterEach(() => {
   liveSessionsStore.setState({ tabs: [] })
   notificationsStore.setState({ notifications: [], globalMute: false })
+  ptyHostStore.setState({ mountNode: null, activeSlotId: null })
 })
