@@ -1,5 +1,6 @@
 /**
- * Registry of live Pty Tabs across all Workspaces (Slice 39, v5).
+ * Registry of live Pty Tabs across all Workspaces (Slice 39, v5;
+ * converted to a Zustand vanilla store in Slice 48, v6 — ADR-0007).
  *
  * Each entry represents one Pty Tab that has been Resumed and is still
  * alive: its `node-pty` process is running, the renderer holds an open
@@ -9,9 +10,13 @@
  * read it, and so tabs survive Project navigation — `WorkspaceScreen`
  * is `key`ed by `encodedPath` and unmounts on Project switch.
  *
- * Pure data + observer pattern; no React, no DOM. The React hook in
- * `useLiveSessions.tsx` wraps this via `useSyncExternalStore`.
+ * Pure data — no React, no DOM, no `window`. The React bindings live
+ * in `hooks/useLiveSessions.tsx`. Mutations that would not change
+ * anything (duplicate add, same-value update, unknown slot) return
+ * before `set`, so subscribers are only notified on real changes.
  */
+
+import { createStore, type StoreApi } from 'zustand/vanilla'
 
 export interface LiveTab {
   /** Synthetic id assigned before the pty spawns so React keying is stable. */
@@ -28,13 +33,7 @@ export interface LiveSessionsSnapshot {
   tabs: ReadonlyArray<LiveTab>
 }
 
-export interface LiveSessionsRegistry {
-  /**
-   * Returns a stable snapshot reference. The same object is returned
-   * across calls until the registry mutates, so `useSyncExternalStore`
-   * can use referential equality to skip needless re-renders.
-   */
-  snapshot(): LiveSessionsSnapshot
+export interface LiveSessionsState extends LiveSessionsSnapshot {
   add(input: {
     slotId: string
     encodedPath: string
@@ -44,52 +43,40 @@ export interface LiveSessionsRegistry {
   updatePtyId(slotId: string, ptyId: string): void
   markActivity(slotId: string, atMs: number): void
   remove(slotId: string): void
-  subscribe(listener: () => void): () => void
 }
 
-export function createLiveSessionsRegistry(): LiveSessionsRegistry {
-  const tabs = new Map<string, LiveTab>()
-  const listeners = new Set<() => void>()
-  let cachedSnapshot: LiveSessionsSnapshot = { tabs: [] }
+export type LiveSessionsStore = StoreApi<LiveSessionsState>
 
-  const rebuild = (): void => {
-    cachedSnapshot = { tabs: Array.from(tabs.values()) }
-    for (const listener of listeners) listener()
-  }
+export function createLiveSessionsStore(): LiveSessionsStore {
+  return createStore<LiveSessionsState>()((set, get) => ({
+    tabs: [],
 
-  return {
-    snapshot: () => cachedSnapshot,
     add: (input) => {
-      if (tabs.has(input.slotId)) return
-      tabs.set(input.slotId, { ...input, ptyId: null })
-      rebuild()
+      if (get().tabs.some((t) => t.slotId === input.slotId)) return
+      set((s) => ({ tabs: [...s.tabs, { ...input, ptyId: null }] }))
     },
+
     updatePtyId: (slotId, ptyId) => {
-      const existing = tabs.get(slotId)
-      if (!existing) return
-      if (existing.ptyId === ptyId) return
-      tabs.set(slotId, { ...existing, ptyId })
-      rebuild()
+      const existing = get().tabs.find((t) => t.slotId === slotId)
+      if (!existing || existing.ptyId === ptyId) return
+      set((s) => ({
+        tabs: s.tabs.map((t) => (t.slotId === slotId ? { ...t, ptyId } : t))
+      }))
     },
+
     markActivity: (slotId, atMs) => {
-      const existing = tabs.get(slotId)
-      if (!existing) return
-      if (existing.lastActivityAt === atMs) return
-      tabs.set(slotId, { ...existing, lastActivityAt: atMs })
-      rebuild()
+      const existing = get().tabs.find((t) => t.slotId === slotId)
+      if (!existing || existing.lastActivityAt === atMs) return
+      set((s) => ({
+        tabs: s.tabs.map((t) => (t.slotId === slotId ? { ...t, lastActivityAt: atMs } : t))
+      }))
     },
+
     remove: (slotId) => {
-      if (!tabs.has(slotId)) return
-      tabs.delete(slotId)
-      rebuild()
-    },
-    subscribe: (listener) => {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
+      if (!get().tabs.some((t) => t.slotId === slotId)) return
+      set((s) => ({ tabs: s.tabs.filter((t) => t.slotId !== slotId) }))
     }
-  }
+  }))
 }
 
 // --- Aggregation helpers (pure functions over a snapshot) ----------------
@@ -156,8 +143,8 @@ export function maxActivityForProject(
  * Recency window matching `PtyTabBar.tsx`'s historical 2 s heuristic —
  * a PTY that emitted output within this many ms is rendered as
  * "currently active" (spinner on). Exported so the renderer's
- * indicator logic and the future Slice 41 idle-detector (8 s) share
- * the constant family.
+ * indicator logic and the Slice 41 idle-detector (8 s) share the
+ * constant family.
  */
 export const SPINNER_RECENCY_MS = 2_000
 

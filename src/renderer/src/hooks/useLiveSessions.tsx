@@ -1,95 +1,60 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useStore } from 'zustand'
+import { useShallow } from 'zustand/react/shallow'
 import {
-  createLiveSessionsRegistry,
+  createLiveSessionsStore,
   isProjectActive,
   isProjectLive,
   isSessionActive,
   isSessionLive,
   tabsForProject,
-  type LiveSessionsRegistry,
-  type LiveSessionsSnapshot,
   type LiveTab
 } from '../state/live-sessions'
 
-interface ContextValue {
-  registry: LiveSessionsRegistry
-}
-
-const LiveSessionsContext = createContext<ContextValue | null>(null)
+/**
+ * The App's live-sessions store instance (Slice 48 / v6, ADR-0007) —
+ * one per renderer lifetime, so Pty Tabs survive `WorkspaceScreen`
+ * unmounts (it remounts on Project switch because it's `key`ed by
+ * `encodedPath`). Replaces the former context provider + hand-rolled
+ * subscriber registry.
+ */
+export const liveSessionsStore = createLiveSessionsStore()
 
 /**
- * App-level provider that owns the live-PTY registry for the lifetime
- * of the renderer. Mounted in `App.tsx` above the screen switch so the
- * value survives `WorkspaceScreen` unmount (it remounts on Project
- * switch because it's `key`ed by `encodedPath`).
+ * Event bridge, formerly the context provider. Owns the global PTY
+ * subscriptions independent of any `WorkspaceScreen` mount: activity
+ * updates + exit cleanup must keep flowing while the user is on Home
+ * Screen or Settings — otherwise the Home Screen indicators (Slice 40)
+ * and tab survival across navigation would both break.
  */
 export function LiveSessionsProvider({ children }: { children: ReactNode }): JSX.Element {
-  const value = useMemo<ContextValue>(() => ({ registry: createLiveSessionsRegistry() }), [])
-
-  // Global PTY-event subscriptions that own the registry's lifecycle
-  // independent of any `WorkspaceScreen` mount. Activity updates +
-  // exit cleanup must keep flowing while the user is on Home Screen
-  // or Settings — otherwise the Home Screen indicators (Slice 40) and
-  // Project-survival across navigation would both break.
   useEffect(() => {
-    const { registry } = value
     const offData = window.api.pty.onData((event) => {
       const now = Date.now()
-      for (const t of registry.snapshot().tabs) {
-        if (t.ptyId === event.ptyId) registry.markActivity(t.slotId, now)
+      const state = liveSessionsStore.getState()
+      for (const t of state.tabs) {
+        if (t.ptyId === event.ptyId) state.markActivity(t.slotId, now)
       }
     })
     const offExit = window.api.pty.onExit((event) => {
-      for (const t of registry.snapshot().tabs) {
-        if (t.ptyId === event.ptyId) registry.remove(t.slotId)
+      const state = liveSessionsStore.getState()
+      for (const t of state.tabs) {
+        if (t.ptyId === event.ptyId) state.remove(t.slotId)
       }
     })
     return () => {
       offData()
       offExit()
     }
-  }, [value])
+  }, [])
 
-  return <LiveSessionsContext.Provider value={value}>{children}</LiveSessionsContext.Provider>
-}
-
-function useRegistry(): LiveSessionsRegistry {
-  const ctx = useContext(LiveSessionsContext)
-  if (!ctx) {
-    throw new Error('useLiveSessions: missing <LiveSessionsProvider> above this component')
-  }
-  return ctx.registry
-}
-
-function useSnapshot(): LiveSessionsSnapshot {
-  const registry = useRegistry()
-  return useSyncExternalStore(
-    (listener) => registry.subscribe(listener),
-    () => registry.snapshot(),
-    () => registry.snapshot()
-  )
-}
-
-/**
- * Re-renders every `intervalMs` so consumers' "is currently active?"
- * checks (which compare `Date.now() - lastActivityAt` against the 2 s
- * recency window) update without the snapshot itself changing. Matches
- * the existing `PtyTabBar.tsx` ●-dot pattern. 500 ms tick is a good
- * compromise between responsiveness and renderer churn.
- */
-function useActivityTick(intervalMs = 500): number {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), intervalMs)
-    return () => clearInterval(id)
-  }, [intervalMs])
-  return now
+  return <>{children}</>
 }
 
 /**
  * Imperative registry actions — for `WorkspaceScreen` to call when the
- * user Resumes a session, when a PTY's ptyId resolves, when activity
- * arrives, or when a tab exits. Stable identity across renders.
+ * user Resumes a session or when a PTY's ptyId resolves. Stable
+ * identity across renders.
  */
 export function useLiveSessionsActions(): {
   addTab: (input: { slotId: string; encodedPath: string; sessionId: string }) => void
@@ -97,35 +62,50 @@ export function useLiveSessionsActions(): {
   markActivity: (slotId: string) => void
   removeTab: (slotId: string) => void
 } {
-  const registry = useRegistry()
-  const ref = useRef(registry)
-  ref.current = registry
   return useMemo(
     () => ({
-      addTab: (input) => ref.current.add({ ...input, lastActivityAt: Date.now() }),
-      setPtyId: (slotId, ptyId) => ref.current.updatePtyId(slotId, ptyId),
-      markActivity: (slotId) => ref.current.markActivity(slotId, Date.now()),
-      removeTab: (slotId) => ref.current.remove(slotId)
+      addTab: (input) =>
+        liveSessionsStore.getState().add({ ...input, lastActivityAt: Date.now() }),
+      setPtyId: (slotId, ptyId) => liveSessionsStore.getState().updatePtyId(slotId, ptyId),
+      markActivity: (slotId) => liveSessionsStore.getState().markActivity(slotId, Date.now()),
+      removeTab: (slotId) => liveSessionsStore.getState().remove(slotId)
     }),
     []
   )
 }
 
 /**
- * Subscribes to the registry; returns the current snapshot. Re-renders
- * on every registry mutation.
+ * All live tabs scoped to one Project's `encodedPath`. Shallow-compared
+ * so consumers re-render only when one of *their* Project's tabs
+ * changes — other Projects' activity doesn't touch them.
  */
-export function useLiveSessionsSnapshot(): LiveSessionsSnapshot {
-  return useSnapshot()
+export function useLiveTabsForProject(encodedPath: string): LiveTab[] {
+  return useStore(
+    liveSessionsStore,
+    useShallow((s) => tabsForProject(s, encodedPath))
+  )
 }
 
 /**
- * All live tabs scoped to one Project's `encodedPath`. `WorkspaceScreen`
- * uses this to render its tab bar without seeing other Projects' tabs.
+ * Boolean recency flag driven by store changes + a 500 ms tick (the
+ * spinner has to turn OFF when output stops, without any store
+ * mutation happening). State updates bail out when the flag hasn't
+ * flipped, so neither PTY chunks nor ticks re-render consumers whose
+ * indicator state is unchanged.
  */
-export function useLiveTabsForProject(encodedPath: string): LiveTab[] {
-  const snapshot = useSnapshot()
-  return useMemo(() => tabsForProject(snapshot, encodedPath), [snapshot, encodedPath])
+function useRecencyFlag(compute: (nowMs: number) => boolean, intervalMs = 500): boolean {
+  const [flag, setFlag] = useState(() => compute(Date.now()))
+  useEffect(() => {
+    const update = (): void => setFlag(compute(Date.now()))
+    update()
+    const timer = setInterval(update, intervalMs)
+    const off = liveSessionsStore.subscribe(update)
+    return () => {
+      clearInterval(timer)
+      off()
+    }
+  }, [compute, intervalMs])
+  return flag
 }
 
 /**
@@ -134,24 +114,23 @@ export function useLiveTabsForProject(encodedPath: string): LiveTab[] {
  * is transient (output within 2 s).
  */
 export function useSessionIndicator(sessionId: string): { isLive: boolean; isActive: boolean } {
-  const snapshot = useSnapshot()
-  const now = useActivityTick()
-  return {
-    isLive: isSessionLive(snapshot, sessionId),
-    isActive: isSessionActive(snapshot, sessionId, now)
-  }
+  const isLive = useStore(liveSessionsStore, (s) => isSessionLive(s, sessionId))
+  const compute = useCallback(
+    (nowMs: number) => isSessionActive(liveSessionsStore.getState(), sessionId, nowMs),
+    [sessionId]
+  )
+  return { isLive, isActive: useRecencyFlag(compute) }
 }
 
 /**
  * Per-Project indicator state — drives the green tint + spinner on
  * the Home Screen surfaces (ProjectSidebar, ProjectCards, Detail pane).
- * Wired in Slice 40; exposed here so the hook surface is complete.
  */
 export function useProjectIndicator(encodedPath: string): { isLive: boolean; isActive: boolean } {
-  const snapshot = useSnapshot()
-  const now = useActivityTick()
-  return {
-    isLive: isProjectLive(snapshot, encodedPath),
-    isActive: isProjectActive(snapshot, encodedPath, now)
-  }
+  const isLive = useStore(liveSessionsStore, (s) => isProjectLive(s, encodedPath))
+  const compute = useCallback(
+    (nowMs: number) => isProjectActive(liveSessionsStore.getState(), encodedPath, nowMs),
+    [encodedPath]
+  )
+  return { isLive, isActive: useRecencyFlag(compute) }
 }
