@@ -280,6 +280,9 @@ Test scope mirrors v4's pattern: unit-test the deep modules (SQL boundaries, tim
 Everything PRD-v4's "Out of Scope" list contains stays deferred, minus the v5 work. Specifically:
 
 **Deferred to v6:**
+
+> **Update — 2026-07-07:** v6 became renderer hardening (see [PRD-v6](./PRD-v6.md)) — renderer test infrastructure, Zustand state consolidation, and the portal PtyView host. Pattern-matching Notification kinds are the leading v7 feature candidate per v5 dogfood; Scheduled / cron-based Analysis queues behind them.
+
 - **Scheduled / cron-based Analysis** — explicit candidate for v6 per the v4 planning Q1 split as updated by v5 planning. Brings its own decision tree (always-on vs OS-scheduled, catch-up semantics, notifications when a scheduled run completes — which now plugs into v5's notification subsystem, throttling, per-Project vs global). The notification surface v5 ships is intentionally designed to receive future signal sources, of which Scheduled Analysis run completion is the most obvious next consumer.
 
 **Deferred to v7 or later:**
@@ -340,4 +343,4 @@ Per v1/v2/v3/v4 workflow conventions (kept): one issue per slice; commit body en
 - v5 introduces ADR-0006 (in-window notifications surface). Future notification sources — Scheduled Analysis run completion (v6), other event types later — plug into the same table + IPC surface introduced here.
 - v5 introduces one new glossary term: **Notification**. CONTEXT.md is updated in Slice 44.
 - v5 renames the Home Screen's "Active Projects" section to "Recent Projects" (Slice 40) to free up "active" semantics for the new feature. The underlying section behavior (sort by Last Activity) is unchanged.
-- v6 is Scheduled / cron-based Analysis per the planning split as updated by v5. v6 planning happens when v5 ships; the decision tree (always-on vs OS-scheduled, catch-up semantics, notifications when a scheduled run completes — which now plugs into v5's notification subsystem, throttling, per-Project vs global) is unresolved and not premature to lock today.
+- v6 is Scheduled / cron-based Analysis per the planning split as updated by v5. v6 planning happens when v5 ships; the decision tree (always-on vs OS-scheduled, catch-up semantics, notifications when a scheduled run completes — which now plugs into v5's notification subsystem, throttling, per-Project vs global) is unresolved and not premature to lock today. *(Update — 2026-07-07: superseded; v6 became renderer hardening per PRD-v6. Pattern-matching kinds lead the v7 candidate pool; Scheduled Analysis queues behind them.)*

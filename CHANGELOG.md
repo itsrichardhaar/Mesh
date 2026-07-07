@@ -15,6 +15,18 @@ The stable `1.0.0` release ships once every item in the
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-07-07
+
+### Added
+- **Slice 50 (v6): PRD-v6 + ADR-0007 + ADR-0008 + v0.6.0 release ceremonials.** Closing slice of v6. Pure docs + release — no code; the test infrastructure, backfill, store consolidation, and portal host all shipped across Slices 45–49.
+  - **New `docs/adr/0007-zustand-for-renderer-state.md`** records the incremental Zustand adoption: navigation store + live-sessions/notifications conversions, contexts retained for theme/UI-mode, store-per-domain as the pattern for future state. Rejected alternatives: Jotai, plain context + useReducer, continued hand-rolling, deferral, single unified store.
+  - **New `docs/adr/0008-pty-view-lifetime-follows-pty-lifetime.md`** records the App-level portal host as the completion of Slice 39's state-lifetime alignment — view lifetime = PTY lifetime, the reconnect path deleted rather than patched. Rejected alternatives: serialize-and-restore, un-keying WorkspaceScreen, status quo; the fixed-layer escape hatch is noted.
+  - **`docs/PRD-v6.md` committed** — drafted into the working tree during v6 planning (2026-07-07 grilling session) and held across Slices 45–49, per the v3/v4/v5 closing-slice precedent.
+  - **`docs/PRD-v5.md` gains dated notes** where it slated Scheduled Analysis for v6: v6 became renderer hardening; pattern-matching Notification kinds lead the v7 candidate pool; Scheduled Analysis queues behind them. v5's body otherwise untouched, per Slice 32 principle A.
+  - **`CONTEXT.md` deliberately unchanged** — v6 introduces zero new domain terms; portal host, store, and test harness are implementation vocabulary.
+  - **Release ceremonials.** `package.json` 0.5.0 → 0.6.0. CHANGELOG `[Unreleased]` promoted to `[0.6.0] — 2026-07-07`; new empty `[Unreleased]` opens for v7. `git tag v0.6.0`.
+  - **HITL verification passed (2026-07-07).** Scrollback intact across repeated Project round-trips in both directions with live indicators correct on all four surfaces; keyboard focus lands in the active terminal immediately after every switch; ⌘[ and sidebar toggle behave; file-tree resize while portaled out refits cleanly on return; theme toggle repaints live terminals in both Projects; full notification round-trip (idle fire → toast → dropdown → Jump → mark-read) plus global and per-Project mute verified regression-free.
+
 ### Changed
 - **Design system refresh aligned to Cursor's editorial aesthetic.** Wholesale token repaint: warm cream canvas (`#f7f7f4` light / `#1a1917` dark) instead of Mesh's original `#faf8f4` / `#1a1814`. Warm near-black ink (`#26251e` / `#f2eee5`) replaces the cool-warm mix. **Cursor Orange (`#f54e00`)** replaces terracotta (`#d97757`) as the single brand accent — used scarcely, reserved for primary CTAs, selection tints, and the notification unread dot. Three hairline tiers (`--border-subtle` / `--border-soft` / `--border-strong`) replace the single divider tone. Drop shadows dimmed toward hairline-only depth. `--accent-active` (`#d04200`) added for press states. Semantic tokens added: `--text-success` (`#1f8a65`) and refined `--text-error` (`#cf2d56`).
 - **AI-timeline pastel tokens reserved for v6.** Five new CSS variables — `--timeline-thinking` (peach), `--timeline-grep` (mint), `--timeline-read` (blue), `--timeline-edit` (lavender), `--timeline-done` (gold) — introduced now so the v6 pattern-matcher notification-kind slices can consume them without further token grilling. Same values in both light and dark modes (pastel-on-dark-canvas reads fine, matches the Slack/Linear convention). Currently unused; scoped per Cursor spec to in-product agent-action visualizations only.
