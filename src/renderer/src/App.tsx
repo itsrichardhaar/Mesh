@@ -1,37 +1,36 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Project } from '@shared/types'
-import type { JumpToSessionInput } from './components/NotificationsBell'
+import { useCallback, useEffect } from 'react'
 import { NotificationToast } from './components/NotificationToast'
 import { TopBar } from './components/TopBar'
 import { useFileTreeCollapsed } from './hooks/useFileTreeCollapsed'
 import { LiveSessionsProvider } from './hooks/useLiveSessions'
+import { useNavigation } from './hooks/useNavigation'
 import { NotificationsProvider } from './hooks/useNotifications'
 import { useProjectsSidebarCollapsed } from './hooks/useProjectsSidebarCollapsed'
 import { HomeScreen } from './screens/HomeScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
-import { WorkspaceScreen, type PendingJump } from './screens/WorkspaceScreen'
+import { WorkspaceScreen } from './screens/WorkspaceScreen'
 import { ThemeProvider } from './theme/ThemeProvider'
 import { UiModeProvider } from './theme/UiModeProvider'
 
-type Screen = 'home' | 'settings' | 'workspace'
-type NonSettingsScreen = Exclude<Screen, 'settings'>
-
+/**
+ * Composition root. Navigation state (screen, open Workspace,
+ * Home selection, one-shot Jump-to-session) lives in the Zustand
+ * navigation store (Slice 47 / v6, ADR-0007) — App wires screens,
+ * providers, and menu accelerators to it.
+ */
 export function App(): JSX.Element {
-  const [screen, setScreen] = useState<Screen>('home')
-  const [workspaceProject, setWorkspaceProject] = useState<Project | null>(null)
-  // Selected Project on the Home Screen. `null` means "show cards view";
-  // a value means "show that project's Analysis detail." Lifted from
-  // HomeScreen so `goHome` can clear it when invoked from the top bar.
-  const [homeSelection, setHomeSelection] = useState<string | null>(null)
-  // `previousScreen` is whatever non-Settings screen was active when
-  // Settings opened — that's where Esc / ⌘W returns us to.
-  const previousScreen = useRef<NonSettingsScreen>('home')
-
-  // v5 / Slice 42: one-shot "land on this session's tab" instruction
-  // sent from a notification's Jump button. WorkspaceScreen consumes
-  // it via an effect keyed by `key` so consecutive jumps to the same
-  // session still trigger reactivation.
-  const [pendingJump, setPendingJump] = useState<PendingJump | null>(null)
+  const screen = useNavigation((s) => s.screen)
+  const workspaceProject = useNavigation((s) => s.workspaceProject)
+  const homeSelection = useNavigation((s) => s.homeSelection)
+  const pendingJump = useNavigation((s) => s.pendingJump)
+  const openSettings = useNavigation((s) => s.openSettings)
+  const closeSettings = useNavigation((s) => s.closeSettings)
+  const toggleSettings = useNavigation((s) => s.toggleSettings)
+  const openWorkspace = useNavigation((s) => s.openWorkspace)
+  const goHome = useNavigation((s) => s.goHome)
+  const selectHome = useNavigation((s) => s.selectHome)
+  const jumpToSession = useNavigation((s) => s.jumpToSession)
+  const consumePendingJump = useNavigation((s) => s.consumePendingJump)
 
   // Sidebar collapse state — lifted here so the top-bar sidebar-toggle
   // button can target whichever sidebar belongs to the active screen.
@@ -47,67 +46,6 @@ export function App(): JSX.Element {
     }
     // Settings has no sidebar; the toggle is hidden in that state.
   }, [screen, files, projects])
-
-  const openSettings = useCallback(() => {
-    setScreen((current) => {
-      if (current !== 'settings') previousScreen.current = current as NonSettingsScreen
-      return 'settings'
-    })
-  }, [])
-
-  const closeSettings = useCallback(() => {
-    setScreen(previousScreen.current)
-  }, [])
-
-  /**
-   * Gear icon in the top bar — opens Settings from any other screen,
-   * or closes Settings if it's already open. Single affordance, two
-   * directions; replaces the in-Settings "Close" button.
-   */
-  const toggleSettings = useCallback(() => {
-    setScreen((current) => {
-      if (current === 'settings') return previousScreen.current
-      previousScreen.current = current as NonSettingsScreen
-      return 'settings'
-    })
-  }, [])
-
-  const openWorkspace = useCallback((project: Project) => {
-    setWorkspaceProject(project)
-    setScreen('workspace')
-  }, [])
-
-  const goHome = useCallback(() => {
-    setScreen('home')
-    setHomeSelection(null)
-  }, [])
-
-  // v5 / Slice 42: Jump-to-session resolves the notification's Project,
-  // opens its Workspace, and sets a one-shot pendingJump so the
-  // WorkspaceScreen activates the matching Pty Tab (or selects the
-  // Session row when the PTY no longer exists). Resolution is async —
-  // we re-fetch the Project list because the notification only stores
-  // `encodedPath`, not the full Project shape.
-  const jumpToSession = useCallback(async (input: JumpToSessionInput): Promise<void> => {
-    let project: Project | null = workspaceProject?.encodedPath === input.encodedPath ? workspaceProject : null
-    if (!project) {
-      const all = await window.api.projects.list()
-      project = all.find((p) => p.encodedPath === input.encodedPath) ?? null
-    }
-    if (!project) return
-    setWorkspaceProject(project)
-    setScreen('workspace')
-    setPendingJump({
-      sessionId: input.sessionId,
-      ptyId: input.ptyId,
-      encodedPath: input.encodedPath,
-      key: Date.now()
-    })
-  }, [workspaceProject])
-
-  const onPendingJumpConsumed = useCallback(() => {
-    setPendingJump(null)
-  }, [])
 
   useEffect(() => {
     const offOpen = window.api.menu.onOpenSettings(() => openSettings())
@@ -169,7 +107,7 @@ export function App(): JSX.Element {
                     onOpenWorkspace={openWorkspace}
                     onOpenSettings={openSettings}
                     selectedEncodedPath={homeSelection}
-                    onSelect={setHomeSelection}
+                    onSelect={selectHome}
                     sidebarCollapsed={projects.collapsed}
                   />
                 </div>
@@ -185,7 +123,7 @@ export function App(): JSX.Element {
                         ? pendingJump
                         : null
                     }
-                    onPendingJumpConsumed={onPendingJumpConsumed}
+                    onPendingJumpConsumed={consumePendingJump}
                   />
                 )}
                 {screen === 'settings' && <SettingsScreen onClose={closeSettings} />}
