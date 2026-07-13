@@ -269,6 +269,35 @@ export interface CostSummary {
   unpricedModels: string[]
 }
 
+/** Headline totals for the global Usage dashboard stat cards (Slice 54). */
+export interface UsageSummary {
+  eventCount: number
+  /** Distinct Sessions that produced at least one Usage Event. */
+  sessionCount: number
+  /** All token classes summed (input + cache-read + cache-write + output). */
+  totalTokens: number
+  totalNotionalCostUsd: number
+  unpricedModels: string[]
+}
+
+/** One calendar day's Usage totals — the raw series the trend chart buckets. */
+export interface UsageDayPoint {
+  /** `YYYY-MM-DD` (UTC). */
+  day: string
+  tokens: number
+  costUsd: number
+}
+
+/**
+ * Everything the global Usage dashboard needs in one round-trip (Slice
+ * 54): headline totals + a per-day series the renderer buckets into
+ * day/week/month and filters by range.
+ */
+export interface UsageDashboard {
+  summary: UsageSummary
+  days: UsageDayPoint[]
+}
+
 // --- Quota (v7 / Slice 51) ------------------------------------------------
 
 /**

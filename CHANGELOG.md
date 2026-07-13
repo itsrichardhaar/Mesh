@@ -16,6 +16,12 @@ The stable `1.0.0` release ships once every item in the
 ## [Unreleased]
 
 ### Added
+- **Slice 54 (v7): Home Screen → global Usage dashboard.** The Home default pane is now the cross-project **Usage** view (the Recent Projects cards are retired; the activity-sorted sidebar is the Project navigator). The per-Project Analysis still opens on selection until the Project Screen lands (Slice 56).
+  - **Stat cards** — Sessions, total Tokens (compact), and Notional Cost (with the "at API rates — not money spent" clarifier) across all Projects.
+  - **Usage trend** — a hand-rolled SVG chart with **Tokens / Cost** metric toggle, **Day / Week / Month** granularity, and a **30-day / 90-day / All** range. Main returns a compact per-day series (tokens + priced cost); the renderer buckets and range-filters it client-side (both additive, so roll-ups need no re-pricing).
+  - **Indexing shimmer** driven by `usage:status-changed` — the pane shows *Indexing your usage…* during the startup sweep / a Rebuild and fills in when it settles.
+  - **New `usage` Zustand store** (ADR-0007) holds the dashboard payload + view state (metric/granularity/range) with selector-based bindings, plus a one-round-trip `usage:get-dashboard` IPC.
+  - **Tests.** Node: the per-day cost builder and the summary / by-day-group queries. Renderer: the pure trend bucketer (day/week/month, range, conservation) and the dashboard component (shimmer, stat cards, bar count, metric toggle).
 - **Slice 53 (v7): Pricing table + Notional Cost.** Puts a dollar figure on Usage — **Notional Cost**, usage valued at published API rates, a measure of intensity and never money spent (ADR-0010).
   - **Per-Model pricing table** (in-repo, a snapshot not a live feed) with opus / sonnet / haiku family rates across all four token classes (fresh input, cache-read, cache-write, output), matched by family so new point releases price without edits. Service-tier aware (batch is half price, priority a premium).
   - **Pure cost layer** computes Notional Cost from token counts grouped by (model, service tier). Unknown models are counted in tokens but **flagged unpriced** and excluded from the total — never priced by a guess. Cost is computed on read from the pricing table, never stored, so a price change needs no cache rebuild.

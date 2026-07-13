@@ -81,6 +81,49 @@ export function usageEventCount(db: Database.Database): number {
   return n
 }
 
+/** Headline counts for the dashboard stat cards. */
+export function usageSummaryCounts(db: Database.Database): {
+  eventCount: number
+  sessionCount: number
+  totalTokens: number
+} {
+  return db
+    .prepare(
+      `SELECT
+         COUNT(*) AS eventCount,
+         COUNT(DISTINCT session_id) AS sessionCount,
+         COALESCE(SUM(input_tokens + cache_read_tokens + cache_write_tokens + output_tokens), 0)
+           AS totalTokens
+       FROM usage_events`
+    )
+    .get() as { eventCount: number; sessionCount: number; totalTokens: number }
+}
+
+/**
+ * Token totals grouped by (day, model, service_tier). The day is the
+ * UTC calendar date (`substr(timestamp,1,10)`); grouping by model+tier
+ * lets the caller price each day's Notional Cost accurately.
+ */
+export function sumTokensByDayAndGroup(
+  db: Database.Database
+): Array<TokenGroup & { day: string }> {
+  return db
+    .prepare(
+      `SELECT
+         substr(timestamp, 1, 10) AS day,
+         model,
+         service_tier AS serviceTier,
+         SUM(input_tokens) AS inputTokens,
+         SUM(cache_read_tokens) AS cacheReadTokens,
+         SUM(cache_write_tokens) AS cacheWriteTokens,
+         SUM(output_tokens) AS outputTokens
+       FROM usage_events
+       GROUP BY day, model, service_tier
+       ORDER BY day`
+    )
+    .all() as Array<TokenGroup & { day: string }>
+}
+
 /**
  * Token totals grouped by (model, service_tier) — the input to Notional
  * Cost. Grouping by tier keeps the cost service-tier aware.

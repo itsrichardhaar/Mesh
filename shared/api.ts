@@ -20,6 +20,7 @@ import type {
   StoredAnalysis,
   StoredValidation,
   ThemePreference,
+  UsageDashboard,
   UsageIngestStatus,
   ValidationResult
 } from './types'
@@ -283,5 +284,7 @@ export interface MeshApi {
     onStatusChanged(cb: (status: UsageIngestStatus) => void): () => void
     /** Aggregate Notional Cost across all Usage Events (Slice 53). */
     getCostSummary(): Promise<CostSummary>
+    /** Everything the global Usage dashboard renders — totals + per-day series (Slice 54). */
+    getDashboard(): Promise<UsageDashboard>
   }
 }

@@ -1,8 +1,8 @@
 import type { Project } from '@shared/types'
 import { OnboardingBanner } from '../components/OnboardingBanner'
-import { ProjectCards } from '../components/ProjectCards'
 import { ProjectDetail } from '../components/ProjectDetail'
 import { ProjectSidebar } from '../components/ProjectSidebar'
+import { UsageDashboard } from '../components/UsageDashboard'
 import { useProjectList } from '../hooks/useProjectList'
 
 interface Props {
@@ -53,11 +53,10 @@ export function HomeScreen({
           ) : state.status === 'ok' && state.projects.filter((p) => !p.hidden && !p.sourceMissing).length === 0 ? (
             <EmptyHome />
           ) : state.status === 'ok' ? (
-            <ProjectCards
-              projects={state.projects}
-              onSelect={onSelect}
-              onOpenWorkspace={onOpenWorkspace}
-            />
+            // v7 / Slice 54: the default Home pane is now the global Usage
+            // dashboard (Recent Projects cards retired). The sidebar is
+            // the Project navigator.
+            <UsageDashboard />
           ) : (
             <EmptyDetail loading={state.status === 'loading'} />
           )}

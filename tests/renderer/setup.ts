@@ -3,6 +3,7 @@ import { afterEach, beforeEach } from 'vitest'
 import { liveSessionsStore } from '@renderer/hooks/useLiveSessions'
 import { notificationsStore } from '@renderer/hooks/useNotifications'
 import { quotaStore } from '@renderer/hooks/useQuota'
+import { usageStore } from '@renderer/hooks/useUsage'
 import { ptyHostStore } from '@renderer/state/pty-host'
 import { installMeshApi } from './test-utils'
 
@@ -20,5 +21,6 @@ afterEach(() => {
   liveSessionsStore.setState({ tabs: [] })
   notificationsStore.setState({ notifications: [], globalMute: false })
   quotaStore.setState({ enabled: false, snapshot: null })
+  usageStore.setState({ dashboard: null, indexing: false, metric: 'tokens', granularity: 'day', range: '30d' })
   ptyHostStore.setState({ mountNode: null, activeSlotId: null })
 })

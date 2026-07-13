@@ -6,8 +6,10 @@ import {
   getIngestCursor,
   insertUsageEvents,
   setIngestCursor,
+  sumTokensByDayAndGroup,
   sumTokensByGroup,
   usageEventCount,
+  usageSummaryCounts,
   wipeAllUsage
 } from '@main/usage/repository'
 
@@ -74,6 +76,34 @@ describe('usage repository', () => {
     const haiku = groups.find((g) => g.model === 'claude-haiku-4-5')
     expect(opus).toMatchObject({ serviceTier: 'standard', inputTokens: 150 })
     expect(haiku).toMatchObject({ serviceTier: 'batch', outputTokens: 7 })
+  })
+
+  it('summarizes counts (events, distinct sessions, total tokens)', () => {
+    // Explicit token fields — makeEvent's non-zero defaults would otherwise leak.
+    const zeros = { inputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0 }
+    insertUsageEvents(db, [
+      makeEvent({ eventId: 'a', sessionId: 's1', ...zeros, inputTokens: 10, outputTokens: 5 }),
+      makeEvent({ eventId: 'b', sessionId: 's1', ...zeros, inputTokens: 1 }),
+      makeEvent({ eventId: 'c', sessionId: 's2', ...zeros, cacheReadTokens: 2, cacheWriteTokens: 3 })
+    ])
+    const summary = usageSummaryCounts(db)
+    expect(summary.eventCount).toBe(3)
+    expect(summary.sessionCount).toBe(2)
+    expect(summary.totalTokens).toBe(10 + 5 + 1 + 2 + 3) // 21
+  })
+
+  it('groups token sums by day (UTC date) and model/tier', () => {
+    insertUsageEvents(db, [
+      makeEvent({ eventId: 'a', timestamp: '2026-07-13T09:00:00Z', inputTokens: 4 }),
+      makeEvent({ eventId: 'b', timestamp: '2026-07-13T23:00:00Z', inputTokens: 6 }),
+      makeEvent({ eventId: 'c', timestamp: '2026-07-14T01:00:00Z', outputTokens: 9 })
+    ])
+    const rows = sumTokensByDayAndGroup(db)
+    const days = rows.map((r) => r.day)
+    expect(days).toContain('2026-07-13')
+    expect(days).toContain('2026-07-14')
+    const jul13 = rows.filter((r) => r.day === '2026-07-13')
+    expect(jul13.reduce((s, r) => s + r.inputTokens, 0)).toBe(10)
   })
 
   it('wipeAllUsage drops events and cursors together (rebuild path)', () => {

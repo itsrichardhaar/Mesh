@@ -82,8 +82,15 @@ import {
 import { QuotaService, httpFetchUsage } from './quota/service'
 import { FALLBACK_CLAUDE_VERSION, claudeCodeVersion, readOauthToken } from './quota/credential'
 import { ingestProject, projectDirNames } from './usage/ingest'
-import { sumTokensByGroup, usageEventCount, wipeAllUsage } from './usage/repository'
+import {
+  sumTokensByDayAndGroup,
+  sumTokensByGroup,
+  usageEventCount,
+  usageSummaryCounts,
+  wipeAllUsage
+} from './usage/repository'
 import { notionalCost } from './usage/cost'
+import { buildDayPoints } from './usage/dashboard'
 import type Database from 'better-sqlite3'
 
 const CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects')
@@ -920,6 +927,24 @@ function registerIpc(): void {
   ipcMain.handle('usage:get-cost-summary', () => {
     const { totalUsd, unpricedModels } = notionalCost(sumTokensByGroup(getDatabase()))
     return { totalNotionalCostUsd: totalUsd, unpricedModels }
+  })
+
+  // Everything the global Usage dashboard needs in one round-trip
+  // (Slice 54): headline totals + a per-day series the renderer buckets.
+  ipcMain.handle('usage:get-dashboard', () => {
+    const db = getDatabase()
+    const counts = usageSummaryCounts(db)
+    const cost = notionalCost(sumTokensByGroup(db))
+    return {
+      summary: {
+        eventCount: counts.eventCount,
+        sessionCount: counts.sessionCount,
+        totalTokens: counts.totalTokens,
+        totalNotionalCostUsd: cost.totalUsd,
+        unpricedModels: cost.unpricedModels
+      },
+      days: buildDayPoints(sumTokensByDayAndGroup(db))
+    }
   })
 }
 

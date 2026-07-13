@@ -388,6 +388,152 @@ button {
   font-size: 12px;
 }
 
+/* Global Usage dashboard — Home default pane (v7 / Slice 54). */
+.usage-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 24px;
+  overflow-y: auto;
+}
+
+.usage-dashboard-empty {
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+}
+
+.usage-shimmer {
+  color: var(--text-muted);
+}
+
+.usage-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.usage-metric-toggle,
+.usage-gran-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+}
+
+.usage-toggle-btn {
+  padding: 4px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: calc(var(--radius-sm) - 2px);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.usage-toggle-btn-active {
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+}
+
+.usage-range {
+  margin-left: auto;
+}
+
+.usage-range select {
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 5px 26px 5px 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background-color: var(--bg-elevated);
+  /* Chevron drawn inline so it tints with the text color and needs no asset. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23807d72' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.usage-range select:hover {
+  border-color: var(--accent);
+}
+
+.usage-range select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.usage-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.usage-stat-card {
+  padding: 14px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md, 10px);
+  background: var(--bg-elevated);
+}
+
+.usage-stat-value {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.usage-stat-label {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.usage-stat-note {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.usage-trend {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.usage-trend-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.usage-trend-dot {
+  fill: var(--bg-canvas);
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+.usage-trend-grid {
+  stroke: var(--border-subtle);
+  stroke-width: 1;
+}
+
+.usage-trend-axis {
+  fill: var(--text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-trend-empty {
+  color: var(--text-muted);
+  padding: 24px 0;
+}
+
 .settings-rebuild-button {
   align-self: flex-start;
   padding: 5px 12px;

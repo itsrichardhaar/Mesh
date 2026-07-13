@@ -8,6 +8,7 @@ import { useNavigation } from './hooks/useNavigation'
 import { NotificationsProvider } from './hooks/useNotifications'
 import { useProjectsSidebarCollapsed } from './hooks/useProjectsSidebarCollapsed'
 import { QuotaProvider } from './hooks/useQuota'
+import { UsageProvider } from './hooks/useUsage'
 import { HomeScreen } from './screens/HomeScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { WorkspaceScreen } from './screens/WorkspaceScreen'
@@ -95,6 +96,7 @@ export function App(): JSX.Element {
         <LiveSessionsProvider>
           <NotificationsProvider>
             <QuotaProvider>
+            <UsageProvider>
             <div className="app-shell">
               <TopBar
                 onToggleSettings={toggleSettings}
@@ -136,6 +138,7 @@ export function App(): JSX.Element {
                 {screen === 'settings' && <SettingsScreen onClose={closeSettings} />}
               </div>
             </div>
+            </UsageProvider>
             </QuotaProvider>
           </NotificationsProvider>
         </LiveSessionsProvider>

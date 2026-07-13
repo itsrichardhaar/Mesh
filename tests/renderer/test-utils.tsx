@@ -181,7 +181,17 @@ export function createMeshApiFake(): MeshApiFake {
       getStatus: vi.fn(async () => ({ state: 'idle' as const, eventCount: 0 })),
       rebuild: vi.fn(async () => undefined),
       onStatusChanged: vi.fn(usageStatusChanged.subscribe),
-      getCostSummary: vi.fn(async () => ({ totalNotionalCostUsd: 0, unpricedModels: [] }))
+      getCostSummary: vi.fn(async () => ({ totalNotionalCostUsd: 0, unpricedModels: [] })),
+      getDashboard: vi.fn(async () => ({
+        summary: {
+          eventCount: 0,
+          sessionCount: 0,
+          totalTokens: 0,
+          totalNotionalCostUsd: 0,
+          unpricedModels: []
+        },
+        days: []
+      }))
     }
   }
 
