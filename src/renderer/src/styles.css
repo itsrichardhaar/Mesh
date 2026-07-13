@@ -534,6 +534,201 @@ button {
   padding: 24px 0;
 }
 
+/* By-project cards + session table (v7 / Slice 55). */
+.usage-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.usage-section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.usage-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.usage-section-aside {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* By-project: a responsive grid of compact cards. */
+.usage-project-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.usage-project-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0; /* grid item: shrink within its track instead of forcing it wide */
+  overflow: hidden; /* clip anything that still exceeds the rounded card */
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md, 10px);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.usage-project-card:hover {
+  border-color: var(--accent);
+}
+
+.usage-project-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0; /* flex item of the card column: let the name inside truncate */
+}
+
+.usage-project-name {
+  flex: 1;
+  min-width: 0; /* allow the flex child to shrink so ellipsis engages */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.usage-project-pct {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-project-card-value {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-project-bar {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--border-subtle);
+  overflow: hidden;
+}
+
+.usage-project-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  min-width: 2px;
+}
+
+.usage-project-card-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Top sessions: a detailed table. */
+.usage-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md, 10px);
+}
+
+.usage-session-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.usage-session-table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--text-muted);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+
+.usage-session-table td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.usage-session-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.usage-session-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-session-model {
+  color: var(--text-secondary);
+}
+
+.usage-session-id-btn {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0;
+}
+
+.usage-session-id-btn:hover {
+  text-decoration: underline;
+}
+
+.usage-session-jump {
+  padding: 3px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.usage-session-jump:hover {
+  border-color: var(--accent);
+}
+
+.usage-turn-detail-row td {
+  background: var(--bg-canvas);
+}
+
+.usage-turn-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0 4px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.usage-turn-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.usage-turn-meta {
+  font-variant-numeric: tabular-nums;
+}
+
 .settings-rebuild-button {
   align-self: flex-start;
   padding: 5px 12px;

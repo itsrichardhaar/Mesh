@@ -274,6 +274,8 @@ export interface UsageSummary {
   eventCount: number
   /** Distinct Sessions that produced at least one Usage Event. */
   sessionCount: number
+  /** Distinct Sessions active in the current calendar month (UTC) — session-explorer header. */
+  sessionsThisMonth: number
   /** All token classes summed (input + cache-read + cache-write + output). */
   totalTokens: number
   totalNotionalCostUsd: number
@@ -288,14 +290,50 @@ export interface UsageDayPoint {
   costUsd: number
 }
 
+/** One Project's Usage totals — the by-project breakdown rows (Slice 55). */
+export interface UsageProjectRow {
+  encodedPath: string
+  tokens: number
+  costUsd: number
+  sessionCount: number
+  /** ISO 8601 timestamp of the Project's newest Usage Event. */
+  lastActivity: string
+}
+
+/** One Session's Usage totals — the session-explorer rows (Slice 55). */
+export interface UsageSessionRow {
+  sessionId: string
+  encodedPath: string
+  tokens: number
+  costUsd: number
+  eventCount: number
+  lastActivity: string
+  /** The Session's dominant Model (most tokens), or null when unlabeled. */
+  model: string | null
+  /** Wall-clock span from the Session's first to last Usage Event, in ms. */
+  durationMs: number
+}
+
+/** One assistant turn within a Session — the per-turn drill-down (Slice 55). */
+export interface UsageTurn {
+  eventId: string
+  timestamp: string
+  model: string | null
+  tokens: number
+  costUsd: number
+}
+
 /**
  * Everything the global Usage dashboard needs in one round-trip (Slice
  * 54): headline totals + a per-day series the renderer buckets into
- * day/week/month and filters by range.
+ * day/week/month and filters by range. Slice 55 adds the by-project
+ * breakdown and the top Sessions by Usage.
  */
 export interface UsageDashboard {
   summary: UsageSummary
   days: UsageDayPoint[]
+  byProject: UsageProjectRow[]
+  topSessions: UsageSessionRow[]
 }
 
 // --- Quota (v7 / Slice 51) ------------------------------------------------

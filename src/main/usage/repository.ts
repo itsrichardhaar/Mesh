@@ -124,6 +124,92 @@ export function sumTokensByDayAndGroup(
     .all() as Array<TokenGroup & { day: string }>
 }
 
+/** Token groups keyed by an extra column (encoded_path / session_id) for per-entity cost. */
+type KeyedGroup<K extends string> = TokenGroup & Record<K, string | null>
+
+export function sumTokensByProjectGroup(db: Database.Database): Array<KeyedGroup<'encodedPath'>> {
+  return db
+    .prepare(
+      `SELECT encoded_path AS encodedPath, model, service_tier AS serviceTier,
+         SUM(input_tokens) AS inputTokens, SUM(cache_read_tokens) AS cacheReadTokens,
+         SUM(cache_write_tokens) AS cacheWriteTokens, SUM(output_tokens) AS outputTokens
+       FROM usage_events GROUP BY encoded_path, model, service_tier`
+    )
+    .all() as Array<KeyedGroup<'encodedPath'>>
+}
+
+export function projectMeta(
+  db: Database.Database
+): Array<{ encodedPath: string; sessionCount: number; tokens: number; lastActivity: string }> {
+  return db
+    .prepare(
+      `SELECT encoded_path AS encodedPath,
+         COUNT(DISTINCT session_id) AS sessionCount,
+         SUM(input_tokens + cache_read_tokens + cache_write_tokens + output_tokens) AS tokens,
+         MAX(timestamp) AS lastActivity
+       FROM usage_events GROUP BY encoded_path`
+    )
+    .all() as Array<{ encodedPath: string; sessionCount: number; tokens: number; lastActivity: string }>
+}
+
+export function sumTokensBySessionGroup(db: Database.Database): Array<KeyedGroup<'sessionId'>> {
+  return db
+    .prepare(
+      `SELECT session_id AS sessionId, model, service_tier AS serviceTier,
+         SUM(input_tokens) AS inputTokens, SUM(cache_read_tokens) AS cacheReadTokens,
+         SUM(cache_write_tokens) AS cacheWriteTokens, SUM(output_tokens) AS outputTokens
+       FROM usage_events GROUP BY session_id, model, service_tier`
+    )
+    .all() as Array<KeyedGroup<'sessionId'>>
+}
+
+export interface SessionMetaRow {
+  sessionId: string
+  encodedPath: string
+  eventCount: number
+  tokens: number
+  firstActivity: string
+  lastActivity: string
+}
+
+export function sessionMeta(db: Database.Database): SessionMetaRow[] {
+  return db
+    .prepare(
+      `SELECT session_id AS sessionId, encoded_path AS encodedPath,
+         COUNT(*) AS eventCount,
+         SUM(input_tokens + cache_read_tokens + cache_write_tokens + output_tokens) AS tokens,
+         MIN(timestamp) AS firstActivity,
+         MAX(timestamp) AS lastActivity
+       FROM usage_events GROUP BY session_id`
+    )
+    .all() as SessionMetaRow[]
+}
+
+/** Distinct Sessions active in a given `YYYY-MM` month (UTC). */
+export function countSessionsInMonth(db: Database.Database, monthPrefix: string): number {
+  const { n } = db
+    .prepare(
+      `SELECT COUNT(DISTINCT session_id) AS n FROM usage_events WHERE substr(timestamp, 1, 7) = ?`
+    )
+    .get(monthPrefix) as { n: number }
+  return n
+}
+
+/** Per-turn rows for one Session, oldest-first — the drill-down source. */
+export function sessionEventRows(
+  db: Database.Database,
+  sessionId: string
+): Array<TokenGroup & { eventId: string; timestamp: string }> {
+  return db
+    .prepare(
+      `SELECT event_id AS eventId, timestamp, model, service_tier AS serviceTier,
+         input_tokens AS inputTokens, cache_read_tokens AS cacheReadTokens,
+         cache_write_tokens AS cacheWriteTokens, output_tokens AS outputTokens
+       FROM usage_events WHERE session_id = ? ORDER BY timestamp`
+    )
+    .all(sessionId) as Array<TokenGroup & { eventId: string; timestamp: string }>
+}
+
 /**
  * Token totals grouped by (model, service_tier) — the input to Notional
  * Cost. Grouping by tier keeps the cost service-tier aware.

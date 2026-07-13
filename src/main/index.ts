@@ -83,14 +83,23 @@ import { QuotaService, httpFetchUsage } from './quota/service'
 import { FALLBACK_CLAUDE_VERSION, claudeCodeVersion, readOauthToken } from './quota/credential'
 import { ingestProject, projectDirNames } from './usage/ingest'
 import {
+  countSessionsInMonth,
+  projectMeta,
+  sessionEventRows,
+  sessionMeta,
   sumTokensByDayAndGroup,
   sumTokensByGroup,
+  sumTokensByProjectGroup,
+  sumTokensBySessionGroup,
   usageEventCount,
   usageSummaryCounts,
   wipeAllUsage
 } from './usage/repository'
 import { notionalCost } from './usage/cost'
-import { buildDayPoints } from './usage/dashboard'
+import { buildDayPoints, buildProjectRows, buildSessionRows, buildTurns } from './usage/dashboard'
+
+/** How many top Sessions by Usage the dashboard's session explorer shows. */
+const TOP_SESSIONS = 50
 import type Database from 'better-sqlite3'
 
 const CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects')
@@ -939,12 +948,23 @@ function registerIpc(): void {
       summary: {
         eventCount: counts.eventCount,
         sessionCount: counts.sessionCount,
+        sessionsThisMonth: countSessionsInMonth(db, new Date().toISOString().slice(0, 7)),
         totalTokens: counts.totalTokens,
         totalNotionalCostUsd: cost.totalUsd,
         unpricedModels: cost.unpricedModels
       },
-      days: buildDayPoints(sumTokensByDayAndGroup(db))
+      days: buildDayPoints(sumTokensByDayAndGroup(db)),
+      byProject: buildProjectRows(sumTokensByProjectGroup(db), projectMeta(db)),
+      topSessions: buildSessionRows(sumTokensBySessionGroup(db), sessionMeta(db), TOP_SESSIONS)
     }
+  })
+
+  // Per-turn drill-down for one Session (Slice 55).
+  ipcMain.handle('usage:get-session-events', (_event, sessionId: unknown) => {
+    if (typeof sessionId !== 'string' || sessionId.length === 0) {
+      throw new Error('usage:get-session-events: sessionId must be a non-empty string')
+    }
+    return buildTurns(sessionEventRows(getDatabase(), sessionId))
   })
 }
 

@@ -186,12 +186,16 @@ export function createMeshApiFake(): MeshApiFake {
         summary: {
           eventCount: 0,
           sessionCount: 0,
+          sessionsThisMonth: 0,
           totalTokens: 0,
           totalNotionalCostUsd: 0,
           unpricedModels: []
         },
-        days: []
-      }))
+        days: [],
+        byProject: [],
+        topSessions: []
+      })),
+      getSessionEvents: vi.fn(async () => [])
     }
   }
 

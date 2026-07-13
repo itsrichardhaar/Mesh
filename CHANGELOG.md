@@ -16,6 +16,11 @@ The stable `1.0.0` release ships once every item in the
 ## [Unreleased]
 
 ### Added
+- **Slice 55 (v7): by-project breakdown + session explorer.** Two more views on the global Usage dashboard, both metric-aware (Tokens / Cost).
+  - **By project** — every Project ranked by Usage with a proportional mini-bar and its Notional Cost; a row resolves to its display name (from the Project list) and clicking it selects that Project on the Home Screen.
+  - **Top sessions** — the heaviest Sessions by Usage, each showing Project · short id · usage · turn count · last activity, with a **Jump** action that reuses the v5 three-tier resolver (live Pty Tab by `ptyId` → any live tab for the `sessionId` → read-only transcript) and an expandable **per-turn drill-down** (model · tokens · cost) loaded on demand.
+  - **Main** adds by-project / by-session aggregates (token sums + per-entity Notional Cost + session/turn counts + last activity) to `usage:get-dashboard`, plus a `usage:get-session-events` IPC for the drill-down. Cost is folded per entity from grouped rows — pure, unit-tested.
+  - **Tests.** Node: the by-project / by-session / per-turn builders (ranking, cost attribution). Renderer: breakdown rows + click-to-select, session Jump invocation (three-tier input), and per-turn expand.
 - **Slice 54 (v7): Home Screen → global Usage dashboard.** The Home default pane is now the cross-project **Usage** view (the Recent Projects cards are retired; the activity-sorted sidebar is the Project navigator). The per-Project Analysis still opens on selection until the Project Screen lands (Slice 56).
   - **Stat cards** — Sessions, total Tokens (compact), and Notional Cost (with the "at API rates — not money spent" clarifier) across all Projects.
   - **Usage trend** — a hand-rolled SVG chart with **Tokens / Cost** metric toggle, **Day / Week / Month** granularity, and a **30-day / 90-day / All** range. Main returns a compact per-day series (tokens + priced cost); the renderer buckets and range-filters it client-side (both additive, so roll-ups need no re-pricing).

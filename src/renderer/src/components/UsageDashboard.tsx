@@ -1,3 +1,6 @@
+import { Fragment, useState } from 'react'
+import type { Project, UsageProjectRow, UsageSessionRow, UsageTurn } from '@shared/types'
+import type { JumpToSessionInput } from './NotificationsBell'
 import { useUsage } from '../hooks/useUsage'
 import { bucketTrend, type Granularity, type Range, type TrendPoint } from '../util/trend'
 
@@ -7,6 +10,29 @@ function formatUsd(usd: number): string {
   return `$${usd.toFixed(2)}`
 }
 
+type Metric = 'tokens' | 'cost'
+
+function metricValue(row: { tokens: number; costUsd: number }, metric: Metric): number {
+  return metric === 'tokens' ? row.tokens : row.costUsd
+}
+
+function formatMetric(value: number, metric: Metric): string {
+  return metric === 'tokens' ? tokenFmt.format(value) : formatUsd(value)
+}
+
+interface DashboardProps {
+  /** Project list for resolving Encoded Path → display name; from the Home Screen. */
+  projects?: Project[]
+  /** Click a by-project row → select it on the Home Screen. */
+  onSelectProject?: (encodedPath: string) => void
+  /** Jump to a Session (v5 three-tier resolution). */
+  onJumpToSession?: (input: JumpToSessionInput) => void
+}
+
+function projectName(projects: Project[] | undefined, encodedPath: string): string {
+  return projects?.find((p) => p.encodedPath === encodedPath)?.name ?? encodedPath
+}
+
 /**
  * Global Usage dashboard — the Home Screen's default pane (v7 / Slice
  * 54). Stat cards + a per-metric trend across all Projects. The heavy
@@ -14,7 +40,11 @@ function formatUsd(usd: number): string {
  * one-round-trip payload and buckets it client-side by granularity +
  * range. SVG rendering is HITL-verified; logic is unit-tested.
  */
-export function UsageDashboard(): JSX.Element {
+export function UsageDashboard({
+  projects,
+  onSelectProject,
+  onJumpToSession
+}: DashboardProps = {}): JSX.Element {
   const { dashboard, indexing, metric, granularity, range, setMetric, setGranularity, setRange } =
     useUsage()
 
@@ -71,7 +101,191 @@ export function UsageDashboard(): JSX.Element {
       </div>
 
       <TrendChart points={points} metric={metric} granularity={granularity} indexing={indexing} />
+
+      <ByProjectBreakdown
+        rows={dashboard.byProject}
+        projects={projects}
+        metric={metric}
+        onSelectProject={onSelectProject}
+      />
+
+      <SessionExplorer
+        rows={dashboard.topSessions}
+        projects={projects}
+        sessionsThisMonth={dashboard.summary.sessionsThisMonth}
+        onJumpToSession={onJumpToSession}
+      />
     </div>
+  )
+}
+
+function ByProjectBreakdown({
+  rows,
+  projects,
+  metric,
+  onSelectProject
+}: {
+  rows: UsageProjectRow[]
+  projects?: Project[]
+  metric: Metric
+  onSelectProject?: (encodedPath: string) => void
+}): JSX.Element | null {
+  if (rows.length === 0) return null
+  const total = rows.reduce((sum, r) => sum + metricValue(r, metric), 0) || 1
+  const max = Math.max(...rows.map((r) => metricValue(r, metric)), 1)
+
+  return (
+    <section className="usage-section" aria-label="Usage by project">
+      <h3 className="usage-section-title">By project</h3>
+      <div className="usage-project-cards">
+        {rows.map((row) => {
+          const value = metricValue(row, metric)
+          const pct = Math.round((value / total) * 100)
+          const name = projectName(projects, row.encodedPath)
+          return (
+            <button
+              key={row.encodedPath}
+              type="button"
+              className="usage-project-card"
+              onClick={() => onSelectProject?.(row.encodedPath)}
+              aria-label={`${name}: ${formatMetric(value, metric)}, ${pct}% of total, ${row.sessionCount} sessions`}
+            >
+              <span className="usage-project-card-head">
+                <span className="usage-project-name">{name}</span>
+                <span className="usage-project-pct">{pct}%</span>
+              </span>
+              <span className="usage-project-card-value">{formatMetric(value, metric)}</span>
+              <span className="usage-project-bar" aria-hidden="true">
+                <span className="usage-project-fill" style={{ width: `${(value / max) * 100}%` }} />
+              </span>
+              <span className="usage-project-card-sub">
+                {row.sessionCount} session{row.sessionCount === 1 ? '' : 's'}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+/** Human duration for a Session span, e.g. `41s`, `22m`, `21h 42m`. Hours are not rolled into days. */
+function formatDuration(ms: number): string {
+  const seconds = Math.round(ms / 1000)
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m`
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`
+}
+
+function SessionExplorer({
+  rows,
+  projects,
+  sessionsThisMonth,
+  onJumpToSession
+}: {
+  rows: UsageSessionRow[]
+  projects?: Project[]
+  sessionsThisMonth: number
+  onJumpToSession?: (input: JumpToSessionInput) => void
+}): JSX.Element | null {
+  const [expanded, setExpanded] = useState<string | null>(null)
+  const [turns, setTurns] = useState<Record<string, UsageTurn[]>>({})
+
+  if (rows.length === 0) return null
+
+  const toggle = async (sessionId: string): Promise<void> => {
+    if (expanded === sessionId) {
+      setExpanded(null)
+      return
+    }
+    setExpanded(sessionId)
+    if (!turns[sessionId]) {
+      const detail = await window.api.usage.getSessionEvents(sessionId)
+      setTurns((prev) => ({ ...prev, [sessionId]: detail }))
+    }
+  }
+
+  return (
+    <section className="usage-section" aria-label="Top sessions by usage">
+      <div className="usage-section-header">
+        <h3 className="usage-section-title">Top sessions</h3>
+        <span className="usage-section-aside">{sessionsThisMonth} this month</span>
+      </div>
+      <div className="usage-table-wrap">
+        <table className="usage-session-table">
+          <thead>
+            <tr>
+              <th scope="col">Session</th>
+              <th scope="col">Project</th>
+              <th scope="col">Model</th>
+              <th scope="col" className="num">Tokens</th>
+              <th scope="col" className="num">Notional</th>
+              <th scope="col" className="num">Duration</th>
+              <th scope="col"><span className="visually-hidden">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const name = projectName(projects, row.encodedPath)
+              const isOpen = expanded === row.sessionId
+              return (
+                <Fragment key={row.sessionId}>
+                  <tr>
+                    <td>
+                      <button
+                        type="button"
+                        className="usage-session-id-btn"
+                        aria-expanded={isOpen}
+                        onClick={() => void toggle(row.sessionId)}
+                      >
+                        {row.sessionId.slice(0, 8)}
+                      </button>
+                    </td>
+                    <td>{name}</td>
+                    <td className="usage-session-model">{row.model ?? 'unknown'}</td>
+                    <td className="num">{tokenFmt.format(row.tokens)}</td>
+                    <td className="num">{formatUsd(row.costUsd)}</td>
+                    <td className="num">{formatDuration(row.durationMs)}</td>
+                    <td className="num">
+                      <button
+                        type="button"
+                        className="usage-session-jump"
+                        onClick={() =>
+                          onJumpToSession?.({
+                            encodedPath: row.encodedPath,
+                            sessionId: row.sessionId,
+                            ptyId: null
+                          })
+                        }
+                      >
+                        Jump
+                      </button>
+                    </td>
+                  </tr>
+                  {isOpen && (
+                    <tr className="usage-turn-detail-row">
+                      <td colSpan={7}>
+                        <ul className="usage-turn-list">
+                          {(turns[row.sessionId] ?? []).map((turn) => (
+                            <li key={turn.eventId} className="usage-turn-row">
+                              <span className="usage-turn-model">{turn.model ?? 'unknown'}</span>
+                              <span className="usage-turn-meta">
+                                {tokenFmt.format(turn.tokens)} tokens · {formatUsd(turn.costUsd)}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
   )
 }
 

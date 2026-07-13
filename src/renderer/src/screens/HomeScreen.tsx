@@ -1,4 +1,5 @@
 import type { Project } from '@shared/types'
+import type { JumpToSessionInput } from '../components/NotificationsBell'
 import { OnboardingBanner } from '../components/OnboardingBanner'
 import { ProjectDetail } from '../components/ProjectDetail'
 import { ProjectSidebar } from '../components/ProjectSidebar'
@@ -12,6 +13,8 @@ interface Props {
   onSelect: (encodedPath: string | null) => void
   /** Hide the projects sidebar — toggled from the top-bar sidebar button. */
   sidebarCollapsed: boolean
+  /** v7 / Slice 55: session-explorer rows jump via the App-level three-tier resolver. */
+  onJumpToSession: (input: JumpToSessionInput) => Promise<void> | void
 }
 
 export function HomeScreen({
@@ -19,7 +22,8 @@ export function HomeScreen({
   onOpenSettings,
   selectedEncodedPath,
   onSelect,
-  sidebarCollapsed
+  sidebarCollapsed,
+  onJumpToSession
 }: Props): JSX.Element {
   const { state, refresh } = useProjectList()
 
@@ -55,8 +59,12 @@ export function HomeScreen({
           ) : state.status === 'ok' ? (
             // v7 / Slice 54: the default Home pane is now the global Usage
             // dashboard (Recent Projects cards retired). The sidebar is
-            // the Project navigator.
-            <UsageDashboard />
+            // the Project navigator. Slice 55 adds by-project + sessions.
+            <UsageDashboard
+              projects={state.projects}
+              onSelectProject={onSelect}
+              onJumpToSession={onJumpToSession}
+            />
           ) : (
             <EmptyDetail loading={state.status === 'loading'} />
           )}

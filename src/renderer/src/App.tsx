@@ -118,6 +118,7 @@ export function App(): JSX.Element {
                     selectedEncodedPath={homeSelection}
                     onSelect={selectHome}
                     sidebarCollapsed={projects.collapsed}
+                    onJumpToSession={jumpToSession}
                   />
                 </div>
                 {workspaceProject && (
