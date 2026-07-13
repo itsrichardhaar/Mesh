@@ -88,7 +88,8 @@ describe('runMigrations', () => {
         '0002_settings',
         '0003_analyses',
         '0004_notifications',
-        '0005_project_mute_notifications'
+        '0005_project_mute_notifications',
+        '0006_usage_events'
       ])
 
       // Stage 4: the Project row is still there...

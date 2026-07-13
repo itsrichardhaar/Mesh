@@ -4,6 +4,7 @@ import type {
   StoredValidation,
   ThemePreference,
   UiModePreference,
+  UsageIngestStatus,
   ValidationResult
 } from '@shared/types'
 import {
@@ -85,6 +86,7 @@ export function SettingsScreen({ onClose }: Props): JSX.Element {
         <ModelSection />
         <NotificationsSection />
         <QuotaSection />
+        <UsageSection />
       </div>
     </div>
   )
@@ -112,6 +114,56 @@ function NotificationsSection(): JSX.Element {
           </span>
         </span>
       </label>
+    </section>
+  )
+}
+
+export function UsageSection(): JSX.Element {
+  const [status, setStatus] = useState<UsageIngestStatus>({ state: 'idle', eventCount: 0 })
+  const [rebuilding, setRebuilding] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    void window.api.usage.getStatus().then((s) => {
+      if (!cancelled) setStatus(s)
+    })
+    const unsub = window.api.usage.onStatusChanged((s) => setStatus(s))
+    return () => {
+      cancelled = true
+      unsub()
+    }
+  }, [])
+
+  const busy = rebuilding || status.state === 'indexing'
+  const rebuild = async (): Promise<void> => {
+    setRebuilding(true)
+    try {
+      await window.api.usage.rebuild()
+    } finally {
+      setRebuilding(false)
+    }
+  }
+
+  return (
+    <section className="settings-section settings-section-usage" aria-label="Usage data">
+      <h2>Usage data</h2>
+      <p className="settings-usage-status">
+        {status.state === 'indexing'
+          ? 'Indexing…'
+          : `${status.eventCount.toLocaleString()} usage events indexed`}
+      </p>
+      <button
+        type="button"
+        className="settings-rebuild-button"
+        onClick={() => void rebuild()}
+        disabled={busy}
+      >
+        {busy ? 'Rebuilding…' : 'Rebuild usage index'}
+      </button>
+      <p className="settings-toggle-help">
+        Usage analytics are a rebuildable cache derived from your session logs.
+        Rebuilding re-reads every session from scratch — safe to run anytime.
+      </p>
     </section>
   )
 }

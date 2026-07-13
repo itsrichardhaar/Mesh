@@ -2,7 +2,7 @@ import type { Mock } from 'vitest'
 import { vi } from 'vitest'
 import type { MeshApi } from '@shared/api'
 import type { PtyDataEvent, PtyExitEvent } from '@shared/pty'
-import type { Notification, ProviderId } from '@shared/types'
+import type { Notification, ProviderId, UsageIngestStatus } from '@shared/types'
 
 /**
  * Typed fake of the preload `window.api` surface (Slice 45 / v6).
@@ -64,6 +64,7 @@ export interface MeshEmitters {
   notificationsUpdated: (event: { ids: string[] }) => void
   notificationsCleared: (event: { encodedPath: string | null }) => void
   muteChanged: (event: MuteChangedEvent) => void
+  usageStatusChanged: (status: UsageIngestStatus) => void
 }
 
 export interface MeshApiFake {
@@ -94,6 +95,7 @@ export function createMeshApiFake(): MeshApiFake {
   const notificationsUpdated = new Channel<{ ids: string[] }>()
   const notificationsCleared = new Channel<{ encodedPath: string | null }>()
   const muteChanged = new Channel<MuteChangedEvent>()
+  const usageStatusChanged = new Channel<UsageIngestStatus>()
 
   const api: MeshApi = {
     ping: vi.fn(async () => 'pong'),
@@ -174,6 +176,11 @@ export function createMeshApiFake(): MeshApiFake {
       getSnapshot: vi.fn(async () => null),
       isEnabled: vi.fn(async () => false),
       setEnabled: vi.fn(async () => undefined)
+    },
+    usage: {
+      getStatus: vi.fn(async () => ({ state: 'idle' as const, eventCount: 0 })),
+      rebuild: vi.fn(async () => undefined),
+      onStatusChanged: vi.fn(usageStatusChanged.subscribe)
     }
   }
 
@@ -193,7 +200,8 @@ export function createMeshApiFake(): MeshApiFake {
       notificationCreated: notificationCreated.emit,
       notificationsUpdated: notificationsUpdated.emit,
       notificationsCleared: notificationsCleared.emit,
-      muteChanged: muteChanged.emit
+      muteChanged: muteChanged.emit,
+      usageStatusChanged: usageStatusChanged.emit
     }
   }
 }

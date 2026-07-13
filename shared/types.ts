@@ -209,6 +209,55 @@ export type NotificationKind = 'idle' | (string & { __brand?: 'notification-kind
 
 export const KNOWN_NOTIFICATION_KINDS: readonly NotificationKind[] = ['idle']
 
+// --- Usage (v7 / Slice 52) ------------------------------------------------
+
+/**
+ * The atomic record of one assistant turn's token consumption within a
+ * Session — the canonical unit every Usage view aggregates from. Derived
+ * entirely from the Session's JSONL (never authored) and cached in
+ * `usage_events` as a rebuildable index (ADR-0009): dropping the table
+ * and re-sweeping the JSONL reproduces it exactly.
+ *
+ * Attributed to a Project by its containing folder's Encoded Path; the
+ * `cwd` field is provenance only, never the attribution key.
+ */
+export interface UsageEvent {
+  /** The assistant message's uuid — stable primary key; dedups re-ingest. */
+  eventId: string
+  /** Project this turn belongs to (containing folder's Encoded Path). */
+  encodedPath: string
+  /** Session (JSONL file stem) this turn belongs to. */
+  sessionId: string
+  /** ISO 8601 timestamp of the turn. */
+  timestamp: string
+  /** Model that produced the turn, or null when the line doesn't label it. */
+  model: string | null
+  inputTokens: number
+  cacheReadTokens: number
+  cacheWriteTokens: number
+  outputTokens: number
+  /** Claude's `service_tier` (pricing-relevant), or null. */
+  serviceTier: string | null
+  /** Git branch recorded on the line, or null. Provenance. */
+  gitBranch: string | null
+  /** Working directory recorded on the line. Provenance only — NOT the attribution key. */
+  cwd: string | null
+  /** Absolute path of the source JSONL file. Provenance. */
+  sourceFile: string
+  /** 1-based line number within the source file. Provenance. */
+  sourceLine: number
+}
+
+/**
+ * Coarse ingest status for the Usage cache (v7 / Slice 52). `indexing`
+ * while the startup sweep or a Rebuild is running; drives the Home
+ * indexing shimmer (Slice 54). `eventCount` is the current row count.
+ */
+export interface UsageIngestStatus {
+  state: 'idle' | 'indexing'
+  eventCount: number
+}
+
 // --- Quota (v7 / Slice 51) ------------------------------------------------
 
 /**

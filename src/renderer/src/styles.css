@@ -370,6 +370,32 @@ button {
   color: var(--text-secondary);
 }
 
+/* Usage-data settings section (v7 / Slice 52). */
+.settings-usage-status {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  margin: 0 0 8px;
+}
+
+.settings-rebuild-button {
+  align-self: flex-start;
+  padding: 5px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.settings-rebuild-button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.settings-rebuild-button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .top-bar-action {
   -webkit-app-region: no-drag;
   width: 30px;

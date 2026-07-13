@@ -19,6 +19,7 @@ import type {
   StoredAnalysis,
   StoredValidation,
   ThemePreference,
+  UsageIngestStatus,
   ValidationResult
 } from './types'
 
@@ -265,5 +266,19 @@ export interface MeshApi {
     getSnapshot(): Promise<QuotaSnapshot | null>
     isEnabled(): Promise<boolean>
     setEnabled(value: boolean): Promise<void>
+  }
+
+  /**
+   * v7 / Slice 52: the rebuildable Usage Events cache (ADR-0009). The
+   * cache is populated by an async startup sweep and kept fresh by the
+   * session watcher — the renderer only reads status and can force a
+   * from-scratch `rebuild`. `onStatusChanged` drives the Home indexing
+   * shimmer (Slice 54).
+   */
+  usage: {
+    getStatus(): Promise<UsageIngestStatus>
+    /** Wipe the cache + ingest cursors and re-sweep from scratch. */
+    rebuild(): Promise<void>
+    onStatusChanged(cb: (status: UsageIngestStatus) => void): () => void
   }
 }

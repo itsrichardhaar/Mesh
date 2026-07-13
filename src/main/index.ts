@@ -81,6 +81,9 @@ import {
 } from './settings/repository'
 import { QuotaService, httpFetchUsage } from './quota/service'
 import { FALLBACK_CLAUDE_VERSION, claudeCodeVersion, readOauthToken } from './quota/credential'
+import { ingestProject, projectDirNames } from './usage/ingest'
+import { usageEventCount, wipeAllUsage } from './usage/repository'
+import type Database from 'better-sqlite3'
 
 const CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects')
 
@@ -113,8 +116,45 @@ let quotaService: QuotaService | null = null
  */
 let quotaUserAgent: string | null = null
 
+/**
+ * v7 / Slice 52: Usage ingest state. `usageIndexing` is true while the
+ * startup sweep or a Rebuild is running; the renderer's Home shimmer
+ * (Slice 54) reflects it. The cache itself lives in SQLite (ADR-0009).
+ */
+let usageIndexing = false
+
 /** Days of notification history retained — older rows swept at boot. */
 const NOTIFICATION_RETENTION_DAYS = 7
+
+const usageNow = (): string => new Date().toISOString()
+
+/** Push the current Usage ingest status to the renderer (shimmer + count). */
+function emitUsageStatus(): void {
+  mainWindow?.webContents.send('usage:status-changed', {
+    state: usageIndexing ? 'indexing' : 'idle',
+    eventCount: usageEventCount(getDatabase())
+  })
+}
+
+/**
+ * Sweep every Project into the Usage cache, yielding between Projects so
+ * the main thread stays responsive (better-sqlite3 + fs are synchronous;
+ * yielding keeps the UI from freezing during a large first sweep). Runs
+ * after first paint, so launch is never blocked.
+ */
+async function runUsageSweep(db: Database.Database): Promise<void> {
+  usageIndexing = true
+  emitUsageStatus()
+  try {
+    for (const encodedPath of projectDirNames(CLAUDE_PROJECTS_DIR)) {
+      ingestProject(db, CLAUDE_PROJECTS_DIR, encodedPath, usageNow)
+      await new Promise((resolve) => setImmediate(resolve))
+    }
+  } finally {
+    usageIndexing = false
+    emitUsageStatus()
+  }
+}
 
 // In production builds, `electron-builder` embeds `build/icon.icns` into the
 // `.app` bundle (configured in `electron-builder.yml`), so the dock icon
@@ -556,9 +596,13 @@ function registerIpc(): void {
       }
       const projectDir = join(CLAUDE_PROJECTS_DIR, encodedPath)
       // First touch subscribes the watcher so subsequent jsonl writes
-      // surface in the renderer; idempotent under repeat.
+      // surface in the renderer; idempotent under repeat. Slice 52 (v7):
+      // the same signal tail-ingests this Project's new turns into the
+      // Usage cache, so an open Project stays fresh live.
       watchSessions(encodedPath, projectDir, () => {
         mainWindow?.webContents.send('sessions:changed', encodedPath)
+        ingestProject(getDatabase(), CLAUDE_PROJECTS_DIR, encodedPath, usageNow)
+        emitUsageStatus()
       })
       return listSessions(projectDir)
     }
@@ -853,6 +897,21 @@ function registerIpc(): void {
     }
     setQuotaEnabled(getDatabase(), value)
   })
+
+  // --- Usage cache (v7 / Slice 52, ADR-0009) ------------------------------
+  ipcMain.handle('usage:get-status', () => ({
+    state: usageIndexing ? 'indexing' : 'idle',
+    eventCount: usageEventCount(getDatabase())
+  }))
+
+  // Rebuild wipes the cache + cursors and re-sweeps from scratch — the
+  // drop-and-rebuild path that proves the cache is purely derived.
+  ipcMain.handle('usage:rebuild', async (): Promise<void> => {
+    const db = getDatabase()
+    wipeAllUsage(db)
+    emitUsageStatus()
+    await runUsageSweep(db)
+  })
 }
 
 /** Stable SQLite key shape for per-Provider secrets. */
@@ -997,6 +1056,11 @@ app.whenReady().then(() => {
   applyPersistedTheme()
   buildApplicationMenu(() => mainWindow)
   createWindow()
+
+  // Slice 52 (v7): populate the Usage cache after the window exists, so
+  // the sweep never blocks first paint. Yields between Projects; the
+  // renderer sees `indexing` until it settles (ADR-0009).
+  void runUsageSweep(db)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

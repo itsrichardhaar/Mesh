@@ -5,6 +5,7 @@ import settings0002 from './migrations/0002_settings.sql?raw'
 import analyses0003 from './migrations/0003_analyses.sql?raw'
 import notifications0004 from './migrations/0004_notifications.sql?raw'
 import projectMute0005 from './migrations/0005_project_mute_notifications.sql?raw'
+import usageEvents0006 from './migrations/0006_usage_events.sql?raw'
 
 export interface Migration {
   id: string
@@ -17,7 +18,8 @@ export const MIGRATIONS: readonly Migration[] = [
   { id: '0002_settings', sql: settings0002 },
   { id: '0003_analyses', sql: analyses0003 },
   { id: '0004_notifications', sql: notifications0004 },
-  { id: '0005_project_mute_notifications', sql: projectMute0005 }
+  { id: '0005_project_mute_notifications', sql: projectMute0005 },
+  { id: '0006_usage_events', sql: usageEvents0006 }
 ]
 
 const TRACKING_TABLE_SQL = `

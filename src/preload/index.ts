@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { MeshApi } from '@shared/api'
 import type { PtyDataEvent, PtyExitEvent } from '@shared/pty'
-import type { Notification, ProviderId } from '@shared/types'
+import type { Notification, ProviderId, UsageIngestStatus } from '@shared/types'
 
 function subscribe(channel: string, cb: () => void): () => void {
   const handler = (): void => cb()
@@ -104,6 +104,11 @@ const api: MeshApi = {
     getSnapshot: () => ipcRenderer.invoke('quota:get-snapshot'),
     isEnabled: () => ipcRenderer.invoke('quota:is-enabled'),
     setEnabled: (value) => ipcRenderer.invoke('quota:set-enabled', value)
+  },
+  usage: {
+    getStatus: () => ipcRenderer.invoke('usage:get-status'),
+    rebuild: () => ipcRenderer.invoke('usage:rebuild'),
+    onStatusChanged: (cb) => subscribeArg<UsageIngestStatus>('usage:status-changed', cb)
   }
 }
 
