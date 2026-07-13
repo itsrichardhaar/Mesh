@@ -29,7 +29,10 @@ A Project's decoded absolute path on disk (e.g., `/Users/richardhaar/Desktop/Mes
 ### Screens
 
 **Home Screen**:
-Mesh's landing view: Project sidebar on the left, selected Project's Analysis on the right. Single-click selects; double-click opens the Workspace Screen.
+Mesh's landing view: Project sidebar on the left, the global **Usage** views on the right (across all Projects). Single-click a Project in the sidebar opens its **Project Screen**; double-click opens its **Workspace Screen**.
+
+**Project Screen**:
+A single Project's overview — the "refresh myself after stepping away" view. Top to bottom: the Project's **Usage** strip, the **Analyze** bar, and the **Analysis** in a collapsible accordion beneath it. The middle altitude between the Home Screen (all Projects) and the Workspace Screen (deep work in one Project).
 
 **Workspace Screen**:
 The per-Project view: file tree on the left, Sessions list in the middle, transcript or file content on the right.
@@ -51,6 +54,36 @@ The three deterministic counts displayed above an Analysis: Sessions, Files Touc
 
 **Activity** / **Last Activity**:
 The timestamp of the newest event in any of a Project's Sessions. Drives both sidebar sort order and the Last Activity stat.
+
+### Usage
+
+**Usage** (domain):
+The token-consumption domain — everything Mesh derives from the token counts recorded in Session JSONL: totals, trends, breakdowns, and Notional Cost. Distinct from **Analysis** (the LLM-written report): Usage is deterministic and derived; Analysis is generated. Never called "Analytics" (one letter from Analysis, different meaning).
+_Avoid_: Analytics, metrics, telemetry
+
+**Usage Event**:
+The atomic record of one assistant turn's token consumption within a Session — input, output, and Cache-Read / Cache-Write token counts, the Model, and timestamp. Derived entirely from the Session's JSONL (never authored); identified by the assistant message's uuid for idempotent re-ingest. Attributed to a Project by its containing folder's Encoded Path (the `cwd` field is provenance only, never the attribution key). The canonical unit every Usage view aggregates from.
+_Avoid_: entry, row, record, sample, turn
+
+**Cache-Read Tokens** / **Cache-Write Tokens**:
+Input tokens served from (read) or committed to (write) a prompt cache — priced differently from fresh input, so tracked separately. In Claude Code's JSONL these are `cache_read_input_tokens` and `cache_creation_input_tokens`.
+_Avoid_: cached tokens (ambiguous — always say read or write)
+
+**Notional Cost**:
+The value of Usage priced at published API rates, regardless of the user's actual plan — a measure of usage *intensity*, not money spent. Computed from Usage Event token counts and a per-Model pricing table; it never reflects an invoice. The "Cost" metric toggle in Usage views always means Notional Cost, and is always shown with a clarifier ("at API rates — not money spent").
+_Avoid_: cost (bare), spend, price, bill, invoice
+
+**Subscription Utilization**:
+Notional Cost over a period compared against a plan's flat fee — answers "is the subscription paying off?" A money metric, and the only thing in Mesh called "Utilization." Requires the user to enter their plan fee.
+_Avoid_: ROI, savings, value
+
+**Quota**:
+A Claude subscription usage window Anthropic imposes, each with a percent-used and a reset time — Mesh surfaces the **5-hour window** and the **weekly window**. Account-global, not per-Project (the same Quota shows on every Project and the Workspace). Read live from Anthropic's OAuth usage endpoint; absent from local logs, so unavailable unless the user opts into the networked fetch. A window's percentage is its **percent used**, never its "utilization."
+_Avoid_: limit, allowance, cap, rate limit, utilization (that's a money term)
+
+**Quota Reset**:
+The moment a Quota window rolls over and its percent-used returns to zero.
+_Avoid_: refresh, rollover, cycle
 
 ### Sessions and terminals
 
@@ -93,6 +126,9 @@ A Project whose Source Path no longer exists on disk (folder deleted/moved). Ren
 - A **Pty Tab** corresponds to exactly one **Session** being Resumed
 - Multiple **Pty Tabs** can exist per Project; all die when Mesh's process exits
 - A **Project**'s **Activity** is derived from its Sessions' newest event timestamp
+- A **Session** comprises 0..N **Usage Events** (one per assistant turn that reports usage)
+- A **Usage Event** is attributed to exactly one **Project** (by the containing folder's Encoded Path) and carries a **Notional Cost**
+- **Quota** is account-global — tied to neither a Project nor a Session, and read from Anthropic's OAuth endpoint rather than any Session's JSONL
 
 ## Example dialogue
 
@@ -114,3 +150,5 @@ A Project whose Source Path no longer exists on disk (folder deleted/moved). Ren
 - **"Terminal"** — used ambiguously between *the transcript view* (read-only rendered JSONL) and *the live pty* (a running `claude --resume`). Resolved: *transcript* for the rendered JSONL view; **Pty Tab** for the live process.
 - **"Dashboard"** — used in early discussion. Resolved: **Mesh** for the product, **Home Screen** for the landing view.
 - **"Suggestion" / "chip"** — discussed in early Analysis design (a fourth panel of clickable actions); deferred to v2. Not part of v1 vocabulary.
+- **"Utilization"** — ambiguous between a Quota window's rate-limit consumption and Notional-Cost-vs-plan-fee. Resolved: **Subscription Utilization** (money) is the only "Utilization"; a Quota window's figure is its **percent used**.
+- **"Analytics"** — the token domain is **Usage**, never "Analytics" (one letter from the LLM **Analysis**, entirely different meaning). "Analytics" is not Mesh vocabulary.
