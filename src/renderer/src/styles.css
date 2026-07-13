@@ -374,7 +374,18 @@ button {
 .settings-usage-status {
   font-variant-numeric: tabular-nums;
   color: var(--text-secondary);
+  margin: 0 0 4px;
+}
+
+.settings-usage-cost {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
   margin: 0 0 8px;
+}
+
+.settings-usage-cost-note {
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .settings-rebuild-button {

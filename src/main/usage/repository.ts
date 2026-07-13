@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3'
 import type { UsageEvent } from '@shared/types'
+import type { TokenGroup } from './cost'
 
 /**
  * Persistence for the rebuildable Usage Events cache (ADR-0009). Inserts
@@ -78,4 +79,32 @@ export function wipeAllUsage(db: Database.Database): void {
 export function usageEventCount(db: Database.Database): number {
   const { n } = db.prepare('SELECT COUNT(*) AS n FROM usage_events').get() as { n: number }
   return n
+}
+
+/**
+ * Token totals grouped by (model, service_tier) — the input to Notional
+ * Cost. Grouping by tier keeps the cost service-tier aware.
+ */
+export function sumTokensByGroup(db: Database.Database): TokenGroup[] {
+  const rows = db
+    .prepare(
+      `SELECT
+         model,
+         service_tier AS serviceTier,
+         SUM(input_tokens) AS inputTokens,
+         SUM(cache_read_tokens) AS cacheReadTokens,
+         SUM(cache_write_tokens) AS cacheWriteTokens,
+         SUM(output_tokens) AS outputTokens
+       FROM usage_events
+       GROUP BY model, service_tier`
+    )
+    .all() as Array<{
+    model: string | null
+    serviceTier: string | null
+    inputTokens: number
+    cacheReadTokens: number
+    cacheWriteTokens: number
+    outputTokens: number
+  }>
+  return rows
 }

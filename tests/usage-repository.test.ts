@@ -6,6 +6,7 @@ import {
   getIngestCursor,
   insertUsageEvents,
   setIngestCursor,
+  sumTokensByGroup,
   usageEventCount,
   wipeAllUsage
 } from '@main/usage/repository'
@@ -60,6 +61,19 @@ describe('usage repository', () => {
     expect(getIngestCursor(db, '/p/s1.jsonl')).toEqual({ byteOffset: 100, lineCount: 3 })
     setIngestCursor(db, '/p/s1.jsonl', { byteOffset: 250, lineCount: 8 }, '2026-07-13T12:05:00Z')
     expect(getIngestCursor(db, '/p/s1.jsonl')).toEqual({ byteOffset: 250, lineCount: 8 })
+  })
+
+  it('sums tokens grouped by (model, service_tier)', () => {
+    insertUsageEvents(db, [
+      makeEvent({ eventId: 'a', model: 'claude-opus-4-8', serviceTier: 'standard', inputTokens: 100 }),
+      makeEvent({ eventId: 'b', model: 'claude-opus-4-8', serviceTier: 'standard', inputTokens: 50 }),
+      makeEvent({ eventId: 'c', model: 'claude-haiku-4-5', serviceTier: 'batch', outputTokens: 7 })
+    ])
+    const groups = sumTokensByGroup(db)
+    const opus = groups.find((g) => g.model === 'claude-opus-4-8')
+    const haiku = groups.find((g) => g.model === 'claude-haiku-4-5')
+    expect(opus).toMatchObject({ serviceTier: 'standard', inputTokens: 150 })
+    expect(haiku).toMatchObject({ serviceTier: 'batch', outputTokens: 7 })
   })
 
   it('wipeAllUsage drops events and cursors together (rebuild path)', () => {

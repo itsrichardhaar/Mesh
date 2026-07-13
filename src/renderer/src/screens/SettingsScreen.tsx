@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type {
+  CostSummary,
   ProviderId,
   StoredValidation,
   ThemePreference,
@@ -120,19 +121,30 @@ function NotificationsSection(): JSX.Element {
 
 export function UsageSection(): JSX.Element {
   const [status, setStatus] = useState<UsageIngestStatus>({ state: 'idle', eventCount: 0 })
+  const [cost, setCost] = useState<CostSummary | null>(null)
   const [rebuilding, setRebuilding] = useState(false)
+
+  const refreshCost = useCallback(async (): Promise<void> => {
+    const summary = await window.api.usage.getCostSummary()
+    setCost(summary)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
     void window.api.usage.getStatus().then((s) => {
       if (!cancelled) setStatus(s)
     })
-    const unsub = window.api.usage.onStatusChanged((s) => setStatus(s))
+    void refreshCost()
+    const unsub = window.api.usage.onStatusChanged((s) => {
+      setStatus(s)
+      // Cost changes as ingest settles — refresh once it's idle again.
+      if (s.state === 'idle') void refreshCost()
+    })
     return () => {
       cancelled = true
       unsub()
     }
-  }, [])
+  }, [refreshCost])
 
   const busy = rebuilding || status.state === 'indexing'
   const rebuild = async (): Promise<void> => {
@@ -152,6 +164,12 @@ export function UsageSection(): JSX.Element {
           ? 'Indexing…'
           : `${status.eventCount.toLocaleString()} usage events indexed`}
       </p>
+      {cost && status.state === 'idle' && (
+        <p className="settings-usage-cost">
+          ≈ ${cost.totalNotionalCostUsd.toFixed(2)}{' '}
+          <span className="settings-usage-cost-note">at API rates — not money spent</span>
+        </p>
+      )}
       <button
         type="button"
         className="settings-rebuild-button"

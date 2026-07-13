@@ -10,6 +10,7 @@ import type {
 } from './pty'
 import type { SessionSummary, TranscriptEntry } from './sessions'
 import type {
+  CostSummary,
   Notification,
   Project,
   ProjectPatch,
@@ -280,5 +281,7 @@ export interface MeshApi {
     /** Wipe the cache + ingest cursors and re-sweep from scratch. */
     rebuild(): Promise<void>
     onStatusChanged(cb: (status: UsageIngestStatus) => void): () => void
+    /** Aggregate Notional Cost across all Usage Events (Slice 53). */
+    getCostSummary(): Promise<CostSummary>
   }
 }

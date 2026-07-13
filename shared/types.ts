@@ -258,6 +258,17 @@ export interface UsageIngestStatus {
   eventCount: number
 }
 
+/**
+ * Aggregate Notional Cost across all Usage Events (v7 / Slice 53,
+ * ADR-0010). `totalNotionalCostUsd` values usage at published API rates
+ * — a measure of intensity, never money spent. `unpricedModels` lists
+ * models with no known rate (their tokens are counted, not priced).
+ */
+export interface CostSummary {
+  totalNotionalCostUsd: number
+  unpricedModels: string[]
+}
+
 // --- Quota (v7 / Slice 51) ------------------------------------------------
 
 /**

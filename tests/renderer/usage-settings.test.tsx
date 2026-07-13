@@ -21,6 +21,17 @@ describe('UsageSection', () => {
     expect(screen.getByText('1,234 usage events indexed')).toBeInTheDocument()
   })
 
+  it('shows Notional Cost with the "not money spent" clarifier', async () => {
+    meshApi().usage.getStatus.mockResolvedValue({ state: 'idle', eventCount: 10 })
+    meshApi().usage.getCostSummary.mockResolvedValue({
+      totalNotionalCostUsd: 42.5,
+      unpricedModels: []
+    })
+    await renderSection()
+    expect(screen.getByText(/≈ \$42\.50/)).toBeInTheDocument()
+    expect(screen.getByText(/at API rates — not money spent/i)).toBeInTheDocument()
+  })
+
   it('calls usage.rebuild when the Rebuild button is clicked', async () => {
     meshApi().usage.getStatus.mockResolvedValue({ state: 'idle', eventCount: 10 })
     await renderSection()

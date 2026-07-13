@@ -82,7 +82,8 @@ import {
 import { QuotaService, httpFetchUsage } from './quota/service'
 import { FALLBACK_CLAUDE_VERSION, claudeCodeVersion, readOauthToken } from './quota/credential'
 import { ingestProject, projectDirNames } from './usage/ingest'
-import { usageEventCount, wipeAllUsage } from './usage/repository'
+import { sumTokensByGroup, usageEventCount, wipeAllUsage } from './usage/repository'
+import { notionalCost } from './usage/cost'
 import type Database from 'better-sqlite3'
 
 const CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects')
@@ -911,6 +912,14 @@ function registerIpc(): void {
     wipeAllUsage(db)
     emitUsageStatus()
     await runUsageSweep(db)
+  })
+
+  // Notional Cost across all Usage Events (Slice 53, ADR-0010). Computed
+  // on read from the pricing table — never stored, so a price change
+  // takes effect without touching the cache.
+  ipcMain.handle('usage:get-cost-summary', () => {
+    const { totalUsd, unpricedModels } = notionalCost(sumTokensByGroup(getDatabase()))
+    return { totalNotionalCostUsd: totalUsd, unpricedModels }
   })
 }
 

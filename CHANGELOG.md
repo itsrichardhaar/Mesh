@@ -16,6 +16,11 @@ The stable `1.0.0` release ships once every item in the
 ## [Unreleased]
 
 ### Added
+- **Slice 53 (v7): Pricing table + Notional Cost.** Puts a dollar figure on Usage — **Notional Cost**, usage valued at published API rates, a measure of intensity and never money spent (ADR-0010).
+  - **Per-Model pricing table** (in-repo, a snapshot not a live feed) with opus / sonnet / haiku family rates across all four token classes (fresh input, cache-read, cache-write, output), matched by family so new point releases price without edits. Service-tier aware (batch is half price, priority a premium).
+  - **Pure cost layer** computes Notional Cost from token counts grouped by (model, service tier). Unknown models are counted in tokens but **flagged unpriced** and excluded from the total — never priced by a guess. Cost is computed on read from the pricing table, never stored, so a price change needs no cache rebuild.
+  - **Surfaced** in Settings → *Usage data* as "≈ $X.XX at API rates — not money spent"; the clarifier travels with every dollar figure. New `usage:get-cost-summary` IPC + `sumTokensByGroup` aggregation.
+  - **Tests.** Node: family rate lookup + unknown/absent fallback, tier multipliers, per-token-class cost math, unpriced-model flagging, and the grouped token-sum query. Renderer: the Settings cost line + clarifier.
 - **Slice 52 (v7): Usage ingest + `usage_events` rebuildable cache.** The data spine for v7's Usage views (ADR-0009). Every assistant turn's token counts are derived from the Session JSONL into a new SQLite cache — never authored, always reproducible by re-sweeping.
   - **Migration `0006_usage_events`** adds the `usage_events` cache (with by-project / by-time / by-session indexes) and a `usage_ingest_state` per-file cursor. The upgrade-cycle harness covers it from v1.
   - **Pure derivation.** `parseUsageLine` maps one JSONL line → a `UsageEvent` (uuid-keyed, attributed to a Project by its containing folder's Encoded Path; `cwd` is provenance only). `tailParse` consumes only newline-complete appended bytes, so a growing session re-ingests just its new turns; a truncated/replaced file resets.
