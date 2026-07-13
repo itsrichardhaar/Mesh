@@ -99,6 +99,11 @@ const api: MeshApi = {
         | { scope: 'global'; value: boolean }
         | { scope: 'project'; encodedPath: string; value: boolean }
       >('notifications:mute-changed', cb)
+  },
+  quota: {
+    getSnapshot: () => ipcRenderer.invoke('quota:get-snapshot'),
+    isEnabled: () => ipcRenderer.invoke('quota:is-enabled'),
+    setEnabled: (value) => ipcRenderer.invoke('quota:set-enabled', value)
   }
 }
 

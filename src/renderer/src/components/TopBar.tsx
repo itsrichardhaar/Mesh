@@ -1,6 +1,7 @@
 import { Moon, PanelLeft, Settings, Sun } from 'lucide-react'
 import type { JumpToSessionInput } from './NotificationsBell'
 import { NotificationsBell } from './NotificationsBell'
+import { QuotaChip } from './QuotaChip'
 import { useTheme } from '../theme/ThemeProvider'
 
 interface Props {
@@ -69,6 +70,7 @@ export function TopBar({
         </button>
       )}
       <div className="top-bar-spacer" />
+      <QuotaChip />
       <NotificationsBell onJumpToSession={onJumpToSession} />
       <button
         type="button"

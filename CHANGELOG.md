@@ -15,6 +15,14 @@ The stable `1.0.0` release ships once every item in the
 
 ## [Unreleased]
 
+### Added
+- **Slice 51 (v7): Networked Claude Quota — opt-in top-bar chip.** First slice of v7 (Usage) and Mesh's first-ever outbound network call, ring-fenced per ADR-0011. A persistent top-bar chip shows the account-global Claude subscription **Quota** — the 5-hour and weekly windows, each with percent-used and a reset countdown.
+  - **Opt-in, off by default.** A new Settings toggle ("Show Claude subscription quota") persists `quota_enabled`. While off, nothing outbound happens and no credential is read; the chip is hidden.
+  - **Main-process `quota/` module**, isolated from the (future) Usage ingest pipeline. A pure `parseOauthUsage` transform (unit-tested against the endpoint's payload shape) feeds a `QuotaService` with on-demand fetch, a ~5-minute in-process cache, and 429/error/no-credential back-off that serves the last good snapshot rather than re-hammering the aggressively rate-limited endpoint.
+  - **Credential handling.** The OAuth token is read from Claude Code's own credential (macOS Keychain via the `security` CLI, with a `~/.claude/.credentials.json` fallback) — *not* an `sk-ant-` key, and *not* Electron `safeStorage` (which only round-trips Mesh's own secrets). It is used solely in the `Authorization` header to `api.anthropic.com`, never persisted, logged, or sent to the renderer. The fetch carries the required `User-Agent: claude-code/<version>` header.
+  - **Reduced-color-vision constraint.** Each gauge encodes headroom with fill length + a numeric % + a label; the fill is a single neutral tone at every level (no red/amber/green thresholds), and the accessible name carries the number and reset — legible with color removed.
+  - **Tests.** Node: the pure parser (full / missing-window / malformed) and the service's opt-in gating, cache TTL, and 429-serves-last-snapshot with injected fetch + clock. Renderer: the chip's render/hide states and the pure reset-countdown formatter. New IPC surface (`quota:get-snapshot` / `is-enabled` / `set-enabled`) added to the preload bridge and the typed `window.api` test fake.
+
 ## [0.6.0] — 2026-07-07
 
 ### Added

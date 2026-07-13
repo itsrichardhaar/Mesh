@@ -72,11 +72,15 @@ import {
 import {
   getActiveProvider,
   getGlobalNotificationsMute,
+  getQuotaEnabled,
   getSetting,
   setActiveProvider,
   setGlobalNotificationsMute,
+  setQuotaEnabled,
   setSetting
 } from './settings/repository'
+import { QuotaService, httpFetchUsage } from './quota/service'
+import { FALLBACK_CLAUDE_VERSION, claudeCodeVersion, readOauthToken } from './quota/credential'
 
 const CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects')
 
@@ -93,6 +97,21 @@ const ptyManager = new PtyManager()
  * constructed in `app.whenReady` so the database exists first.
  */
 let idleDetector: IdleDetector | null = null
+
+/**
+ * v7 / Slice 51: networked Claude Quota (ADR-0011). Opt-in, off by
+ * default; the service gates its own credential read + fetch on the
+ * `quota_enabled` setting. Lazily constructed in `app.whenReady`.
+ */
+let quotaService: QuotaService | null = null
+
+/**
+ * Cached `User-Agent` for the quota fetch (`claude-code/<version>`).
+ * Resolved once, lazily, on the first enabled fetch — resolving the
+ * Claude binary + running `--version` is subprocess work we don't want
+ * to repeat per call.
+ */
+let quotaUserAgent: string | null = null
 
 /** Days of notification history retained — older rows swept at boot. */
 const NOTIFICATION_RETENTION_DAYS = 7
@@ -819,6 +838,21 @@ function registerIpc(): void {
     }
     return isProjectMuted(getDatabase(), encodedPath)
   })
+
+  // --- Quota (v7 / Slice 51, ADR-0011) ------------------------------------
+  // `get-snapshot` returns null (chip hidden) whenever disabled, no
+  // credential, or the fetch failed — the service enforces the opt-in
+  // gate, so no keychain/network access occurs while disabled.
+  ipcMain.handle('quota:get-snapshot', () => quotaService?.getSnapshot() ?? null)
+
+  ipcMain.handle('quota:is-enabled', (): boolean => getQuotaEnabled(getDatabase()))
+
+  ipcMain.handle('quota:set-enabled', (_event, value: unknown): void => {
+    if (typeof value !== 'boolean') {
+      throw new Error('quota:set-enabled: value must be a boolean')
+    }
+    setQuotaEnabled(getDatabase(), value)
+  })
 }
 
 /** Stable SQLite key shape for per-Provider secrets. */
@@ -939,6 +973,25 @@ app.whenReady().then(() => {
   if (retentionCleared > 0) {
     console.log(`[mesh] notifications: retention sweep cleared ${retentionCleared} rows older than ${NOTIFICATION_RETENTION_DAYS} days`)
   }
+
+  // Slice 51 (v7): networked Claude Quota (ADR-0011). The service gates
+  // its own credential read + fetch on `quota_enabled` — nothing
+  // outbound happens until the user opts in.
+  quotaUserAgent = `claude-code/${FALLBACK_CLAUDE_VERSION}`
+  quotaService = new QuotaService({
+    isEnabled: () => getQuotaEnabled(db),
+    readToken: () => readOauthToken(),
+    fetchUsage: httpFetchUsage,
+    userAgent: () => quotaUserAgent ?? `claude-code/${FALLBACK_CLAUDE_VERSION}`,
+    now: () => Date.now()
+  })
+  // Refine the User-Agent with the real Claude Code version once (async,
+  // cached). The endpoint rejects the shared low rate-limit bucket
+  // without a plausible claude-code UA; the fallback covers any fetch
+  // that races this resolution.
+  void resolveClaudeBinary().then((bin) => {
+    quotaUserAgent = `claude-code/${claudeCodeVersion(bin)}`
+  })
 
   registerIpc()
   applyPersistedTheme()

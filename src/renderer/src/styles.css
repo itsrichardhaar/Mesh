@@ -318,6 +318,58 @@ button {
   height: 100%;
 }
 
+/* Quota chip (v7 / Slice 51). Account-global Claude Quota, shown as two
+   mini-gauges. Reduced-color-vision constraint: level is carried by fill
+   length + the numeric %, never hue — the fill is a single neutral tone
+   at every level (no red/amber/green thresholds). */
+.quota-chip {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-right: 10px;
+  padding: 0 4px;
+}
+
+.quota-gauge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-secondary);
+}
+
+.quota-gauge-label {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.quota-gauge-track {
+  position: relative;
+  width: 34px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border-subtle);
+  overflow: hidden;
+}
+
+.quota-gauge-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--text-muted);
+  min-width: 2px;
+}
+
+.quota-gauge-pct {
+  font-variant-numeric: tabular-nums;
+  min-width: 30px;
+  text-align: right;
+  color: var(--text-secondary);
+}
+
 .top-bar-action {
   -webkit-app-region: no-drag;
   width: 30px;

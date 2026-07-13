@@ -16,6 +16,7 @@ import {
 } from '@shared/models'
 import { PROVIDER_IDS } from '@shared/types'
 import { useNotifications } from '../hooks/useNotifications'
+import { useQuota } from '../hooks/useQuota'
 import { useTheme } from '../theme/ThemeProvider'
 import { useUiMode } from '../theme/UiModeProvider'
 import { relativeTime } from '../util/relativeTime'
@@ -83,6 +84,7 @@ export function SettingsScreen({ onClose }: Props): JSX.Element {
         <AppearanceSection />
         <ModelSection />
         <NotificationsSection />
+        <QuotaSection />
       </div>
     </div>
   )
@@ -107,6 +109,32 @@ function NotificationsSection(): JSX.Element {
           <span className="settings-toggle-help">
             New notifications still appear in the dropdown while paused — only
             top-right toasts are suppressed.
+          </span>
+        </span>
+      </label>
+    </section>
+  )
+}
+
+function QuotaSection(): JSX.Element {
+  const { enabled, setEnabled } = useQuota()
+  return (
+    <section className="settings-section settings-section-quota" aria-label="Claude quota">
+      <h2>Claude quota</h2>
+      <label className="settings-toggle">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => void setEnabled(e.target.checked)}
+        />
+        <span>
+          <span className="settings-toggle-label">Show Claude subscription quota</span>
+          <span className="settings-toggle-help">
+            Displays your 5-hour and weekly usage windows in the top bar. This is
+            the one feature that reaches the network: when enabled, Mesh reads your
+            Claude Code login from the system keychain and calls Anthropic on demand
+            to fetch the windows. Off by default; nothing leaves your machine while
+            it’s off.
           </span>
         </span>
       </label>

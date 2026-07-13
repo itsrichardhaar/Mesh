@@ -208,3 +208,37 @@ export interface Notification {
 export type NotificationKind = 'idle' | (string & { __brand?: 'notification-kind' })
 
 export const KNOWN_NOTIFICATION_KINDS: readonly NotificationKind[] = ['idle']
+
+// --- Quota (v7 / Slice 51) ------------------------------------------------
+
+/**
+ * One Claude subscription usage window. `percentUsed` is the window's
+ * consumption (0–100) — deliberately never called "utilization" (that
+ * word is reserved for the money metric, Subscription Utilization; see
+ * CONTEXT.md). The renderer computes the reset countdown against the
+ * wall clock from `resetsAt`.
+ */
+export interface QuotaWindow {
+  /** Stable discriminator for which subscription window this is. */
+  kind: 'five_hour' | 'seven_day'
+  /** Human label, e.g. "5-hour window" / "Weekly window". */
+  label: string
+  /** Percent of the window consumed (from the endpoint's `utilization`). */
+  percentUsed: number
+  /** ISO 8601 timestamp when this window's percent-used returns to zero. */
+  resetsAt: string
+}
+
+/**
+ * Account-global Claude Quota, fetched live from Anthropic's OAuth usage
+ * endpoint (ADR-0011). Never derived from local logs and never a Usage
+ * Event. `null` everywhere the feature is disabled, has no credential,
+ * or the fetch failed — the renderer hides its chip in that case.
+ */
+export interface QuotaSnapshot {
+  /** Always `'claude'` in v7 — Mesh is Claude-Code-only (ADR-0002). */
+  provider: 'claude'
+  windows: ReadonlyArray<QuotaWindow>
+  /** ISO 8601 timestamp when this snapshot was fetched. */
+  fetchedAt: string
+}

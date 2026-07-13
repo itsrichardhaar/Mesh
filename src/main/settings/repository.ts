@@ -7,6 +7,9 @@ export const ACTIVE_PROVIDER_KEY = 'active_provider'
 /** Slice 43 (v5): global notifications-mute toggle. Stored as `'1'` / `'0'`. */
 export const NOTIFICATIONS_GLOBAL_MUTE_KEY = 'notifications_global_mute'
 
+/** v7 / Slice 51: opt-in for networked Claude Quota (ADR-0011). Stored as `'1'` / `'0'`. */
+export const QUOTA_ENABLED_KEY = 'quota_enabled'
+
 /**
  * Read a single setting's string value, or `null` if no row exists for
  * the key. Encrypted secrets (Slice 7) live in `value_blob` and have
@@ -74,4 +77,17 @@ export function getGlobalNotificationsMute(db: Database.Database): boolean {
 
 export function setGlobalNotificationsMute(db: Database.Database, value: boolean): void {
   setSetting(db, NOTIFICATIONS_GLOBAL_MUTE_KEY, value ? '1' : '0')
+}
+
+/**
+ * v7 / Slice 51: whether networked Claude Quota is enabled. Defaults to
+ * `false` (off) when no row exists — the outbound call and the
+ * credential read happen only after the user opts in (ADR-0011).
+ */
+export function getQuotaEnabled(db: Database.Database): boolean {
+  return getSetting(db, QUOTA_ENABLED_KEY) === '1'
+}
+
+export function setQuotaEnabled(db: Database.Database, value: boolean): void {
+  setSetting(db, QUOTA_ENABLED_KEY, value ? '1' : '0')
 }

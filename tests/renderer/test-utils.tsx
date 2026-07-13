@@ -169,6 +169,11 @@ export function createMeshApiFake(): MeshApiFake {
       onUpdated: vi.fn(notificationsUpdated.subscribe),
       onCleared: vi.fn(notificationsCleared.subscribe),
       onMuteChanged: vi.fn(muteChanged.subscribe)
+    },
+    quota: {
+      getSnapshot: vi.fn(async () => null),
+      isEnabled: vi.fn(async () => false),
+      setEnabled: vi.fn(async () => undefined)
     }
   }
 

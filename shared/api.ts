@@ -15,6 +15,7 @@ import type {
   ProjectPatch,
   ProjectStats,
   ProviderId,
+  QuotaSnapshot,
   StoredAnalysis,
   StoredValidation,
   ThemePreference,
@@ -249,5 +250,20 @@ export interface MeshApi {
         | { scope: 'project'; encodedPath: string; value: boolean }
       ) => void
     ): () => void
+  }
+
+  /**
+   * v7 / Slice 51: account-global Claude Quota — the one ring-fenced,
+   * opt-in networked feature (ADR-0011). `getSnapshot` returns the
+   * current 5-hour + weekly windows, or `null` when the feature is
+   * disabled, no Claude Code credential is present, or the fetch failed
+   * (the renderer hides its chip on `null`). Reads/network happen only
+   * while `isEnabled` is true; the OAuth token never crosses this
+   * bridge — only the derived `QuotaSnapshot` does.
+   */
+  quota: {
+    getSnapshot(): Promise<QuotaSnapshot | null>
+    isEnabled(): Promise<boolean>
+    setEnabled(value: boolean): Promise<void>
   }
 }
