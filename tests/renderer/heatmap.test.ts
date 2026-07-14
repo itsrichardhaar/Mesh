@@ -14,11 +14,11 @@ const DAYS: UsageDayPoint[] = [
 ]
 
 describe('heatmapGrid', () => {
-  it('lays out 26 week-columns of 7 weekday cells', () => {
+  it('lays out 53 week-columns of 7 weekday cells (a rolling year)', () => {
     const grid = heatmapGrid(DAYS, 'tokens', NOW)
-    expect(grid.weeks).toHaveLength(26)
+    expect(grid.weeks).toHaveLength(53)
     expect(grid.weeks.every((col) => col.length === 7)).toBe(true)
-    expect(grid.weeks.flat()).toHaveLength(182)
+    expect(grid.weeks.flat()).toHaveLength(371)
     expect(grid.endDay).toBe('2026-07-15')
   })
 

@@ -47,7 +47,7 @@ Slice 61   PRD-v8 + CONTEXT + v0.8.0 release ceremonials + HITL gate + packaged-
 
 Each slice is independently committable and demoable:
 - After 58: the Home dashboard shows a Token Composition card — the four token-class shares over the active range (Input / Output / Cache-Read / Cache-Write), always a token share (never Notional Cost).
-- After 59: the time-visualization slot toggles between the usage **Trend** and a 26-week **Activity Heatmap**; intensity follows the Tokens/Notional-Cost metric toggle; the granularity + range controls hide in Heatmap mode; the heatmap is legible with color removed.
+- After 59: the time-visualization slot toggles between the usage **Trend** and a ~1-year **Activity Heatmap** (stretched full-width like the trend); intensity follows the Tokens/Notional-Cost metric toggle; the granularity control hides in Heatmap mode; the heatmap is legible with color removed.
 - After 60: entering a monthly plan fee in Settings reveals a **Subscription Utilization** gauge — this calendar month's Notional Cost as a percent of the fee, with the Quota-style fill + % + label encoding; clearing the fee hides the gauge.
 - After 61: v8 formally closes — PRD-v8 committed, CONTEXT terms recorded, `v0.8.0` tagged, and the packaged build installed into `/Applications/Mesh.app`.
 
@@ -63,7 +63,7 @@ Each slice is independently committable and demoable:
 ### Activity Heatmap + view toggle (Slice 59)
 
 - **Shares the time slot with the trend.** A segmented **Trend | Heatmap** control swaps the visualization in place — one slot, two view modes, rather than a second stacked card.
-- **Client-side over the day series.** The heatmap buckets the existing per-day series into a **26-week** calendar (weeks as columns, weekdays as rows). The window is fixed (the data is ~1 month old at v8 planning; a full 53-week year would render mostly empty and grows into itself later).
+- **Client-side over the day series.** The heatmap buckets the existing per-day series into a **~1-year (53-week)** calendar (weeks as columns, weekdays as rows), stretched to fill the container width like the trend chart (responsive square cells). *Realized decision (Slice 59):* a 26-week window left a large empty gap beside the full-width trend; a rolling year fills the width, matches the GitHub-style reference, and reads as sparse-but-honest on young data.
 - **Color-safe encoding (the reduced-color-vision constraint).** Intensity is a **single-hue lightness ramp** (darker = more), *plus* an intensity-scaled **cell fill (size)**, *plus* the exact value **on hover**, *plus* a discrete **named legend** (none/low/med/high with thresholds). Magnitude reads three redundant ways; hue is never load-bearing.
 - **Control visibility.** The metric toggle (Tokens / Notional Cost) applies to both views and stays visible. The granularity (Day/Week/Month) and range (30d/90d/all) controls are Trend-only and **hide** in Heatmap mode (the heatmap owns its window) — hidden, not disabled, so there are no dead controls.
 
@@ -88,7 +88,7 @@ Mirrors the v4/v5/v6/v7 closing-slice pattern.
 
 ### CONTEXT.md changes
 
-v8 introduces two glossary terms (**Token Composition**, **Activity Heatmap**) and sharpens one (**Subscription Utilization**), all written during the planning grill. Implementation vocabulary — *view toggle*, *lightness ramp*, *26-week window*, *day series* — stays OUT of the glossary (the same call v6/v7 made). No Relationships change: these are views over Usage Events and Notional Cost, which the Relationships section already covers.
+v8 introduces two glossary terms (**Token Composition**, **Activity Heatmap**) and sharpens one (**Subscription Utilization**), all written during the planning grill. Implementation vocabulary — *view toggle*, *lightness ramp*, *53-week window*, *day series* — stays OUT of the glossary (the same call v6/v7 made). No Relationships change: these are views over Usage Events and Notional Cost, which the Relationships section already covers.
 
 ### No new ADRs (why)
 
@@ -105,7 +105,7 @@ v8 keeps the v6/v7 test policy: **renderer-touching slices ship renderer tests**
 |---|---|---|
 | `buildDayPoints` token-class extension | ✅ | Pure: per-day class counts sum correctly; totals unchanged |
 | Composition share math (range sum → shares) | ✅ | Pure over fixtures; shares total 100%, empty-range guard |
-| Heatmap bucketer (day series → 26-week grid) | ✅ | Pure: correct week/weekday cells, window edges, empty days |
+| Heatmap bucketer (day series → 53-week grid) | ✅ | Pure: correct week/weekday cells, window edges, empty days |
 | Subscription Utilization math (month cost ÷ fee) | ✅ | Pure; month boundary, missing-fee → hidden, ≥100% label |
 | Plan-fee setting round-trip | ✅ | Node: set/get through the settings repository; invalid/blank input |
 | Token Composition card | ✅ | RTL over accessible queries; shares + labels; range re-computes |
@@ -141,7 +141,7 @@ v8 keeps the v6/v7 test policy: **renderer-touching slices ship renderer tests**
 
 ## Risks and Open Items
 
-- **Heatmap density on young data.** The `usage_events` cache is ~1 month old at v8 planning; a calendar view will look sparse. Mitigation: the fixed 26-week window reads as "over time" now and fills in as history grows; the named legend keeps low-density cells interpretable; extend to a full year in a later release once the data warrants it.
+- **Heatmap density on young data.** The `usage_events` cache is ~1 month old at v8 planning; a full-year calendar will look sparse. Accepted deliberately (Slice 59): full-width parity with the trend chart was the stronger UX signal than a denser-but-narrow grid, and the named legend keeps low-density cells interpretable. The grid fills in as history grows.
 - **Reduced-color-vision correctness on the heatmap and the Utilization gauge.** A shade-only heatmap or a hue-coded pass/fail gauge would be invisible to the user. Mitigation: lightness + cell-fill size + hover value + named legend on the heatmap; fill + % + label on the gauge; both verified with color removed in the HITL gate. This is the sharpest constraint in v8.
 - **Subscription Utilization mis-read as spend.** Comparing Notional Cost to a real dollar fee invites the "money spent" reading ADR-0010 forbids. Mitigation: the numerator stays notional, the fee is never decremented per-use, the clarifier says so, and CONTEXT.md pins the wording.
 - **The plan fee is a static, user-entered constant.** A plan change means the user must re-enter it; a stale fee silently skews the gauge. Mitigation: acceptable for v8 — the fee lives in Settings where the user set it, and the gauge is opt-in via that field; no automatic plan detection is attempted (that would need Anthropic plan data Mesh does not have).

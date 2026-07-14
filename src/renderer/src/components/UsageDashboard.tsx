@@ -500,7 +500,7 @@ const HEAT_LEGEND = [
 ] as const
 
 /**
- * Activity Heatmap (v8 / Slice 59) — a 26-week calendar shaded by the
+ * Activity Heatmap (v8 / Slice 59) — a ~1-year calendar shaded by the
  * active metric. The other view mode of the shared time slot. Intensity
  * is encoded three redundant ways so it never depends on hue (the
  * reduced-color-vision constraint): a lightness ramp *and* the cell's
@@ -512,7 +512,7 @@ function ActivityHeatmap({ days, metric }: { days: UsageDayPoint[]; metric: Metr
   const fmt = (v: number): string => (metric === 'tokens' ? tokenFmt.format(v) : formatUsd(v))
 
   if (grid.max === 0) {
-    return <p className="usage-trend-empty">No usage in the last 26 weeks yet.</p>
+    return <p className="usage-trend-empty">No usage in the last year yet.</p>
   }
 
   return (
@@ -520,7 +520,7 @@ function ActivityHeatmap({ days, metric }: { days: UsageDayPoint[]; metric: Metr
       <div
         className="usage-heatmap-grid"
         role="img"
-        aria-label={`Activity heatmap by ${metric}, last 26 weeks`}
+        aria-label={`Activity heatmap by ${metric}, last year`}
       >
         {grid.weeks.map((col, wi) => (
           <div key={wi} className="usage-heatmap-col">

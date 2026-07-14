@@ -22,8 +22,8 @@ export interface HeatmapGrid {
   endDay: string
 }
 
-/** Weeks shown — a fixed recent window (PRD-v8: reads as "over time" now, grows into a year later). */
-const WEEKS = 26
+/** Weeks shown — a rolling ~1 year (GitHub-style), so the grid fills the width like the trend chart. */
+const WEEKS = 53
 const DAY_MS = 24 * 60 * 60 * 1000
 
 function utcMs(day: string): number {
@@ -43,7 +43,7 @@ function levelOf(value: number, max: number): 0 | 1 | 2 | 3 {
 }
 
 /**
- * Fold the per-day series into a 26-week calendar grid ending at `now`'s
+ * Fold the per-day series into a 53-week calendar grid ending at `now`'s
  * week, shaded by the active metric. Weeks are columns (oldest→newest),
  * weekdays are rows (Monday-aligned, matching the trend's week bucketing).
  * Days past today in the final week are padding (`day: null`). Pure (takes

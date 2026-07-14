@@ -553,11 +553,12 @@ button {
   gap: 10px;
 }
 
+/* One column per week, stretched to fill the width like the trend chart. */
 .usage-heatmap-grid {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(53, 1fr);
   gap: 3px;
-  overflow-x: auto; /* many week columns: scroll rather than force the page wide */
-  padding-bottom: 2px;
+  width: 100%;
 }
 
 .usage-heatmap-col {
@@ -574,6 +575,13 @@ button {
   height: 12px;
   border-radius: 2px;
   background: var(--border-subtle); /* the empty track */
+}
+
+/* Grid cells are responsive squares (the legend swatches keep the fixed size above). */
+.usage-heatmap-grid .usage-heatmap-cell {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
 }
 
 .usage-heatmap-cell[data-empty] {
