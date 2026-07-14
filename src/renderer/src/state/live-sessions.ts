@@ -6,7 +6,7 @@
  * alive: its `node-pty` process is running, the renderer holds an open
  * subscription, and the user may navigate away without losing it. The
  * registry replaces `WorkspaceScreen`'s former local `ptyTabs` state so
- * the Home Screen surfaces (sidebar, ProjectCards, Detail pane) can
+ * the Home Screen surfaces (sidebar, Project Screen) can
  * read it, and so tabs survive Project navigation — `WorkspaceScreen`
  * is `key`ed by `encodedPath` and unmounts on Project switch.
  *

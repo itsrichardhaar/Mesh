@@ -1,6 +1,14 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { ArrowRight, FileText, Lightbulb, ListChecks, Plus, type LucideIcon } from 'lucide-react'
-import type { Project, ProjectStats, StoredAnalysis } from '@shared/types'
+import {
+  ArrowRight,
+  ChevronRight,
+  FileText,
+  Lightbulb,
+  ListChecks,
+  Plus,
+  type LucideIcon
+} from 'lucide-react'
+import type { Project, ProjectStats, StoredAnalysis, UsageProjectSummary } from '@shared/types'
 import { findModel } from '@shared/models'
 import { useActiveProviderModel } from '../hooks/useActiveProviderModel'
 import { useProjectIndicator } from '../hooks/useLiveSessions'
@@ -40,10 +48,22 @@ interface Props {
   onOpenWorkspace: () => void
 }
 
-export function ProjectDetail({ project, onBack, onOpenWorkspace }: Props): JSX.Element {
+/**
+ * The **Project Screen** (v7 / Slice 56) — a single Project's overview,
+ * the middle altitude between the Home Screen (all Projects) and the
+ * Workspace Screen (deep work). Shown in the Home right pane when a
+ * Project is selected in the sidebar; the sidebar stays put so switching
+ * Projects is one click. Top to bottom: Stats Row + Usage strip, the
+ * Analyze bar, and the Analysis in a collapsible accordion beneath it.
+ */
+export function ProjectScreen({ project, onBack, onOpenWorkspace }: Props): JSX.Element {
   const [stats, setStats] = useState<StatsState>({ status: 'loading' })
   const [analysis, setAnalysis] = useState<AnalysisState>({ status: 'loading' })
   const [run, setRun] = useState<RunState>({ status: 'idle' })
+  const [usage, setUsage] = useState<UsageProjectSummary | null>(null)
+  // The Analysis accordion is collapsed by default; a fresh Analyze
+  // expands it (the user's grill decision), and it stays toggleable.
+  const [analysisOpen, setAnalysisOpen] = useState(false)
   const { isLive, isActive } = useProjectIndicator(project.encodedPath)
 
   useEffect(() => {
@@ -88,10 +108,28 @@ export function ProjectDetail({ project, onBack, onOpenWorkspace }: Props): JSX.
     }
   }, [project.encodedPath])
 
-  // Drop any in-flight error when the user navigates to a different
-  // Project so it doesn't bleed across.
+  // Per-Project Usage strip (Slice 56).
+  useEffect(() => {
+    let cancelled = false
+    setUsage(null)
+    window.api.usage
+      .getProjectSummary(project.encodedPath)
+      .then((s) => {
+        if (!cancelled) setUsage(s)
+      })
+      .catch(() => {
+        // Usage cache may be mid-ingest or empty; the strip just hides.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [project.encodedPath])
+
+  // Drop any in-flight error and collapse the Analysis accordion when the
+  // user navigates to a different Project so nothing bleeds across.
   useEffect(() => {
     setRun({ status: 'idle' })
+    setAnalysisOpen(false)
   }, [project.encodedPath])
 
   const analyze = async (): Promise<void> => {
@@ -100,6 +138,7 @@ export function ProjectDetail({ project, onBack, onOpenWorkspace }: Props): JSX.
       const next = await window.api.analyses.run(project.encodedPath)
       setAnalysis({ status: 'ok', analysis: next })
       setRun({ status: 'idle' })
+      setAnalysisOpen(true) // reveal the fresh Analysis (grill decision)
     } catch (err) {
       // Pre-flight: the IPC threw rather than persisting a row.
       // Surface a friendly message; log the original to the console
@@ -156,6 +195,8 @@ export function ProjectDetail({ project, onBack, onOpenWorkspace }: Props): JSX.
 
       <StatsRow project={project} state={stats} />
 
+      <UsageStrip usage={usage} />
+
       <AnalyzeBar
         project={project}
         analysis={analysis}
@@ -163,8 +204,71 @@ export function ProjectDetail({ project, onBack, onOpenWorkspace }: Props): JSX.
         onAnalyze={() => void analyze()}
       />
 
-      <AnalysisPanel state={analysis} />
+      <AnalysisAccordion
+        state={analysis}
+        open={analysisOpen}
+        onToggle={() => setAnalysisOpen((v) => !v)}
+      />
     </div>
+  )
+}
+
+const usageTokenFmt = new Intl.NumberFormat('en-US', {
+  notation: 'compact',
+  maximumFractionDigits: 1
+})
+
+/** Per-Project Usage strip: tokens + Notional Cost. Hidden until loaded / when empty. */
+function UsageStrip({ usage }: { usage: UsageProjectSummary | null }): JSX.Element | null {
+  if (!usage || usage.eventCount === 0) return null
+  return (
+    <div className="usage-strip" aria-label="Project usage">
+      <div className="usage-strip-metric">
+        <span className="usage-strip-value">{usageTokenFmt.format(usage.tokens)}</span>
+        <span className="usage-strip-label">tokens</span>
+      </div>
+      <div className="usage-strip-metric">
+        <span className="usage-strip-value">${usage.costUsd.toFixed(2)}</span>
+        <span className="usage-strip-label">notional · at API rates</span>
+      </div>
+    </div>
+  )
+}
+
+/** Collapsible Analysis section (Slice 56). Collapsed by default; Analyze opens it. */
+function AnalysisAccordion({
+  state,
+  open,
+  onToggle
+}: {
+  state: AnalysisState
+  open: boolean
+  onToggle: () => void
+}): JSX.Element {
+  const hint =
+    state.status === 'ok' && state.analysis?.status === 'ok'
+      ? `Updated ${relativeTime(state.analysis.generatedAt)}`
+      : state.status === 'ok' && state.analysis === null
+        ? 'Not analyzed yet'
+        : ''
+  return (
+    <section className="analysis-accordion" aria-label="Analysis">
+      <button
+        type="button"
+        className="analysis-accordion-header"
+        aria-expanded={open}
+        onClick={onToggle}
+      >
+        <ChevronRight
+          size={16}
+          aria-hidden="true"
+          className={`analysis-accordion-chevron${open ? ' analysis-accordion-chevron-open' : ''}`}
+        />
+        <span className="analysis-accordion-title">Analysis</span>
+        {hint && <span className="analysis-accordion-hint">{hint}</span>}
+      </button>
+      {open && <AnalysisPanel state={state} />}
+    </section>
   )
 }
 

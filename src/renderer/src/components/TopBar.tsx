@@ -30,7 +30,7 @@ interface Props {
  * The left-most action is a sidebar toggle targeting whichever sidebar
  * belongs to the active screen (projects on Home, files on Workspace,
  * hidden in Settings). Back-to-Home navigation lives on the in-view
- * `‹ Home` buttons in `ProjectDetail` and `WorkspaceScreen`.
+ * `‹ Home` buttons in `ProjectScreen` and `WorkspaceScreen`.
  *
  * The gear button toggles Settings in both directions — open from any
  * other screen, close when Settings is already open. Replaces the

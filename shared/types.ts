@@ -290,6 +290,14 @@ export interface UsageDayPoint {
   costUsd: number
 }
 
+/** One Project's headline Usage — the Project Screen's Usage strip (Slice 56). */
+export interface UsageProjectSummary {
+  eventCount: number
+  sessionCount: number
+  tokens: number
+  costUsd: number
+}
+
 /** One Project's Usage totals — the by-project breakdown rows (Slice 55). */
 export interface UsageProjectRow {
   encodedPath: string

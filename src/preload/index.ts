@@ -111,7 +111,8 @@ const api: MeshApi = {
     onStatusChanged: (cb) => subscribeArg<UsageIngestStatus>('usage:status-changed', cb),
     getCostSummary: () => ipcRenderer.invoke('usage:get-cost-summary'),
     getDashboard: () => ipcRenderer.invoke('usage:get-dashboard'),
-    getSessionEvents: (sessionId) => ipcRenderer.invoke('usage:get-session-events', sessionId)
+    getSessionEvents: (sessionId) => ipcRenderer.invoke('usage:get-session-events', sessionId),
+    getProjectSummary: (encodedPath) => ipcRenderer.invoke('usage:get-project-summary', encodedPath)
   }
 }
 

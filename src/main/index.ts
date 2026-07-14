@@ -85,9 +85,11 @@ import { ingestProject, projectDirNames } from './usage/ingest'
 import {
   countSessionsInMonth,
   projectMeta,
+  projectUsageCounts,
   sessionEventRows,
   sessionMeta,
   sumTokensByDayAndGroup,
+  sumTokensByGroupForProject,
   sumTokensByGroup,
   sumTokensByProjectGroup,
   sumTokensBySessionGroup,
@@ -965,6 +967,17 @@ function registerIpc(): void {
       throw new Error('usage:get-session-events: sessionId must be a non-empty string')
     }
     return buildTurns(sessionEventRows(getDatabase(), sessionId))
+  })
+
+  // One Project's headline Usage — the Project Screen strip (Slice 56).
+  ipcMain.handle('usage:get-project-summary', (_event, encodedPath: unknown) => {
+    if (typeof encodedPath !== 'string' || encodedPath.length === 0) {
+      throw new Error('usage:get-project-summary: encodedPath must be a non-empty string')
+    }
+    const db = getDatabase()
+    const counts = projectUsageCounts(db, encodedPath)
+    const cost = notionalCost(sumTokensByGroupForProject(db, encodedPath))
+    return { ...counts, costUsd: cost.totalUsd }
   })
 }
 

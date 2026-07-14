@@ -22,6 +22,7 @@ import type {
   ThemePreference,
   UsageDashboard,
   UsageIngestStatus,
+  UsageProjectSummary,
   UsageTurn,
   ValidationResult
 } from './types'
@@ -289,5 +290,7 @@ export interface MeshApi {
     getDashboard(): Promise<UsageDashboard>
     /** Per-turn drill-down for one Session in the explorer (Slice 55). */
     getSessionEvents(sessionId: string): Promise<UsageTurn[]>
+    /** One Project's headline Usage for its Project Screen strip (Slice 56). */
+    getProjectSummary(encodedPath: string): Promise<UsageProjectSummary>
   }
 }

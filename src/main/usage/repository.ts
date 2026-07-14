@@ -185,6 +185,38 @@ export function sessionMeta(db: Database.Database): SessionMetaRow[] {
     .all() as SessionMetaRow[]
 }
 
+/** Headline counts for one Project — the Project Screen's Usage strip. */
+export function projectUsageCounts(
+  db: Database.Database,
+  encodedPath: string
+): { eventCount: number; sessionCount: number; tokens: number } {
+  return db
+    .prepare(
+      `SELECT
+         COUNT(*) AS eventCount,
+         COUNT(DISTINCT session_id) AS sessionCount,
+         COALESCE(SUM(input_tokens + cache_read_tokens + cache_write_tokens + output_tokens), 0)
+           AS tokens
+       FROM usage_events WHERE encoded_path = ?`
+    )
+    .get(encodedPath) as { eventCount: number; sessionCount: number; tokens: number }
+}
+
+/** Token groups for one Project (model, service_tier) — the input to its Notional Cost. */
+export function sumTokensByGroupForProject(
+  db: Database.Database,
+  encodedPath: string
+): TokenGroup[] {
+  return db
+    .prepare(
+      `SELECT model, service_tier AS serviceTier,
+         SUM(input_tokens) AS inputTokens, SUM(cache_read_tokens) AS cacheReadTokens,
+         SUM(cache_write_tokens) AS cacheWriteTokens, SUM(output_tokens) AS outputTokens
+       FROM usage_events WHERE encoded_path = ? GROUP BY model, service_tier`
+    )
+    .all(encodedPath) as TokenGroup[]
+}
+
 /** Distinct Sessions active in a given `YYYY-MM` month (UTC). */
 export function countSessionsInMonth(db: Database.Database, monthPrefix: string): number {
   const { n } = db

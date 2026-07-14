@@ -16,6 +16,16 @@ The stable `1.0.0` release ships once every item in the
 ## [Unreleased]
 
 ### Added
+- **Slice 56 (v7): Project Screen — Usage strip → Analyze → Analysis accordion.** The per-Project overview (shown in the Home right pane when a Project is selected; the sidebar stays for one-click switching) is reworked into the middle altitude between the global Home dashboard and the Workspace.
+  - **Per-Project Usage strip** at the top — this Project's total tokens + Notional Cost (from a new `usage:get-project-summary` IPC), hidden until the cache has data.
+  - **Analysis accordion** — the LLM Analysis now lives in a collapsible section beneath the Analyze bar, collapsed by default and auto-expanded after a fresh Analyze (the grill decision). The Stats Row stays.
+  - **`ProjectDetail` renamed to `ProjectScreen`** to match the CONTEXT term; the dead `ProjectCards` component (unrendered since Slice 54) is deleted, with its stale comment references tidied.
+  - **Tests.** Node: the per-Project usage counts + isolated token-group query. Renderer: the Usage strip render, the accordion's collapsed-by-default + click-to-expand, and auto-expand after Analyze.
+
+### Changed
+- The Recent Projects cards are fully retired (the global Usage dashboard replaced them as the Home default in Slice 54; the component is now removed).
+
+### Added (earlier v7 slices)
 - **Slice 55 (v7): by-project breakdown + session explorer.** Two more views on the global Usage dashboard, both metric-aware (Tokens / Cost).
   - **By project** — every Project ranked by Usage with a proportional mini-bar and its Notional Cost; a row resolves to its display name (from the Project list) and clicking it selects that Project on the Home Screen.
   - **Top sessions** — the heaviest Sessions by Usage, each showing Project · short id · usage · turn count · last activity, with a **Jump** action that reuses the v5 three-tier resolver (live Pty Tab by `ptyId` → any live tab for the `sessionId` → read-only transcript) and an expandable **per-turn drill-down** (model · tokens · cost) loaded on demand.

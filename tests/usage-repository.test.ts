@@ -5,9 +5,11 @@ import type { UsageEvent } from '@shared/types'
 import {
   getIngestCursor,
   insertUsageEvents,
+  projectUsageCounts,
   setIngestCursor,
   sumTokensByDayAndGroup,
   sumTokensByGroup,
+  sumTokensByGroupForProject,
   usageEventCount,
   usageSummaryCounts,
   wipeAllUsage
@@ -104,6 +106,22 @@ describe('usage repository', () => {
     expect(days).toContain('2026-07-14')
     const jul13 = rows.filter((r) => r.day === '2026-07-13')
     expect(jul13.reduce((s, r) => s + r.inputTokens, 0)).toBe(10)
+  })
+
+  it('summarizes one Project in isolation (counts + its own token groups)', () => {
+    const zeros = { inputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0 }
+    insertUsageEvents(db, [
+      makeEvent({ eventId: 'a', encodedPath: '-a', sessionId: 's1', ...zeros, inputTokens: 10 }),
+      makeEvent({ eventId: 'b', encodedPath: '-a', sessionId: 's2', ...zeros, outputTokens: 5 }),
+      makeEvent({ eventId: 'c', encodedPath: '-b', sessionId: 's3', ...zeros, inputTokens: 99 })
+    ])
+    const a = projectUsageCounts(db, '-a')
+    expect(a.eventCount).toBe(2)
+    expect(a.sessionCount).toBe(2)
+    expect(a.tokens).toBe(15)
+    // Only -a's groups come back.
+    const groups = sumTokensByGroupForProject(db, '-a')
+    expect(groups.reduce((s, g) => s + g.inputTokens + g.outputTokens, 0)).toBe(15)
   })
 
   it('wipeAllUsage drops events and cursors together (rebuild path)', () => {

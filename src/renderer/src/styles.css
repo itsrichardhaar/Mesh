@@ -729,6 +729,70 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+/* Project Screen: Usage strip + Analysis accordion (v7 / Slice 56). */
+.usage-strip {
+  display: flex;
+  gap: 28px;
+  padding: 12px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md, 10px);
+  background: var(--bg-elevated);
+}
+
+.usage-strip-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.usage-strip-value {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.usage-strip-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.analysis-accordion {
+  display: flex;
+  flex-direction: column;
+}
+
+.analysis-accordion-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 14px;
+  text-align: left;
+}
+
+.analysis-accordion-chevron {
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+
+.analysis-accordion-chevron-open {
+  transform: rotate(90deg);
+}
+
+.analysis-accordion-title {
+  font-weight: 600;
+}
+
+.analysis-accordion-hint {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .settings-rebuild-button {
   align-self: flex-start;
   padding: 5px 12px;

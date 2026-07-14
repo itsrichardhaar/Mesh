@@ -1,7 +1,7 @@
 import type { Project } from '@shared/types'
 import type { JumpToSessionInput } from '../components/NotificationsBell'
 import { OnboardingBanner } from '../components/OnboardingBanner'
-import { ProjectDetail } from '../components/ProjectDetail'
+import { ProjectScreen } from '../components/ProjectScreen'
 import { ProjectSidebar } from '../components/ProjectSidebar'
 import { UsageDashboard } from '../components/UsageDashboard'
 import { useProjectList } from '../hooks/useProjectList'
@@ -49,7 +49,7 @@ export function HomeScreen({
         )}
         <main className="detail-pane" aria-label="Project detail">
           {selected ? (
-            <ProjectDetail
+            <ProjectScreen
               project={selected}
               onBack={() => onSelect(null)}
               onOpenWorkspace={() => onOpenWorkspace(selected)}

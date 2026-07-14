@@ -124,7 +124,7 @@ export function useSessionIndicator(sessionId: string): { isLive: boolean; isAct
 
 /**
  * Per-Project indicator state — drives the green tint + spinner on
- * the Home Screen surfaces (ProjectSidebar, ProjectCards, Detail pane).
+ * the Home Screen surfaces (ProjectSidebar, Project Screen).
  */
 export function useProjectIndicator(encodedPath: string): { isLive: boolean; isActive: boolean } {
   const isLive = useStore(liveSessionsStore, (s) => isProjectLive(s, encodedPath))
