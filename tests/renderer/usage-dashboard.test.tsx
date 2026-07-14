@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import type { Project, UsageDashboard as UsageDashboardData } from '@shared/types'
 import { UsageDashboard } from '@renderer/components/UsageDashboard'
 import { usageStore } from '@renderer/hooks/useUsage'
+import { planFeeStore } from '@renderer/hooks/usePlanFee'
 import { meshApi } from './test-utils'
 
 function project(encodedPath: string, name: string): Project {
@@ -122,6 +123,42 @@ describe('UsageDashboard — by-project + session explorer (Slice 55)', () => {
     render(<UsageDashboard projects={[project('-proj-a', 'Alpha')]} onSelectProject={onSelectProject} />)
     await userEvent.click(screen.getByRole('button', { name: /Alpha: .* sessions/i }))
     expect(onSelectProject).toHaveBeenCalledWith('-proj-a')
+  })
+
+  // A dashboard whose only day is today, so the current-calendar-month
+  // sum is deterministic regardless of when the suite runs.
+  const dashboardToday = (costUsd: number): UsageDashboardData => {
+    const today = new Date().toISOString().slice(0, 10)
+    return dashboard({
+      days: [
+        { day: today, tokens: 1_000, costUsd, inputTokens: 100, outputTokens: 200, cacheReadTokens: 600, cacheWriteTokens: 100 }
+      ]
+    })
+  }
+
+  it('hides the Subscription Utilization gauge until a plan fee is set', () => {
+    planFeeStore.setState({ planFeeUsd: null })
+    usageStore.setState({ dashboard: dashboard(), range: 'all', metric: 'tokens' })
+    render(<UsageDashboard />)
+    const region = screen.getByRole('region', { name: 'Subscription Utilization' })
+    expect(within(region).getByText(/set your monthly plan fee/i)).toBeInTheDocument()
+  })
+
+  it('shows the utilization percent against the plan fee when set', () => {
+    planFeeStore.setState({ planFeeUsd: 20 })
+    usageStore.setState({ dashboard: dashboardToday(12), range: 'all', metric: 'tokens' })
+    render(<UsageDashboard />)
+    const region = screen.getByRole('region', { name: 'Subscription Utilization' })
+    expect(within(region).getByText('60%')).toBeInTheDocument() // 12 of 20
+  })
+
+  it('reads “Paying off” when this month beats the fee', () => {
+    planFeeStore.setState({ planFeeUsd: 10 })
+    usageStore.setState({ dashboard: dashboardToday(25), range: 'all', metric: 'tokens' })
+    render(<UsageDashboard />)
+    const region = screen.getByRole('region', { name: 'Subscription Utilization' })
+    expect(within(region).getByText('250%')).toBeInTheDocument()
+    expect(within(region).getByText(/Paying off/)).toBeInTheDocument()
   })
 
   it('renders the token composition card with class shares over the range', () => {

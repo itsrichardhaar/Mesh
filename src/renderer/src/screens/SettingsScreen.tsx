@@ -19,6 +19,7 @@ import {
 import { PROVIDER_IDS } from '@shared/types'
 import { useNotifications } from '../hooks/useNotifications'
 import { useQuota } from '../hooks/useQuota'
+import { usePlanFee } from '../hooks/usePlanFee'
 import { useTheme } from '../theme/ThemeProvider'
 import { useUiMode } from '../theme/UiModeProvider'
 import { relativeTime } from '../util/relativeTime'
@@ -87,6 +88,7 @@ export function SettingsScreen({ onClose }: Props): JSX.Element {
         <ModelSection />
         <NotificationsSection />
         <QuotaSection />
+        <SubscriptionSection />
         <UsageSection />
       </div>
     </div>
@@ -182,6 +184,55 @@ export function UsageSection(): JSX.Element {
         Usage analytics are a rebuildable cache derived from your session logs.
         Rebuilding re-reads every session from scratch — safe to run anytime.
       </p>
+    </section>
+  )
+}
+
+export function SubscriptionSection(): JSX.Element {
+  const { planFeeUsd, setPlanFee } = usePlanFee()
+  const [draft, setDraft] = useState('')
+
+  // Reflect the loaded/persisted fee into the field.
+  useEffect(() => {
+    setDraft(planFeeUsd === null ? '' : String(planFeeUsd))
+  }, [planFeeUsd])
+
+  const commit = (): void => {
+    const trimmed = draft.trim()
+    if (trimmed === '') {
+      void setPlanFee(null)
+      return
+    }
+    const n = Number.parseFloat(trimmed)
+    void setPlanFee(Number.isFinite(n) && n > 0 ? n : null)
+  }
+
+  return (
+    <section className="settings-section settings-section-subscription" aria-label="Subscription">
+      <h2>Subscription</h2>
+      <label className="settings-field">
+        <span className="settings-toggle-label">Monthly plan fee (USD)</span>
+        <input
+          className="api-key-input"
+          type="number"
+          min="0"
+          step="1"
+          inputMode="decimal"
+          placeholder="e.g. 20, 100, 200"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit()
+          }}
+        />
+        <span className="settings-toggle-help">
+          Your flat monthly Claude plan fee. Mesh compares this month’s Notional Cost
+          (usage valued at API rates) against it to show whether your subscription is
+          paying off — a value-vs-fee ratio, never money spent. Leave blank to hide the
+          gauge.
+        </span>
+      </label>
     </section>
   )
 }

@@ -718,6 +718,76 @@ button {
   min-width: 2px;
 }
 
+/* Subscription Utilization gauge (v8 / Slice 60). Quota-style encoding:
+   fill length + numeric % + worded verdict — never hue alone. */
+.usage-utilization {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md, 10px);
+  background: var(--bg-elevated);
+}
+
+.usage-util-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.usage-util-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.usage-util-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.usage-util-gauge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.usage-util-track {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--border-subtle);
+  overflow: hidden;
+}
+
+.usage-util-fill {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  background: var(--accent);
+}
+
+.usage-util-pct {
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-util-detail {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-utilization-empty .usage-util-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .usage-ranked-item {
   display: flex;
   flex-direction: column;
@@ -3623,6 +3693,14 @@ body.sidebar-resizing .sidebar-resize-handle {
   gap: 10px;
   padding: 6px 0;
   cursor: pointer;
+}
+
+/* Text/number setting field: stacked label → input → help (Slice 60). */
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 0;
 }
 
 .settings-toggle input[type='checkbox'] {

@@ -17,6 +17,8 @@ import {
   type TrendPoint
 } from '../util/trend'
 import { heatmapGrid } from '../util/heatmap'
+import { subscriptionUtilization } from '../util/utilization'
+import { usePlanFee } from '../hooks/usePlanFee'
 
 type TimeView = 'trend' | 'heatmap'
 
@@ -118,6 +120,8 @@ export function UsageDashboard({
           note="at API rates — not money spent"
         />
       </div>
+
+      <SubscriptionUtilization days={days} />
 
       <div className="usage-time">
         <div className="usage-view-toggle" role="group" aria-label="Time view">
@@ -249,6 +253,56 @@ function RankedList({
           })}
         </ul>
       )}
+    </section>
+  )
+}
+
+/**
+ * Subscription Utilization (v8 / Slice 60) — this calendar month's
+ * Notional Cost against the user's flat monthly plan fee. Hidden behind a
+ * "set your fee" hint until a fee is entered. State is carried by fill
+ * length + numeric % + a worded verdict — never hue alone (the
+ * reduced-color-vision constraint). Framed value-vs-fee, not spend
+ * (ADR-0010): the fee is a constant, never decremented per use.
+ */
+function SubscriptionUtilization({ days }: { days: UsageDayPoint[] }): JSX.Element {
+  const { planFeeUsd } = usePlanFee()
+  const util = subscriptionUtilization(days, planFeeUsd, Date.now())
+
+  if (!util) {
+    return (
+      <section className="usage-utilization usage-utilization-empty" aria-label="Subscription Utilization">
+        <span className="usage-util-title">Subscription Utilization</span>
+        <p className="usage-util-hint">
+          Set your monthly plan fee in Settings to see whether your subscription is paying off.
+        </p>
+      </section>
+    )
+  }
+
+  const capped = Math.min(100, util.percent)
+  const verdict = util.percent >= 100 ? 'Paying off' : `${util.percent}% of your plan's value`
+  return (
+    <section className="usage-utilization" aria-label="Subscription Utilization">
+      <div className="usage-util-head">
+        <span className="usage-util-title">Subscription Utilization</span>
+        <span className="usage-util-sub">this month · at API rates vs your flat fee — not money spent</span>
+      </div>
+      <div
+        className="usage-util-gauge"
+        role="group"
+        aria-label={`${util.percent} percent: ${formatUsd(util.costUsd)} of Notional Cost this month against your ${formatUsd(util.feeUsd)} plan; ${verdict}`}
+      >
+        <span className="usage-util-track" aria-hidden="true">
+          <span className="usage-util-fill" style={{ width: `${capped}%` }} />
+        </span>
+        <span className="usage-util-pct" aria-hidden="true">
+          {util.percent}%
+        </span>
+      </div>
+      <div className="usage-util-detail" aria-hidden="true">
+        {formatUsd(util.costUsd)} of {formatUsd(util.feeUsd)} · {verdict}
+      </div>
     </section>
   )
 }
