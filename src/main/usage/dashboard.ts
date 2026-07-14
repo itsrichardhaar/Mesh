@@ -1,5 +1,6 @@
 import type {
   UsageDayPoint,
+  UsageModelRow,
   UsageProjectRow,
   UsageSessionRow,
   UsageTurn
@@ -44,6 +45,29 @@ export function buildProjectRows(
       lastActivity: m.lastActivity
     }))
     .sort((a, b) => b.tokens - a.tokens)
+}
+
+/**
+ * by-model breakdown rows, ranked by tokens descending. Reuses the same
+ * (model, tier) token groups the cost summary already sums over — cost is
+ * priced per model so each row's Notional Cost respects its own tiers. Pure.
+ */
+export function buildModelRows(groups: readonly TokenGroup[]): UsageModelRow[] {
+  const byModel = new Map<string | null, TokenGroup[]>()
+  for (const g of groups) {
+    const bucket = byModel.get(g.model)
+    if (bucket) bucket.push(g)
+    else byModel.set(g.model, [g])
+  }
+  const rows: UsageModelRow[] = []
+  for (const [model, gs] of byModel) {
+    rows.push({
+      model,
+      tokens: gs.reduce((sum, g) => sum + tokensOf(g), 0),
+      costUsd: notionalCost(gs).totalUsd
+    })
+  }
+  return rows.sort((a, b) => b.tokens - a.tokens)
 }
 
 /** Dominant Model (most tokens) per value of `key`. */

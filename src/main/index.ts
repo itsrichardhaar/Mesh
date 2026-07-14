@@ -98,7 +98,13 @@ import {
   wipeAllUsage
 } from './usage/repository'
 import { notionalCost } from './usage/cost'
-import { buildDayPoints, buildProjectRows, buildSessionRows, buildTurns } from './usage/dashboard'
+import {
+  buildDayPoints,
+  buildModelRows,
+  buildProjectRows,
+  buildSessionRows,
+  buildTurns
+} from './usage/dashboard'
 
 /** How many top Sessions by Usage the dashboard's session explorer shows. */
 const TOP_SESSIONS = 50
@@ -945,7 +951,8 @@ function registerIpc(): void {
   ipcMain.handle('usage:get-dashboard', () => {
     const db = getDatabase()
     const counts = usageSummaryCounts(db)
-    const cost = notionalCost(sumTokensByGroup(db))
+    const groups = sumTokensByGroup(db)
+    const cost = notionalCost(groups)
     return {
       summary: {
         eventCount: counts.eventCount,
@@ -957,6 +964,7 @@ function registerIpc(): void {
       },
       days: buildDayPoints(sumTokensByDayAndGroup(db)),
       byProject: buildProjectRows(sumTokensByProjectGroup(db), projectMeta(db)),
+      byModel: buildModelRows(groups),
       topSessions: buildSessionRows(sumTokensBySessionGroup(db), sessionMeta(db), TOP_SESSIONS)
     }
   })

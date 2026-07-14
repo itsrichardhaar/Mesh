@@ -1,5 +1,11 @@
 import { Fragment, useState } from 'react'
-import type { Project, UsageProjectRow, UsageSessionRow, UsageTurn } from '@shared/types'
+import type {
+  Project,
+  UsageModelRow,
+  UsageProjectRow,
+  UsageSessionRow,
+  UsageTurn
+} from '@shared/types'
 import type { JumpToSessionInput } from './NotificationsBell'
 import { useUsage } from '../hooks/useUsage'
 import { bucketTrend, type Granularity, type Range, type TrendPoint } from '../util/trend'
@@ -102,12 +108,15 @@ export function UsageDashboard({
 
       <TrendChart points={points} metric={metric} granularity={granularity} indexing={indexing} />
 
-      <ByProjectBreakdown
-        rows={dashboard.byProject}
-        projects={projects}
-        metric={metric}
-        onSelectProject={onSelectProject}
-      />
+      <div className="usage-breakdowns">
+        <ByModelBreakdown rows={dashboard.byModel} metric={metric} />
+        <ByProjectBreakdown
+          rows={dashboard.byProject}
+          projects={projects}
+          metric={metric}
+          onSelectProject={onSelectProject}
+        />
+      </div>
 
       <SessionExplorer
         rows={dashboard.topSessions}
@@ -116,6 +125,107 @@ export function UsageDashboard({
         onJumpToSession={onJumpToSession}
       />
     </div>
+  )
+}
+
+/**
+ * Ordinal dot/bar palette for the ranked-list cards. Colour is purely
+ * decorative — rank is carried by vertical position, bar length, and the
+ * value itself — so it never has to be distinguished on its own. Leads
+ * with Mesh's accent, then a set that reads on both light and dark themes.
+ */
+const RANK_COLORS = [
+  'var(--accent)',
+  '#6c8cff',
+  '#8b5cf6',
+  '#14b8a6',
+  '#ec4899',
+  '#f59e0b',
+  '#3b82f6',
+  '#64748b'
+]
+
+interface RankedItem {
+  /** Stable React key. */
+  key: string
+  /** Display label (truncates with ellipsis). */
+  name: string
+  /** Metric value driving the value text, %, and bar length. */
+  value: number
+  /** Full-row aria-label (screen-reader summary). */
+  ariaLabel: string
+  /** When set, the row is a button that fires this on click. */
+  onSelect?: () => void
+}
+
+/**
+ * A single card holding a ranked list of contributors — one row each with
+ * an ordinal dot, name, bold value, share-%, and a proportion bar. The
+ * layout shared by By model + By project (Slice 55 polish); replaces the
+ * former grid of one-card-per-project.
+ */
+function RankedList({
+  title,
+  items,
+  metric,
+  emptyLabel
+}: {
+  title: string
+  items: RankedItem[]
+  metric: Metric
+  emptyLabel: string
+}): JSX.Element {
+  const total = items.reduce((sum, i) => sum + i.value, 0) || 1
+  const max = Math.max(...items.map((i) => i.value), 1)
+
+  return (
+    <section className="usage-ranked" aria-label={title}>
+      <h3 className="usage-section-title">{title}</h3>
+      {items.length === 0 ? (
+        <p className="usage-ranked-empty">{emptyLabel}</p>
+      ) : (
+        <ul className="usage-ranked-list">
+          {items.map((item, i) => {
+            const pct = Math.round((item.value / total) * 100)
+            const color = RANK_COLORS[i % RANK_COLORS.length]!
+            const body = (
+              <>
+                <span className="usage-ranked-line">
+                  <span className="usage-ranked-dot" style={{ background: color }} aria-hidden="true" />
+                  <span className="usage-ranked-name">{item.name}</span>
+                  <span className="usage-ranked-value">{formatMetric(item.value, metric)}</span>
+                  <span className="usage-ranked-pct">{pct}%</span>
+                </span>
+                <span className="usage-ranked-bar" aria-hidden="true">
+                  <span
+                    className="usage-ranked-fill"
+                    style={{ width: `${(item.value / max) * 100}%`, background: color }}
+                  />
+                </span>
+              </>
+            )
+            return (
+              <li key={item.key} className="usage-ranked-row">
+                {item.onSelect ? (
+                  <button
+                    type="button"
+                    className="usage-ranked-item usage-ranked-item-btn"
+                    onClick={item.onSelect}
+                    aria-label={item.ariaLabel}
+                  >
+                    {body}
+                  </button>
+                ) : (
+                  <div className="usage-ranked-item" aria-label={item.ariaLabel}>
+                    {body}
+                  </div>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </section>
   )
 }
 
@@ -129,44 +239,40 @@ function ByProjectBreakdown({
   projects?: Project[]
   metric: Metric
   onSelectProject?: (encodedPath: string) => void
-}): JSX.Element | null {
-  if (rows.length === 0) return null
-  const total = rows.reduce((sum, r) => sum + metricValue(r, metric), 0) || 1
-  const max = Math.max(...rows.map((r) => metricValue(r, metric)), 1)
+}): JSX.Element {
+  const items: RankedItem[] = rows.map((row) => {
+    const value = metricValue(row, metric)
+    const name = projectName(projects, row.encodedPath)
+    const sessions = `${row.sessionCount} session${row.sessionCount === 1 ? '' : 's'}`
+    return {
+      key: row.encodedPath,
+      name,
+      value,
+      ariaLabel: `${name}: ${formatMetric(value, metric)}, ${sessions}`,
+      onSelect: () => onSelectProject?.(row.encodedPath)
+    }
+  })
+  return <RankedList title="By project" items={items} metric={metric} emptyLabel="No project usage yet." />
+}
 
-  return (
-    <section className="usage-section" aria-label="Usage by project">
-      <h3 className="usage-section-title">By project</h3>
-      <div className="usage-project-cards">
-        {rows.map((row) => {
-          const value = metricValue(row, metric)
-          const pct = Math.round((value / total) * 100)
-          const name = projectName(projects, row.encodedPath)
-          return (
-            <button
-              key={row.encodedPath}
-              type="button"
-              className="usage-project-card"
-              onClick={() => onSelectProject?.(row.encodedPath)}
-              aria-label={`${name}: ${formatMetric(value, metric)}, ${pct}% of total, ${row.sessionCount} sessions`}
-            >
-              <span className="usage-project-card-head">
-                <span className="usage-project-name">{name}</span>
-                <span className="usage-project-pct">{pct}%</span>
-              </span>
-              <span className="usage-project-card-value">{formatMetric(value, metric)}</span>
-              <span className="usage-project-bar" aria-hidden="true">
-                <span className="usage-project-fill" style={{ width: `${(value / max) * 100}%` }} />
-              </span>
-              <span className="usage-project-card-sub">
-                {row.sessionCount} session{row.sessionCount === 1 ? '' : 's'}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-    </section>
-  )
+function ByModelBreakdown({
+  rows,
+  metric
+}: {
+  rows: UsageModelRow[]
+  metric: Metric
+}): JSX.Element {
+  const items: RankedItem[] = rows.map((row) => {
+    const value = metricValue(row, metric)
+    const name = row.model ?? 'unknown'
+    return {
+      key: name,
+      name,
+      value,
+      ariaLabel: `${name}: ${formatMetric(value, metric)}`
+    }
+  })
+  return <RankedList title="By model" items={items} metric={metric} emptyLabel="No model usage yet." />
 }
 
 /** Human duration for a Session span, e.g. `41s`, `22m`, `21h 42m`. Hours are not rolled into days. */
@@ -391,11 +497,20 @@ function TrendChart({
       {area && <path className="usage-trend-area" d={area} fill="url(#usage-trend-grad)" />}
       <path className="usage-trend-line" d={line} />
       <circle className="usage-trend-dot" cx={last.x} cy={last.y} r={3.5} />
-      {labelIdxs.map((i) => (
-        <text key={i} className="usage-trend-axis" x={xAt(i)} y={H - 6} textAnchor="middle">
-          {formatAxisLabel(points[i]!.label, granularity)}
-        </text>
-      ))}
+      {labelIdxs.map((i, k) => {
+        // Anchor the endpoints inward (start/end) so the first and last
+        // labels sit inside the plot bounds instead of overflowing the
+        // viewBox and being clipped at the edges.
+        const isFirst = k === 0
+        const isLast = k === labelIdxs.length - 1
+        const anchor = isFirst ? 'start' : isLast ? 'end' : 'middle'
+        const x = isFirst ? padL : isLast ? W - padR : xAt(i)
+        return (
+          <text key={i} className="usage-trend-axis" x={x} y={H - 6} textAnchor={anchor}>
+            {formatAxisLabel(points[i]!.label, granularity)}
+          </text>
+        )
+      })}
     </svg>
   )
 }

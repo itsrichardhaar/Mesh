@@ -193,6 +193,7 @@ export function createMeshApiFake(): MeshApiFake {
         },
         days: [],
         byProject: [],
+        byModel: [],
         topSessions: []
       })),
       getSessionEvents: vi.fn(async () => []),

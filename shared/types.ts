@@ -308,6 +308,14 @@ export interface UsageProjectRow {
   lastActivity: string
 }
 
+/** One Model's Usage totals — the by-model breakdown rows (Slice 55 polish). */
+export interface UsageModelRow {
+  /** Model id, or null when the Usage Event carried no model label. */
+  model: string | null
+  tokens: number
+  costUsd: number
+}
+
 /** One Session's Usage totals — the session-explorer rows (Slice 55). */
 export interface UsageSessionRow {
   sessionId: string
@@ -335,12 +343,13 @@ export interface UsageTurn {
  * Everything the global Usage dashboard needs in one round-trip (Slice
  * 54): headline totals + a per-day series the renderer buckets into
  * day/week/month and filters by range. Slice 55 adds the by-project
- * breakdown and the top Sessions by Usage.
+ * breakdown, the by-model breakdown, and the top Sessions by Usage.
  */
 export interface UsageDashboard {
   summary: UsageSummary
   days: UsageDayPoint[]
   byProject: UsageProjectRow[]
+  byModel: UsageModelRow[]
   topSessions: UsageSessionRow[]
 }
 

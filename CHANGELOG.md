@@ -16,6 +16,7 @@ The stable `1.0.0` release ships once every item in the
 ## [Unreleased]
 
 ### Added
+- **Slice 55 polish (v7): By project reworked into a single ranked-list card + new By model breakdown.** The by-project grid of one-card-per-project is replaced by a single card listing Projects ranked by Usage — ordinal dot · name · value · share-% · proportion bar — and clicking a row still selects that Project. A sibling **By model** card uses the same layout, built from the token groups the cost summary already computes (no new query); it's metric-aware (Tokens / Cost) and prices each Model's Notional Cost per service tier. Also fixes the trend chart's edge x-axis labels being clipped (first/last now anchor inward). Node tests cover `buildModelRows` (tier folding, per-model pricing, null-model row); renderer test covers the By model card's ranking + share.
 - **Slice 56 (v7): Project Screen — Usage strip → Analyze → Analysis accordion.** The per-Project overview (shown in the Home right pane when a Project is selected; the sidebar stays for one-click switching) is reworked into the middle altitude between the global Home dashboard and the Workspace.
   - **Per-Project Usage strip** at the top — this Project's total tokens + Notional Cost (from a new `usage:get-project-summary` IPC), hidden until the cache has data.
   - **Analysis accordion** — the LLM Analysis now lives in a collapsible section beneath the Analyze bar, collapsed by default and auto-expanded after a fresh Analyze (the grill decision). The Stats Row stays.

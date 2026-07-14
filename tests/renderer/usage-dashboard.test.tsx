@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Project, UsageDashboard as UsageDashboardData } from '@shared/types'
 import { UsageDashboard } from '@renderer/components/UsageDashboard'
@@ -33,6 +33,7 @@ function dashboard(overrides: Partial<UsageDashboardData> = {}): UsageDashboardD
       { day: '2026-07-13', tokens: 1_000_000, costUsd: 7.34 }
     ],
     byProject: [],
+    byModel: [],
     topSessions: [],
     ...overrides
   }
@@ -95,6 +96,24 @@ describe('UsageDashboard — by-project + session explorer (Slice 55)', () => {
     render(<UsageDashboard projects={[project('-proj-a', 'Alpha')]} onSelectProject={onSelectProject} />)
     await userEvent.click(screen.getByRole('button', { name: /Alpha: .* sessions/i }))
     expect(onSelectProject).toHaveBeenCalledWith('-proj-a')
+  })
+
+  it('renders the by-model card ranked with its share', () => {
+    usageStore.setState({
+      dashboard: dashboard({
+        byModel: [
+          { model: 'claude-opus-4-8', tokens: 3_000_000, costUsd: 30 },
+          { model: null, tokens: 1_000_000, costUsd: 0 }
+        ]
+      }),
+      range: 'all',
+      metric: 'tokens'
+    })
+    render(<UsageDashboard />)
+    const byModel = screen.getByRole('region', { name: 'By model' })
+    expect(within(byModel).getByText('claude-opus-4-8')).toBeInTheDocument()
+    expect(within(byModel).getByText('unknown')).toBeInTheDocument() // null model label
+    expect(within(byModel).getByText('75%')).toBeInTheDocument() // 3M of 4M
   })
 
   it('jumps to a session via the three-tier resolver (ptyId null)', async () => {

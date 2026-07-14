@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildDayPoints,
+  buildModelRows,
   buildProjectRows,
   buildSessionRows,
   buildTurns,
@@ -56,6 +57,31 @@ describe('buildDayPoints', () => {
 
   it('returns an empty series for no rows', () => {
     expect(buildDayPoints([])).toEqual([])
+  })
+})
+
+describe('buildModelRows', () => {
+  it('ranks models by tokens, folds tiers, and prices each model', () => {
+    const rows = buildModelRows([
+      // opus split across two tiers → tokens summed, both priced as opus
+      tg({ inputTokens: 1_000_000 }), // standard → $15
+      tg({ serviceTier: 'batch', inputTokens: 1_000_000 }), // batch → half → $7.50
+      tg({ model: 'claude-haiku-4-5', inputTokens: 1_000_000 }) // haiku → $1
+    ])
+    expect(rows.map((r) => r.model)).toEqual(['claude-opus-4-8', 'claude-haiku-4-5']) // tokens desc
+    expect(rows[0]!.tokens).toBe(2_000_000)
+    expect(rows[0]!.costUsd).toBeCloseTo(22.5, 5)
+    expect(rows[1]!.tokens).toBe(1_000_000)
+    expect(rows[1]!.costUsd).toBeCloseTo(1, 5)
+  })
+
+  it('keeps an unlabeled (null) model as its own row with $0 cost', () => {
+    const rows = buildModelRows([tg({ model: null, outputTokens: 500_000 })])
+    expect(rows).toEqual([{ model: null, tokens: 500_000, costUsd: 0 }])
+  })
+
+  it('returns an empty list for no groups', () => {
+    expect(buildModelRows([])).toEqual([])
   })
 })
 

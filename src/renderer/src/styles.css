@@ -560,41 +560,77 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
-/* By-project: a responsive grid of compact cards. */
-.usage-project-cards {
+/* By model / By project: two side-by-side ranked-list cards. */
+.usage-breakdowns {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
 }
 
-.usage-project-card {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0; /* grid item: shrink within its track instead of forcing it wide */
-  overflow: hidden; /* clip anything that still exceeds the rounded card */
-  padding: 12px 14px;
+.usage-ranked {
+  min-width: 0; /* grid item: allow the card to shrink so rows can truncate */
+  padding: 14px 16px 6px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md, 10px);
   background: var(--bg-elevated);
+}
+
+.usage-ranked .usage-section-title {
+  margin: 0 0 10px;
+}
+
+.usage-ranked-empty {
+  margin: 4px 0 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.usage-ranked-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.usage-ranked-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-width: 0; /* let the name inside truncate instead of forcing the row wide */
+  padding: 8px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
   color: var(--text-primary);
-  cursor: pointer;
   text-align: left;
 }
 
-.usage-project-card:hover {
-  border-color: var(--accent);
+.usage-ranked-item-btn {
+  cursor: pointer;
 }
 
-.usage-project-card-head {
+.usage-ranked-item-btn:hover {
+  background: var(--accent-soft);
+}
+
+.usage-ranked-line {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
   gap: 8px;
-  min-width: 0; /* flex item of the card column: let the name inside truncate */
+  min-width: 0; /* flex ancestor of the truncating name */
 }
 
-.usage-project-name {
+.usage-ranked-dot {
+  flex-shrink: 0;
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.usage-ranked-name {
   flex: 1;
   min-width: 0; /* allow the flex child to shrink so ellipsis engages */
   overflow: hidden;
@@ -603,35 +639,35 @@ button {
   font-size: 13px;
 }
 
-.usage-project-pct {
+.usage-ranked-value {
   flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-ranked-pct {
+  flex-shrink: 0;
+  width: 3ch;
+  text-align: right;
   font-size: 12px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
-.usage-project-card-value {
-  font-size: 18px;
-  font-variant-numeric: tabular-nums;
-}
-
-.usage-project-bar {
-  height: 5px;
+.usage-ranked-bar {
+  width: 100%; /* explicit width so the fill's % resolves inside <button> rows too */
+  height: 4px;
   border-radius: 3px;
   background: var(--border-subtle);
   overflow: hidden;
 }
 
-.usage-project-fill {
+.usage-ranked-fill {
   display: block;
   height: 100%;
-  background: var(--accent);
   min-width: 2px;
-}
-
-.usage-project-card-sub {
-  font-size: 11px;
-  color: var(--text-muted);
+  border-radius: 3px;
 }
 
 /* Top sessions: a detailed table. */
