@@ -73,8 +73,16 @@ _Avoid_: cached tokens (ambiguous — always say read or write)
 The value of Usage priced at published API rates, regardless of the user's actual plan — a measure of usage *intensity*, not money spent. Computed from Usage Event token counts and a per-Model pricing table; it never reflects an invoice. The "Cost" metric toggle in Usage views always means Notional Cost, and is always shown with a clarifier ("at API rates — not money spent").
 _Avoid_: cost (bare), spend, price, bill, invoice
 
+**Token Composition**:
+The share of a period's Usage tokens across the four token classes — Input, Output, Cache-Read, and Cache-Write. Answers "what *kind* of tokens did I consume?" Always expressed as token shares, never as Notional Cost (cache-read tokens are cheap, so a cost split would tell a different, misleading story). A breakdown view, not a time series.
+_Avoid_: token breakdown, token mix, token split (say Token Composition)
+
+**Activity Heatmap**:
+A calendar view of Usage intensity — each day of a recent span shaded by that day's total, so streaks and gaps read at a glance. One of two view modes (with the usage trend) of the Home Screen's time-visualization; intensity follows the active Tokens / Notional Cost metric. Per the reduced-color-vision constraint, intensity is encoded by lightness *and* cell fill *and* an on-hover value, never hue alone.
+_Avoid_: contribution graph, calendar chart, activity grid
+
 **Subscription Utilization**:
-Notional Cost over a period compared against a plan's flat fee — answers "is the subscription paying off?" A money metric, and the only thing in Mesh called "Utilization." Requires the user to enter their plan fee.
+A calendar month's Notional Cost compared against a plan's flat monthly fee — answers "is the subscription paying off?" A money metric, and the only thing in Mesh called "Utilization." Requires the user to enter their plan fee. The fee is a flat constant the user states, never decremented per Usage Event — so this remains a value-vs-fee ratio, not money spent (ADR-0010 holds).
 _Avoid_: ROI, savings, value
 
 **Quota**:
