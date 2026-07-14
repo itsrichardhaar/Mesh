@@ -181,3 +181,4 @@ Per v1–v5 workflow conventions (kept): one issue per slice; commit body ends w
 - Runtime dependency added: `zustand` (Slice 47). Dev dependencies added: `jsdom`, `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom` (Slice 45).
 - The `[Unreleased]` CHANGELOG block already contains the post-v5 design refresh + resizable sidebars; those ship inside `v0.6.0` alongside the v6 slices.
 - v7 planning happens when v6 ships. Pattern-matching notification kinds enter it as the leading candidate with their design questions unresolved and explicitly *not* locked today: detector input (raw chunks vs ANSI-stripped rolling buffer), fire timing (upgrade-at-idle-fire vs immediate), which kinds ship first, and the fixture corpus strategy for brittleness.
+  - *Update — 2026-07-13: v7 became Usage (token analytics + Quota); pattern-matching notification kinds move to v9.*

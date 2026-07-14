@@ -98,6 +98,7 @@ Each slice is independently committable and demoable:
 - **A new `'project'` Screen** in the navigation store (ADR-0007). Single-clicking a sidebar Project opens its Project Screen; **double-click still opens the Workspace** (both interactions from the old Home Screen are preserved). The altitude ladder is Home (all Projects) → Project (overview) → Workspace (deep work).
 - **Layout, top to bottom:** the Project's Usage strip, the **Analyze** bar + button, and the **Analysis** in a collapsible accordion (collapsed by default, expands on Analyze or on click). The **Stats Row** relocates here.
 - **The Recent Projects cards view is deleted, not hidden** — the activity-sorted sidebar absorbs its navigation role.
+- **Realization note (Slice 56, as shipped).** The Project Screen was implemented as the Home Screen's right-pane *selected state* (the sidebar is retained for one-click switching) rather than as a distinct top-level `'project'` route in the navigation store. The altitude ladder, single-click → Project overview / double-click → Workspace behavior, and the deletion of the Recent Projects cards all hold as specified; only the routing mechanism is the pragmatic one. Promote to a full top-level Screen if a future slice needs Project-Screen state to survive independently of the Home selection.
 
 ### CONTEXT.md changes
 
