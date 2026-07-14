@@ -415,12 +415,24 @@ button {
 }
 
 .usage-metric-toggle,
-.usage-gran-toggle {
+.usage-gran-toggle,
+.usage-view-toggle {
   display: inline-flex;
   gap: 2px;
   padding: 2px;
   background: var(--bg-elevated);
   border-radius: var(--radius-sm);
+}
+
+/* Time slot: the Trend | Heatmap toggle sits above the shared view. */
+.usage-time {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.usage-time .usage-view-toggle {
+  align-self: flex-start;
 }
 
 .usage-toggle-btn {
@@ -532,6 +544,95 @@ button {
 .usage-trend-empty {
   color: var(--text-muted);
   padding: 24px 0;
+}
+
+/* Activity Heatmap (v8 / Slice 59). Intensity by lightness + fill size. */
+.usage-heatmap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.usage-heatmap-grid {
+  display: flex;
+  gap: 3px;
+  overflow-x: auto; /* many week columns: scroll rather than force the page wide */
+  padding-bottom: 2px;
+}
+
+.usage-heatmap-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.usage-heatmap-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--border-subtle); /* the empty track */
+}
+
+.usage-heatmap-cell[data-empty] {
+  background: transparent; /* padding slots past today carry no track */
+}
+
+/* Fill: size AND lightness both climb with the level, so intensity reads
+   without relying on hue. Level 0 shows an empty track. */
+.usage-heatmap-fill {
+  border-radius: 2px;
+  background: var(--accent);
+  width: 0;
+  height: 0;
+}
+
+.usage-heatmap-cell[data-level='1'] .usage-heatmap-fill {
+  width: 45%;
+  height: 45%;
+  opacity: 0.45;
+}
+
+.usage-heatmap-cell[data-level='2'] .usage-heatmap-fill {
+  width: 72%;
+  height: 72%;
+  opacity: 0.72;
+}
+
+.usage-heatmap-cell[data-level='3'] .usage-heatmap-fill {
+  width: 100%;
+  height: 100%;
+  opacity: 1;
+}
+
+.usage-heatmap-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.usage-heatmap-caption {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.usage-heatmap-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 /* By-project cards + session table (v7 / Slice 55). */

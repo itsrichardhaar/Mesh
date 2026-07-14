@@ -16,6 +16,9 @@ import {
   type Range,
   type TrendPoint
 } from '../util/trend'
+import { heatmapGrid } from '../util/heatmap'
+
+type TimeView = 'trend' | 'heatmap'
 
 const tokenFmt = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 })
 
@@ -60,6 +63,7 @@ export function UsageDashboard({
 }: DashboardProps = {}): JSX.Element {
   const { dashboard, indexing, metric, granularity, range, setMetric, setGranularity, setRange } =
     useUsage()
+  const [timeView, setTimeView] = useState<TimeView>('trend')
 
   if (!dashboard) {
     return (
@@ -79,16 +83,18 @@ export function UsageDashboard({
           <MetricButton label="Tokens" active={metric === 'tokens'} onClick={() => setMetric('tokens')} />
           <MetricButton label="Cost" active={metric === 'cost'} onClick={() => setMetric('cost')} />
         </div>
-        <div className="usage-gran-toggle" role="group" aria-label="Granularity">
-          {(['day', 'week', 'month'] as Granularity[]).map((g) => (
-            <MetricButton
-              key={g}
-              label={g[0]!.toUpperCase() + g.slice(1)}
-              active={granularity === g}
-              onClick={() => setGranularity(g)}
-            />
-          ))}
-        </div>
+        {timeView === 'trend' && (
+          <div className="usage-gran-toggle" role="group" aria-label="Granularity">
+            {(['day', 'week', 'month'] as Granularity[]).map((g) => (
+              <MetricButton
+                key={g}
+                label={g[0]!.toUpperCase() + g.slice(1)}
+                active={granularity === g}
+                onClick={() => setGranularity(g)}
+              />
+            ))}
+          </div>
+        )}
         <label className="usage-range">
           <span className="visually-hidden">Range</span>
           <select
@@ -113,7 +119,17 @@ export function UsageDashboard({
         />
       </div>
 
-      <TrendChart points={points} metric={metric} granularity={granularity} indexing={indexing} />
+      <div className="usage-time">
+        <div className="usage-view-toggle" role="group" aria-label="Time view">
+          <MetricButton label="Trend" active={timeView === 'trend'} onClick={() => setTimeView('trend')} />
+          <MetricButton label="Heatmap" active={timeView === 'heatmap'} onClick={() => setTimeView('heatmap')} />
+        </div>
+        {timeView === 'trend' ? (
+          <TrendChart points={points} metric={metric} granularity={granularity} indexing={indexing} />
+        ) : (
+          <ActivityHeatmap days={days} metric={metric} />
+        )}
+      </div>
 
       <div className="usage-breakdowns">
         <TokenCompositionCard days={dashboard.days} range={range} />
@@ -473,6 +489,71 @@ function SessionExplorer({
         </table>
       </div>
     </section>
+  )
+}
+
+const HEAT_LEGEND = [
+  { level: 0, label: 'None' },
+  { level: 1, label: 'Low' },
+  { level: 2, label: 'Med' },
+  { level: 3, label: 'High' }
+] as const
+
+/**
+ * Activity Heatmap (v8 / Slice 59) — a 26-week calendar shaded by the
+ * active metric. The other view mode of the shared time slot. Intensity
+ * is encoded three redundant ways so it never depends on hue (the
+ * reduced-color-vision constraint): a lightness ramp *and* the cell's
+ * fill size (both driven by `data-level` in CSS) *and* the exact value on
+ * hover. A discrete named legend spells out the buckets.
+ */
+function ActivityHeatmap({ days, metric }: { days: UsageDayPoint[]; metric: Metric }): JSX.Element {
+  const grid = heatmapGrid(days, metric, Date.now())
+  const fmt = (v: number): string => (metric === 'tokens' ? tokenFmt.format(v) : formatUsd(v))
+
+  if (grid.max === 0) {
+    return <p className="usage-trend-empty">No usage in the last 26 weeks yet.</p>
+  }
+
+  return (
+    <div className="usage-heatmap">
+      <div
+        className="usage-heatmap-grid"
+        role="img"
+        aria-label={`Activity heatmap by ${metric}, last 26 weeks`}
+      >
+        {grid.weeks.map((col, wi) => (
+          <div key={wi} className="usage-heatmap-col">
+            {col.map((cell, di) => (
+              <span
+                key={di}
+                className="usage-heatmap-cell"
+                data-level={cell.day === null ? undefined : cell.level}
+                data-empty={cell.day === null ? '' : undefined}
+                title={cell.day === null ? undefined : `${cell.day}: ${fmt(cell.value)}`}
+              >
+                <span className="usage-heatmap-fill" />
+              </span>
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="usage-heatmap-footer">
+        <span className="usage-heatmap-caption">
+          {grid.startDay} – {grid.endDay}
+        </span>
+        <div className="usage-heatmap-legend">
+          {HEAT_LEGEND.map((l) => (
+            <span key={l.level} className="usage-heatmap-legend-item">
+              <span className="usage-heatmap-cell" data-level={l.level}>
+                <span className="usage-heatmap-fill" />
+              </span>
+              {l.label}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
   )
 }
 

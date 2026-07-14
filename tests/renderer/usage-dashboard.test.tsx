@@ -69,6 +69,31 @@ describe('UsageDashboard', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Cost', pressed: false }))
     expect(screen.getByRole('img', { name: /usage trend by cost/i })).toBeInTheDocument()
   })
+
+  it('toggles to the heatmap, hiding granularity but keeping metric + range', async () => {
+    usageStore.setState({ dashboard: dashboard(), range: 'all', granularity: 'day', metric: 'tokens' })
+    render(<UsageDashboard />)
+    // Trend is the default view: trend chart + granularity control present.
+    expect(screen.getByRole('img', { name: /usage trend by tokens/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Week' })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Heatmap' }))
+
+    // Heatmap swaps in; trend + granularity gone; metric + range stay.
+    expect(screen.getByRole('img', { name: /activity heatmap by tokens/i })).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: /usage trend/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Week' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cost' })).toBeInTheDocument() // metric toggle stays
+    expect(screen.getByRole('combobox', { name: 'Range' })).toBeInTheDocument() // range stays (drives composition)
+  })
+
+  it('shades the heatmap by the active metric', async () => {
+    usageStore.setState({ dashboard: dashboard(), range: 'all', granularity: 'day', metric: 'tokens' })
+    render(<UsageDashboard />)
+    await userEvent.click(screen.getByRole('button', { name: 'Cost' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Heatmap' }))
+    expect(screen.getByRole('img', { name: /activity heatmap by cost/i })).toBeInTheDocument()
+  })
 })
 
 describe('UsageDashboard — by-project + session explorer (Slice 55)', () => {
