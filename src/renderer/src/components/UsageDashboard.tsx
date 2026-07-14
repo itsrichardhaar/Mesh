@@ -1,6 +1,7 @@
 import { Fragment, useState } from 'react'
 import type {
   Project,
+  UsageDayPoint,
   UsageModelRow,
   UsageProjectRow,
   UsageSessionRow,
@@ -8,7 +9,13 @@ import type {
 } from '@shared/types'
 import type { JumpToSessionInput } from './NotificationsBell'
 import { useUsage } from '../hooks/useUsage'
-import { bucketTrend, type Granularity, type Range, type TrendPoint } from '../util/trend'
+import {
+  bucketTrend,
+  tokenComposition,
+  type Granularity,
+  type Range,
+  type TrendPoint
+} from '../util/trend'
 
 const tokenFmt = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 })
 
@@ -109,6 +116,7 @@ export function UsageDashboard({
       <TrendChart points={points} metric={metric} granularity={granularity} indexing={indexing} />
 
       <div className="usage-breakdowns">
+        <TokenCompositionCard days={dashboard.days} range={range} />
         <ByModelBreakdown rows={dashboard.byModel} metric={metric} />
         <ByProjectBreakdown
           rows={dashboard.byProject}
@@ -224,6 +232,79 @@ function RankedList({
             )
           })}
         </ul>
+      )}
+    </section>
+  )
+}
+
+/**
+ * The four token classes in a fixed order with stable colours — order
+ * and colour are consistent across renders so a class is recognised by
+ * position, not just hue (the reduced-color-vision constraint). Always a
+ * token share; never priced.
+ */
+const COMPOSITION_CLASSES = [
+  { key: 'inputTokens', label: 'Input', color: '#6c8cff' },
+  { key: 'outputTokens', label: 'Output', color: '#14b8a6' },
+  { key: 'cacheReadTokens', label: 'Cache read', color: 'var(--accent)' },
+  { key: 'cacheWriteTokens', label: 'Cache write', color: '#8b5cf6' }
+] as const
+
+/**
+ * Token Composition (v8 / Slice 58) — the share of tokens across the four
+ * classes over the active range, as a stacked proportion bar + labeled
+ * rows. Range-aware (folds the day series), granularity-agnostic, and
+ * always a token share regardless of the Tokens/Cost toggle.
+ */
+function TokenCompositionCard({
+  days,
+  range
+}: {
+  days: UsageDayPoint[]
+  range: Range
+}): JSX.Element {
+  const comp = tokenComposition(days, range, Date.now())
+  const rows = COMPOSITION_CLASSES.map((c) => {
+    const value = comp[c.key]
+    return { ...c, value, pct: comp.total === 0 ? 0 : Math.round((value / comp.total) * 100) }
+  })
+
+  return (
+    <section className="usage-ranked" aria-label="Token composition">
+      <h3 className="usage-section-title">Token composition</h3>
+      {comp.total === 0 ? (
+        <p className="usage-ranked-empty">No token usage in this range yet.</p>
+      ) : (
+        <>
+          <div className="usage-composition-bar" aria-hidden="true">
+            {rows.map((r) =>
+              r.value === 0 ? null : (
+                <span
+                  key={r.key}
+                  className="usage-composition-seg"
+                  style={{ width: `${(r.value / comp.total) * 100}%`, background: r.color }}
+                />
+              )
+            )}
+          </div>
+          <ul className="usage-ranked-list">
+            {rows.map((r) => (
+              <li key={r.key} className="usage-ranked-row">
+                <div
+                  className="usage-ranked-item"
+                  aria-label={`${r.label}: ${tokenFmt.format(r.value)} tokens, ${r.pct}%`}
+                >
+                  <span className="usage-ranked-line">
+                    <span className="usage-ranked-dot" style={{ background: r.color }} aria-hidden="true" />
+                    <span className="usage-ranked-name">{r.label}</span>
+                    <span className="usage-ranked-value">{tokenFmt.format(r.value)}</span>
+                    <span className="usage-ranked-pct">{r.pct}%</span>
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </section>
   )

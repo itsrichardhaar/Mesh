@@ -19,6 +19,46 @@ export function filterByRange(days: readonly UsageDayPoint[], range: Range, now:
   return days.filter((d) => d.day >= cutoff)
 }
 
+/** Token Composition (v8 / Slice 58) — the four token-class totals over a range. */
+export interface TokenComposition {
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  cacheWriteTokens: number
+  /** Sum of the four classes (0 when the range is empty). */
+  total: number
+}
+
+/**
+ * Fold the per-day series into its four token-class totals within a
+ * range. Additive across days, so a plain sum — no pricing. Always a
+ * token split (never Notional Cost); cache-read is nearly free, so a
+ * cost-weighted split would mislead. Pure (takes `now` for the range).
+ */
+export function tokenComposition(
+  days: readonly UsageDayPoint[],
+  range: Range,
+  now: number
+): TokenComposition {
+  let inputTokens = 0
+  let outputTokens = 0
+  let cacheReadTokens = 0
+  let cacheWriteTokens = 0
+  for (const day of filterByRange(days, range, now)) {
+    inputTokens += day.inputTokens
+    outputTokens += day.outputTokens
+    cacheReadTokens += day.cacheReadTokens
+    cacheWriteTokens += day.cacheWriteTokens
+  }
+  return {
+    inputTokens,
+    outputTokens,
+    cacheReadTokens,
+    cacheWriteTokens,
+    total: inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens
+  }
+}
+
 /** The bucket key a given `YYYY-MM-DD` falls into, per granularity. */
 function bucketKey(day: string, granularity: Granularity): string {
   if (granularity === 'day') return day

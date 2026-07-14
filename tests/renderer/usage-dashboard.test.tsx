@@ -29,8 +29,9 @@ function dashboard(overrides: Partial<UsageDashboardData> = {}): UsageDashboardD
       unpricedModels: []
     },
     days: [
-      { day: '2026-07-12', tokens: 500_000, costUsd: 5 },
-      { day: '2026-07-13', tokens: 1_000_000, costUsd: 7.34 }
+      // 10/20/60/10 class split so composition shares are exact.
+      { day: '2026-07-12', tokens: 500_000, costUsd: 5, inputTokens: 50_000, outputTokens: 100_000, cacheReadTokens: 300_000, cacheWriteTokens: 50_000 },
+      { day: '2026-07-13', tokens: 1_000_000, costUsd: 7.34, inputTokens: 100_000, outputTokens: 200_000, cacheReadTokens: 600_000, cacheWriteTokens: 100_000 }
     ],
     byProject: [],
     byModel: [],
@@ -96,6 +97,17 @@ describe('UsageDashboard — by-project + session explorer (Slice 55)', () => {
     render(<UsageDashboard projects={[project('-proj-a', 'Alpha')]} onSelectProject={onSelectProject} />)
     await userEvent.click(screen.getByRole('button', { name: /Alpha: .* sessions/i }))
     expect(onSelectProject).toHaveBeenCalledWith('-proj-a')
+  })
+
+  it('renders the token composition card with class shares over the range', () => {
+    usageStore.setState({ dashboard: dashboard(), range: 'all', metric: 'tokens' })
+    render(<UsageDashboard />)
+    const comp = screen.getByRole('region', { name: 'Token composition' })
+    // 10/20/60/10 split across the two fixture days → shares independent of the metric toggle.
+    expect(within(comp).getByText('Cache read')).toBeInTheDocument()
+    expect(within(comp).getByText('60%')).toBeInTheDocument() // cache-read dominates
+    expect(within(comp).getByText('Input')).toBeInTheDocument()
+    expect(within(comp).getAllByText('10%')).toHaveLength(2) // input + cache-write
   })
 
   it('renders the by-model card ranked with its share', () => {

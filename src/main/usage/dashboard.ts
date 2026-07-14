@@ -164,11 +164,26 @@ export function buildDayPoints(rows: readonly DayGroupRow[]): UsageDayPoint[] {
 
   const points: UsageDayPoint[] = []
   for (const [day, groups] of byDay) {
-    const tokens = groups.reduce(
-      (sum, g) => sum + g.inputTokens + g.cacheReadTokens + g.cacheWriteTokens + g.outputTokens,
-      0
-    )
-    points.push({ day, tokens, costUsd: notionalCost(groups).totalUsd })
+    let inputTokens = 0
+    let outputTokens = 0
+    let cacheReadTokens = 0
+    let cacheWriteTokens = 0
+    for (const g of groups) {
+      inputTokens += g.inputTokens
+      outputTokens += g.outputTokens
+      cacheReadTokens += g.cacheReadTokens
+      cacheWriteTokens += g.cacheWriteTokens
+    }
+    const tokens = inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens
+    points.push({
+      day,
+      tokens,
+      costUsd: notionalCost(groups).totalUsd,
+      inputTokens,
+      outputTokens,
+      cacheReadTokens,
+      cacheWriteTokens
+    })
   }
   points.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0))
   return points

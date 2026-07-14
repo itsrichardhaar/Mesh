@@ -288,6 +288,15 @@ export interface UsageDayPoint {
   day: string
   tokens: number
   costUsd: number
+  /**
+   * The day's tokens split by class (Token Composition, v8 / Slice 58) —
+   * these four sum to `tokens`. Additive across days, so the renderer can
+   * fold them over any range without a separate round-trip.
+   */
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  cacheWriteTokens: number
 }
 
 /** One Project's headline Usage — the Project Screen's Usage strip (Slice 56). */

@@ -41,9 +41,37 @@ describe('buildDayPoints', () => {
       row({ day: '2026-07-12', outputTokens: 1_000_000 }) // opus output → $75
     ])
     expect(points).toEqual([
-      { day: '2026-07-12', tokens: 1_000_000, costUsd: 75 },
-      { day: '2026-07-13', tokens: 1_000_000, costUsd: 15 }
+      {
+        day: '2026-07-12',
+        tokens: 1_000_000,
+        costUsd: 75,
+        inputTokens: 0,
+        outputTokens: 1_000_000,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0
+      },
+      {
+        day: '2026-07-13',
+        tokens: 1_000_000,
+        costUsd: 15,
+        inputTokens: 1_000_000,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0
+      }
     ])
+  })
+
+  it('splits a day’s tokens by class, summing to the day total', () => {
+    const [point] = buildDayPoints([
+      row({ day: '2026-07-13', inputTokens: 100, outputTokens: 200 }),
+      row({ day: '2026-07-13', cacheReadTokens: 600, cacheWriteTokens: 100 })
+    ])
+    expect(point!.inputTokens).toBe(100)
+    expect(point!.outputTokens).toBe(200)
+    expect(point!.cacheReadTokens).toBe(600)
+    expect(point!.cacheWriteTokens).toBe(100)
+    expect(point!.tokens).toBe(1000) // sum of the four classes
   })
 
   it('merges multiple model groups within the same day', () => {

@@ -15,6 +15,11 @@ The stable `1.0.0` release ships once every item in the
 
 ## [Unreleased]
 
+### Added
+- **Slice 58 (v8): Token Composition card.** The Home dashboard gains a **Token Composition** card — the share of tokens across the four classes (Input / Output / Cache-Read / Cache-Write) over the active range, as a stacked proportion bar + labeled rows. It sits alongside By model / By project (three-up on wide screens). Always a token share, never Notional Cost (cache-read is nearly free, so a cost split would mislead); range-aware, granularity-agnostic.
+  - **`UsageDayPoint` extended** with the four token-class counts, derived in `buildDayPoints` from columns already stored — **no migration**. The per-day series stays the single client-side source for trend, composition, and (v8 to come) the activity heatmap.
+  - **Tests.** Node: `buildDayPoints` class split (sums to the day total). Renderer: pure `tokenComposition` folder (range-aware, empty-range zeroing) + the card's shares over a range.
+
 ## [0.7.0] — 2026-07-14
 
 ### Added
