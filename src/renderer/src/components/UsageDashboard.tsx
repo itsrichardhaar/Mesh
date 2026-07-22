@@ -196,15 +196,21 @@ function RankedList({
   title,
   items,
   metric,
-  emptyLabel
+  emptyLabel,
+  limit
 }: {
   title: string
   items: RankedItem[]
   metric: Metric
   emptyLabel: string
+  /** When set, render only the first `limit` rows. Shares (%) and bar
+   *  scaling stay relative to the full list, so hiding the tail never
+   *  inflates the visible rows' percentages. */
+  limit?: number
 }): JSX.Element {
   const total = items.reduce((sum, i) => sum + i.value, 0) || 1
   const max = Math.max(...items.map((i) => i.value), 1)
+  const visible = limit == null ? items : items.slice(0, limit)
 
   return (
     <section className="usage-ranked" aria-label={title}>
@@ -213,7 +219,7 @@ function RankedList({
         <p className="usage-ranked-empty">{emptyLabel}</p>
       ) : (
         <ul className="usage-ranked-list">
-          {items.map((item, i) => {
+          {visible.map((item, i) => {
             const pct = Math.round((item.value / total) * 100)
             const color = RANK_COLORS[i % RANK_COLORS.length]!
             const body = (
@@ -391,19 +397,31 @@ function ByProjectBreakdown({
   metric: Metric
   onSelectProject?: (encodedPath: string) => void
 }): JSX.Element {
-  const items: RankedItem[] = rows.map((row) => {
-    const value = metricValue(row, metric)
-    const name = projectName(projects, row.encodedPath)
-    const sessions = `${row.sessionCount} session${row.sessionCount === 1 ? '' : 's'}`
-    return {
-      key: row.encodedPath,
-      name,
-      value,
-      ariaLabel: `${name}: ${formatMetric(value, metric)}, ${sessions}`,
-      onSelect: () => onSelectProject?.(row.encodedPath)
-    }
-  })
-  return <RankedList title="By project" items={items} metric={metric} emptyLabel="No project usage yet." />
+  const items: RankedItem[] = rows
+    .map((row) => {
+      const value = metricValue(row, metric)
+      const name = projectName(projects, row.encodedPath)
+      const sessions = `${row.sessionCount} session${row.sessionCount === 1 ? '' : 's'}`
+      return {
+        key: row.encodedPath,
+        name,
+        value,
+        ariaLabel: `${name}: ${formatMetric(value, metric)}, ${sessions}`,
+        onSelect: () => onSelectProject?.(row.encodedPath)
+      }
+    })
+    // Rows arrive sorted by tokens; re-sort by the active metric so the
+    // top 5 is the top 5 of what's actually shown (matters under Cost).
+    .sort((a, b) => b.value - a.value)
+  return (
+    <RankedList
+      title="By project"
+      items={items}
+      metric={metric}
+      emptyLabel="No project usage yet."
+      limit={5}
+    />
+  )
 }
 
 function ByModelBreakdown({

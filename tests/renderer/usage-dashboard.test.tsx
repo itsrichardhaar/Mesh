@@ -125,6 +125,30 @@ describe('UsageDashboard — by-project + session explorer (Slice 55)', () => {
     expect(onSelectProject).toHaveBeenCalledWith('-proj-a')
   })
 
+  it('caps By project at the top 5, with shares relative to all projects', () => {
+    // 7 projects; top = 1M of a 2M grand total. Tail (p6, p7) must be hidden,
+    // and the top row must read 50% (over the full 2M) — not 56% (over the
+    // visible-5 sum of 1.8M) — proving shares stay relative to every project.
+    const tokens = [1_000_000, 400_000, 200_000, 100_000, 100_000, 100_000, 100_000]
+    const byProject = tokens.map((t, i) => ({
+      encodedPath: `-p${i + 1}`,
+      tokens: t,
+      costUsd: 0,
+      sessionCount: 1,
+      lastActivity: '2026-07-13T00:00:00Z'
+    }))
+    const projects = tokens.map((_, i) => project(`-p${i + 1}`, `P${i + 1}`))
+    usageStore.setState({ dashboard: dashboard({ byProject }), range: 'all', metric: 'tokens' })
+    render(<UsageDashboard projects={projects} />)
+
+    const region = screen.getByRole('region', { name: 'By project' })
+    expect(within(region).getAllByRole('button')).toHaveLength(5) // one button per visible row
+    expect(within(region).getByText('P1')).toBeInTheDocument()
+    expect(within(region).queryByText('P6')).not.toBeInTheDocument() // tail hidden
+    expect(within(region).queryByText('P7')).not.toBeInTheDocument()
+    expect(within(region).getByText('50%')).toBeInTheDocument() // 1M of the full 2M, not 1.8M
+  })
+
   // A dashboard whose only day is today, so the current-calendar-month
   // sum is deterministic regardless of when the suite runs.
   const dashboardToday = (costUsd: number): UsageDashboardData => {
