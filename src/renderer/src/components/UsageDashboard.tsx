@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useLayoutEffect, useRef, useState } from 'react'
 import type {
   Project,
   UsageDayPoint,
@@ -657,6 +657,32 @@ function smoothPath(pts: ReadonlyArray<{ x: number; y: number }>): string {
   return d
 }
 
+/**
+ * Track an element's rendered pixel width via ResizeObserver, falling
+ * back to `fallback` until measured (or where ResizeObserver / layout are
+ * unavailable, e.g. jsdom). Lets an SVG render at a 1:1 user-unit-to-pixel
+ * scale so its text and height stay fixed while it fills a fluid width —
+ * instead of the whole viewBox scaling up with the window.
+ */
+function useMeasuredWidth<T extends Element>(fallback: number): [React.RefObject<T>, number] {
+  const ref = useRef<T>(null)
+  const [width, setWidth] = useState(fallback)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const measure = (): void => {
+      const w = el.clientWidth
+      if (w > 0) setWidth(w)
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  return [ref, width]
+}
+
 function TrendChart({
   points,
   metric,
@@ -668,6 +694,11 @@ function TrendChart({
   granularity: Granularity
   indexing: boolean
 }): JSX.Element {
+  // Render at the container's real pixel width so 1 user unit = 1px: axis
+  // text stays 11px and the chart stays `H` tall on any window size,
+  // rather than the viewBox scaling uniformly and ballooning both.
+  const [svgRef, W] = useMeasuredWidth<SVGSVGElement>(760)
+
   if (points.length === 0) {
     return <p className="usage-trend-empty">{indexing ? 'Indexing…' : 'No usage in this range yet.'}</p>
   }
@@ -675,7 +706,6 @@ function TrendChart({
   const valueOf = (p: TrendPoint): number => (metric === 'tokens' ? p.tokens : p.costUsd)
   const fmtValue = (v: number): string => (metric === 'tokens' ? tokenFmt.format(v) : formatUsd(v))
 
-  const W = 760
   const H = 220
   const padL = 54
   const padR = 14
@@ -686,9 +716,12 @@ function TrendChart({
   const yBase = padT + plotH
   const n = points.length
   const max = Math.max(...points.map(valueOf), 1)
+  // Headroom above the data max so a sharp peak's smoothing overshoot
+  // stays inside the viewBox instead of being clipped at the top edge.
+  const domainMax = max * 1.12
 
   const xAt = (i: number): number => (n === 1 ? padL + plotW / 2 : padL + (i / (n - 1)) * plotW)
-  const yAt = (v: number): number => yBase - (v / max) * plotH
+  const yAt = (v: number): number => yBase - (v / domainMax) * plotH
   const coords = points.map((p, i) => ({ x: xAt(i), y: yAt(valueOf(p)) }))
   const line = smoothPath(coords)
   const area =
@@ -706,6 +739,7 @@ function TrendChart({
   return (
     <svg
       className="usage-trend"
+      ref={svgRef}
       viewBox={`0 0 ${W} ${H}`}
       role="img"
       aria-label={`Usage trend by ${metric}`}
