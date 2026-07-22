@@ -15,7 +15,12 @@ The stable `1.0.0` release ships once every item in the
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-07-22
+
 ### Added
+- **Slice 61 (v8): PRD-v8 + v0.8.0 release ceremonials.** Closing slice of v8 (Usage fast-follows). Docs + release — Token Composition, the Activity Heatmap (Trend | Heatmap toggle), and Subscription Utilization all shipped across Slices 58–60 on the v7 Usage spine. No schema change and no new ADR the whole release.
+  - **PRD-v8 committed** (up front at planning) with the Token Composition / Activity Heatmap glossary terms and the sharpened Subscription Utilization; PRD-v7's "Out of Scope → v8" gains a dated note (v8 shipped; by-model landed early in v7 polish).
+  - **Release ceremonials.** `package.json` 0.7.0 → 0.8.0. CHANGELOG `[Unreleased]` promoted to `[0.8.0] — 2026-07-22`; new empty `[Unreleased]` opens for v9. `git tag v0.8.0`. Packaged build installed into `/Applications/Mesh.app` (first installed post-v6 build).
 - **Slice 60 (v8): plan-fee setting + Subscription Utilization gauge.** A new **Subscription** section in Settings takes a free-form **monthly plan fee** (USD), persisted through the generic settings store. The Home dashboard gains a **Subscription Utilization** gauge — the current calendar month's Notional Cost as a percent of that fee, answering "is the subscription paying off?"
   - **Framing honors ADR-0010.** The numerator is notional (usage at API rates); the fee is a flat constant the user typed, never decremented per use. The gauge is labeled "at API rates vs your flat fee — not money spent"; at ≥ 100% the verdict reads "Paying off".
   - **Reduced-color-vision safe.** Quota-style encoding — fill length + numeric % + a worded verdict carry the state; no hue dependence. Hidden behind a "set your plan fee" hint until a fee is entered.

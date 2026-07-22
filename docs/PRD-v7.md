@@ -148,6 +148,7 @@ v7 keeps the v6 test policy: **renderer-touching slices ship renderer tests**, a
 
 **v8 (Usage fast-follows):**
 - **Activity heatmap**, **token composition** (input/output/cache split), **by-model breakdown**, and the **Subscription Utilization gauge** (with its required plan-fee setting). These land on the v7 spine.
+  - *Update — 2026-07-22: v8 shipped Token Composition, the Activity Heatmap (Trend | Heatmap toggle), and Subscription Utilization + plan-fee. **by-model** shipped early as post-release polish on Slice 55, so it was not part of v8. See `docs/PRD-v8.md`.*
 
 **v9:**
 - **Pattern-matching Notification kind subtypes** (`approval` / `complete` / `question`) via PTY-stdout parsing — the former leading v7 candidate, still fully pre-staged (open `kind` column, reserved `--timeline-*` tokens, the `IdleDetector.onPtyData` seam). Displaced by Usage; unchanged in readiness.
