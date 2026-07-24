@@ -103,8 +103,16 @@ _Avoid_: Terminal (ambiguous between transcript view and live pty)
 The action that opens a Pty Tab for a recorded Session. Default click behavior on a Session row is read-only transcript view; Resume is an explicit click in the transcript pane.
 
 **Notification**:
-A persistent record of a moment that may need user attention in a Project's Pty Tab. Created when a live Pty Tab transitions from active to idle (no PTY output for ≥ 8 seconds) while the user is not currently looking at that Pty Tab. Stored in SQLite with 7-day retention. Surfaced as a top-right toast on creation and as a row in the top-bar bell dropdown until read or cleared. v5 ships one Notification `kind` (`idle`); future kinds (`approval`, `complete`, etc.) add via pattern matching without schema changes.
+A persistent record of a moment that may need user attention in a Project's Pty Tab. Stored in SQLite with 7-day retention. Surfaced as a top-right toast on creation and as a row in the top-bar bell dropdown until read or cleared. Every Notification has a **Notification Kind**. The **idle** kind is the recall floor — it fires when a live Pty Tab transitions from active to idle (no PTY output for ≥ 8 seconds) while the user is not looking at that Pty Tab, guaranteeing no missed moment. Other kinds are detected earlier and more precisely by **Pattern Matchers**.
 _Avoid_: Alert, popup, banner (when referring to the persistent record)
+
+**Notification Kind**:
+What a Notification *means* — the state of the Pty Tab that produced it. **Idle** (recall floor: Claude went quiet, reason unknown). **Approval** (Claude is blocked on the user's answer to a tool-permission prompt — highest urgency). **Complete** (Claude finished its turn and returned to an empty input prompt). A reserved **question** kind (Claude asking a free-text clarifying question) is not yet detected. Kinds are stored as open TEXT; the surface renders an unknown kind as **idle**. Approval and Complete arrived in v9; Idle in v5.
+_Avoid_: type, category, severity
+
+**Pattern Matcher**:
+A detector that recognizes a Notification Kind by reading a Pty Tab's settled terminal screen. Matchers fire a correctly-kinded Notification the moment they recognize the screen — ahead of the idle timer — while the **idle** kind remains the floor if no matcher fires. A broken matcher can only downgrade a Notification to **idle**, never suppress it.
+_Avoid_: parser, scanner, detector (say Pattern Matcher)
 
 ### Providers and models
 
