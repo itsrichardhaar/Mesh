@@ -93,10 +93,10 @@ Decisions below are the nine locked in the 2026-07-24 planning grill (recorded i
 ## Further Notes
 
 - **CONTEXT.md** gained three terms this cycle: **Notification Kind**, **Pattern Matcher**, and a rewritten **Notification** entry. **ADR-0012** records the fire-first / idle-as-floor decision.
-- **Slicing (tracer-bullet, parse-spine-first):**
-  - *Slice 62* — `ScreenModel` (M1) + `matchers` (M2) + fixtures/replay harness (M7): the pure parse spine, fixture-tested. No UI; detection can log to prove it fires.
-  - *Slice 63* — wire M2 into `IdleDetector` (M3): thread PTY bytes through `onData`, fire-first + dedup + idle floor, extend `DEFAULT_IDLE_LABEL`. `approval`/`complete` now fire end-to-end and render via existing `label_text`.
-  - *Slice 64* — presentation (M5): kind→icon map, `--notif-*` tokens, sticky `approval` toast vs auto-dismiss.
-  - *Slice 65* — per-kind toast mute (M4 + M6): global toggles + gate + Settings UI.
-  - *Slice 66* — PRD-v9 + ADR-0012 close-out + v0.9.0 release ceremonials (HITL) + packaged-build install. (Planning artifacts — this PRD, ADR-0012, CONTEXT terms — are committed at planning time, so the closing slice does not re-commit them, mirroring Slice 57/61.)
+- **Slicing (tracer-bullet, parse-spine-first).** Published under parent issue #62; slice issues #63–#67:
+  - *Slice 63* (#63) — `ScreenModel` (M1) + `matchers` (M2) + fixtures/replay harness (M7): the pure parse spine, fixture-tested. No UI; detection can log to prove it fires.
+  - *Slice 64* (#64) — wire M2 into `IdleDetector` (M3): thread PTY bytes through `onData`, fire-first + dedup + idle floor, extend `DEFAULT_IDLE_LABEL`. `approval`/`complete` now fire end-to-end and render via existing `label_text`.
+  - *Slice 65* (#65) — presentation (M5): kind→icon map, `--notif-*` tokens, sticky `approval` toast vs auto-dismiss. (Depends on #64 only; parallel with #66.)
+  - *Slice 66* (#66) — per-kind toast mute (M4 + M6): global toggles + gate + Settings UI. (Depends on #64 only; parallel with #65.)
+  - *Slice 67* (#67, HITL) — PRD-v9 + ADR-0012 close-out + v0.9.0 release ceremonials + packaged-build install. (Planning artifacts — this PRD, ADR-0012, CONTEXT terms — are committed at planning time in `0e83251`, so the closing slice does not re-commit them, mirroring Slice 57/61.)
 - **Reduced-color-vision constraint** (`memory/user-reduced-color-vision.md`) governs all presentation work: shape/position first, color as redundant reinforcement.
