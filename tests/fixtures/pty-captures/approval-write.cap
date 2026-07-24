@@ -1,0 +1,8 @@
+[2J[H[1mEdit file[0m  src/main/index.ts
+
+[32m+  idleDetector?.onPtyData(id, data)[0m
+[31m-  idleDetector?.onPtyData(id)[0m
+
+Do you want to proceed?
+[36m❯ 1. Yes[0m
+  2. No, and tell Claude what to do differently [2m(esc)[0m

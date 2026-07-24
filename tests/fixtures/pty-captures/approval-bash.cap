@@ -1,0 +1,8 @@
+[2J[H[1mBash command[0m
+  npm run build
+[2m  Build the project[0m
+
+Do you want to proceed?
+[36m❯ 1. Yes[0m
+  2. Yes, and don't ask again for npm run commands in this project
+  3. No, and tell Claude what to do differently [2m(esc)[0m
