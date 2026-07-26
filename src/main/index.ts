@@ -704,7 +704,7 @@ function registerIpc(): void {
         rows,
         onData: (id, data) => {
           mainWindow?.webContents.send('pty:data', { ptyId: id, data })
-          idleDetector?.onPtyData(id)
+          idleDetector?.onPtyData(id, data)
         },
         onExit: (id, exitCode) => {
           mainWindow?.webContents.send('pty:exit', { ptyId: id, exitCode })

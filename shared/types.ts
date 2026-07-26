@@ -187,11 +187,11 @@ export interface Notification {
    */
   ptyId: string | null
   /**
-   * Discriminator for future notification subtypes. v1 ships only
-   * `'idle'`; pattern matchers (v6+) may emit `'approval'`, `'complete'`,
-   * `'question'`, etc. Stored as a free-form string in SQLite so adding
-   * a value is a code change, not a migration. The renderer treats
-   * unknown kinds as `'idle'` (graceful degradation).
+   * Discriminator for notification subtypes. v5 shipped only `'idle'`;
+   * v9 Pattern Matchers emit `'approval'` and `'complete'` (a `'question'`
+   * kind remains reserved-but-unimplemented). Stored as a free-form
+   * string in SQLite so adding a value is a code change, not a migration.
+   * The renderer treats unknown kinds as `'idle'` (graceful degradation).
    */
   kind: NotificationKind
   /** Human-readable label rendered in the toast + dropdown row. */
@@ -207,7 +207,7 @@ export interface Notification {
  */
 export type NotificationKind = 'idle' | (string & { __brand?: 'notification-kind' })
 
-export const KNOWN_NOTIFICATION_KINDS: readonly NotificationKind[] = ['idle']
+export const KNOWN_NOTIFICATION_KINDS: readonly NotificationKind[] = ['idle', 'approval', 'complete']
 
 // --- Usage (v7 / Slice 52) ------------------------------------------------
 

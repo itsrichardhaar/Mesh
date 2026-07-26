@@ -3,9 +3,35 @@ import Database from 'better-sqlite3'
 import { runMigrations } from '@main/db/migrations'
 import {
   IDLE_THRESHOLD_MS,
-  IdleDetector
+  SETTLE_MS,
+  IdleDetector,
+  type ScreenView
 } from '@main/notifications/idle-detector'
 import { listNotifications, unreadCount } from '@main/notifications/repository'
+
+/**
+ * Synchronous fake screen: each write REPLACES the current frame (Ink
+ * repaints wholesale, and the real ScreenModel's snapshot is latest-frame-
+ * wins — see screen-model.test.ts). So a test drives the matcher path by
+ * passing a full frame's text as the `data` argument (no ANSI, no xterm,
+ * no async). ANSI decoding + real matching live in screen-model.test.ts /
+ * matchers.test.ts.
+ */
+function fakeScreenFactory(): () => ScreenView {
+  return () => {
+    let frame = ''
+    return {
+      write: (bytes) => {
+        frame = bytes
+      },
+      snapshot: () => frame,
+      dispose: () => {}
+    }
+  }
+}
+
+const APPROVAL_FRAME = 'Do you want to proceed?\n❯ 1. Yes\n  2. No, and tell Claude what to do differently'
+const COMPLETE_FRAME = "I'm done.\n  ? for shortcuts"
 
 const PROJECT_A = '-Users-rh-Desktop-A'
 const SESS_1 = 'sess-1111'
@@ -55,7 +81,7 @@ interface Emitted {
   payload: unknown
 }
 
-function setup(opts: { startMs?: number } = {}) {
+function setup(opts: { startMs?: number; createScreen?: () => ScreenView } = {}) {
   const db = new Database(':memory:')
   runMigrations(db)
   let now = opts.startMs ?? 1_000_000
@@ -68,7 +94,8 @@ function setup(opts: { startMs?: number } = {}) {
     scheduleTimeout: sched.schedule,
     cancelTimeout: sched.cancel,
     emit: (channel, payload) => emitted.push({ channel, payload }),
-    generateId: () => `id-${++idSeq}`
+    generateId: () => `id-${++idSeq}`,
+    createScreen: opts.createScreen
   })
   return {
     db,
@@ -234,5 +261,106 @@ describe('IdleDetector — Slice 41', () => {
     expect(env.emitted.filter((e) => e.channel === 'notifications:created')).toHaveLength(0)
     // But the row is in the DB — user can still see it in the dropdown.
     expect(listNotifications(env.db)).toHaveLength(1)
+  })
+})
+
+describe('IdleDetector — pattern matchers (v9 / Slice 64)', () => {
+  let env: ReturnType<typeof setup>
+  beforeEach(() => {
+    env = setup({ createScreen: fakeScreenFactory() })
+  })
+  afterEach(() => {
+    env.close()
+  })
+
+  const createdKinds = () =>
+    env.emitted
+      .filter((e) => e.channel === 'notifications:created')
+      .map((e) => (e.payload as { kind: string }).kind)
+
+  it('fires an approval notification at the settle window, ahead of the idle floor', () => {
+    env.detector.registerPty('pty-1', PROJECT_A, SESS_1)
+    env.detector.onPtyData('pty-1', APPROVAL_FRAME)
+    // Before settle: nothing yet.
+    env.advanceMs(SETTLE_MS - 1)
+    expect(env.emitted).toHaveLength(0)
+    // At settle: the matcher fires — well before IDLE_THRESHOLD_MS.
+    env.advanceMs(1)
+    expect(createdKinds()).toEqual(['approval'])
+    const stored = listNotifications(env.db)
+    expect(stored[0]).toMatchObject({ kind: 'approval', labelText: 'Approval needed' })
+  })
+
+  it('fires a complete notification when the screen shows the ready prompt', () => {
+    env.detector.registerPty('pty-1', PROJECT_A, SESS_1)
+    env.detector.onPtyData('pty-1', COMPLETE_FRAME)
+    env.advanceMs(SETTLE_MS)
+    expect(createdKinds()).toEqual(['complete'])
+  })
+
+  it('a matcher fire dedups the idle floor — exactly one notification per period', () => {
+    env.detector.registerPty('pty-1', PROJECT_A, SESS_1)
+    env.detector.onPtyData('pty-1', APPROVAL_FRAME)
+    env.advanceMs(SETTLE_MS)
+    expect(createdKinds()).toEqual(['approval'])
+    // Advance well past the idle threshold: the idle timer must NOT add a
+    // second (generic) notification.
+    env.advanceMs(IDLE_THRESHOLD_MS * 2)
+    expect(createdKinds()).toEqual(['approval'])
+  })
+
+  it('falls through to the idle floor when the screen matches nothing (self-heal)', () => {
+    env.detector.registerPty('pty-1', PROJECT_A, SESS_1)
+    env.detector.onPtyData('pty-1', 'just some ordinary tool output, nothing to match here')
+    // Settle passes with no match — no early fire.
+    env.advanceMs(SETTLE_MS)
+    expect(env.emitted).toHaveLength(0)
+    // The idle floor still fires the generic notification.
+    env.advanceMs(IDLE_THRESHOLD_MS - SETTLE_MS)
+    expect(createdKinds()).toEqual(['idle'])
+  })
+
+  it('suppresses a matched notification entirely when the Pty Tab is foregrounded', () => {
+    env.detector.registerPty('pty-1', PROJECT_A, SESS_1)
+    env.detector.setForegroundPty('pty-1')
+    env.detector.onPtyData('pty-1', APPROVAL_FRAME)
+    env.advanceMs(SETTLE_MS)
+    // Foreground suppression is total — no toast AND no row.
+    expect(env.emitted).toHaveLength(0)
+    expect(listNotifications(env.db)).toHaveLength(0)
+  })
+
+  it('a foreground-suppressed match leaves the idle floor armed (degrades, not lost)', () => {
+    env.detector.registerPty('pty-1', PROJECT_A, SESS_1)
+    env.detector.setForegroundPty('pty-1')
+    env.detector.onPtyData('pty-1', APPROVAL_FRAME)
+    env.advanceMs(SETTLE_MS)
+    expect(env.emitted).toHaveLength(0)
+    // User looks away while the prompt is still up — the recall floor must
+    // still catch it (as a generic idle, since no new data re-classifies).
+    env.detector.setForegroundPty(null)
+    env.advanceMs(IDLE_THRESHOLD_MS - SETTLE_MS)
+    expect(createdKinds()).toEqual(['idle'])
+  })
+
+  it('re-arms after an answered approval: activity resumes, then a completion fires next', () => {
+    env.detector.registerPty('pty-1', PROJECT_A, SESS_1)
+    env.detector.onPtyData('pty-1', APPROVAL_FRAME)
+    env.advanceMs(SETTLE_MS)
+    expect(createdKinds()).toEqual(['approval'])
+    // User answers → PTY produces output again (auto-marks the approval read).
+    env.detector.onPtyData('pty-1', 'running the command...')
+    expect(env.emitted.filter((e) => e.channel === 'notifications:updated')).toHaveLength(1)
+    // Claude finishes → a fresh complete notification fires.
+    env.detector.onPtyData('pty-1', COMPLETE_FRAME)
+    env.advanceMs(SETTLE_MS)
+    expect(createdKinds()).toEqual(['approval', 'complete'])
+  })
+
+  it('drives pure idle behavior when onPtyData is called without data', () => {
+    env.detector.registerPty('pty-1', PROJECT_A, SESS_1)
+    env.detector.onPtyData('pty-1')
+    env.advanceMs(IDLE_THRESHOLD_MS)
+    expect(createdKinds()).toEqual(['idle'])
   })
 })
