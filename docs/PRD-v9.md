@@ -90,6 +90,8 @@ Decisions below are the nine locked in the 2026-07-24 planning grill (recorded i
 - **System-level (OS) notifications** — out of scope per ADR-0006; v9 stays in-window.
 - **Content extraction / parsing beyond kind detection** — v9 detects the *kind*, not the *content*.
 
+> **Update — 2026-07-27 (v10 shipped, `v0.10.0`):** v10 was the Usage dashboard overhaul (`docs/PRD-v10.md`), not a notification cycle — it shipped the **Usage Filter** (`[Tokens|Cost] [Project▾] [Timeframe▾]` re-scoping trend / composition / by-model / sessions), redesigned **global Metric Cards** (Today / 7-Day / This Month / Subscription Utilization, computed in main on the user's local day, unaffected by the filter), and the **clickable Quota dropdown** (both windows in one notifications-styled panel). No schema change (ADR-0013, the `0006` indices suffice). The **tool-activity timeline** above therefore remains deferred beyond v10 — v10 spent its budget on the Usage overhaul instead.
+
 ## Further Notes
 
 - **CONTEXT.md** gained three terms this cycle: **Notification Kind**, **Pattern Matcher**, and a rewritten **Notification** entry. **ADR-0012** records the fire-first / idle-as-floor decision.

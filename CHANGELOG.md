@@ -15,6 +15,22 @@ The stable `1.0.0` release ships once every item in the
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-07-27
+
+### Added
+- **Slice 74 (v10): PRD-v10 close-out + v0.10.0 release ceremonials.** Closing slice of v10 (Usage dashboard overhaul). Docs + release — the **Usage Filter**, redesigned **global Metric Cards**, and the **clickable Quota dropdown** shipped across Slices 69–73. No schema change (ADR-0013; the `0006` indices cover the filter predicates); no new ADR beyond ADR-0013.
+  - **Planning artifacts committed up front** (`3827721`): `docs/PRD-v10.md`, `docs/adr/0013-usage-filter-parameterized-query.md`, and the CONTEXT.md terms (**Usage Filter**, **Timeframe**, **Metric Card**), so this slice does not re-commit them. PRD-v9's Out of Scope gains a dated v10 close-out note.
+  - **Release ceremonials.** `package.json` 0.9.0 → 0.10.0. CHANGELOG `[Unreleased]` promoted to `[0.10.0] — 2026-07-27`; new empty `[Unreleased]` opens for v11. `git tag v0.10.0`.
+- **Slice 73 (v10): clickable Quota dropdown.** The top-bar 5-hour / weekly bars stay as the at-a-glance %, and become the click target — clicking either opens **one shared dropdown** (notifications-dropdown pattern: anchored under the chip, dismiss on outside-click / Escape) detailing both windows: label · resets-in · % used · a fill bar · % remaining = `max(0, 100 − used)`. Header "Claude Code Quota · live · subscription". Gating unchanged (opt-in + snapshot present; ADR-0011). Reduced-color-vision safe: fill length + the two numbers carry state, single neutral fill tone.
+- **Slice 72 (v10): global Metric Cards.** The three raw summary stat cards (Sessions / Tokens / Cost) are replaced by four redesigned **global** cards: **Today** (tokens + distinct sessions), **Last 7 days** (tokens + active-day count), **This month** (tokens + average over active days), and **Subscription Utilization** ("N× your plan fee" + notional-vs-fee; bar fills `min(multiple/3, 1)`; never "× value"). Computed in main via `metricCards(db, now, tz, fee)` on the user's **local calendar day** (active-day bucketing shifts each UTC timestamp to local wall clock in SQLite) — the rest of the pipeline stays UTC (ADR-0013 boundary kept). The cards are global: they ignore the Usage Filter. Reduced-color-vision safe: number + label + bar length first.
+- **Slice 71 (v10): sessions table reshape.** The Recent-sessions table is recency-ordered (last-activity desc) and shows **all** filtered sessions with a 500-row safety backstop + a "Showing N of M" note; the metric toggle no longer reorders it.
+- **Slice 70 (v10): Project filter end-to-end.** A Project dropdown in the filter bar re-scopes trend / composition / by-model / sessions via the parameterized main-process query; the By-project breakdown hides when a specific Project is selected (it would be a single 100% row).
+- **Slice 69 (v10): Timeframe filter end-to-end (parameterized-query foundation).** A Timeframe dropdown (All time / This Month / Last 7 / 30 / 90 Days; default This Month) replaces the old Range control and re-scopes the filtered views. Establishes the ADR-0013 architecture: `resolveTimeframe` (pure, UTC) → `usage:get-dashboard({ timeframe, encodedPath })` re-fetches with `WHERE timestamp BETWEEN … AND encoded_path = …`; the metric toggle + granularity stay client-side and never re-fetch. `summary`, `heatmapDays`, and the Metric Cards stay global.
+
+### Fixed
+- **Electron main process failed to boot under `pnpm dev`** with `SyntaxError: Named export 'Terminal' not found` — `@xterm/headless` (a CommonJS module added in v9) was left external, so the ESM main bundle's named import failed Node's ESM loader. Now excluded from `externalizeDepsPlugin` (rollup bundles it and handles the CJS→ESM interop) and aliased past its broken `module` field (which points at a non-existent `lib/xterm.mjs`). Latent since v9 because that release was verified via the packaged `dist` build, not `dev`.
+- **Usage toolbar: Project dropdown stranded mid-toolbar.** Both filter dropdowns carried `margin-left: auto`; two auto-margins split the free space. Grouped into a single right-aligned `.usage-filters` container so Project and Timeframe sit together.
+
 ## [0.9.0] — 2026-07-27
 
 ### Added
