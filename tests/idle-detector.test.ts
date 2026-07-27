@@ -363,4 +363,22 @@ describe('IdleDetector — pattern matchers (v9 / Slice 64)', () => {
     env.advanceMs(IDLE_THRESHOLD_MS)
     expect(createdKinds()).toEqual(['idle'])
   })
+
+  it('per-kind toast mute suppresses the toast for that kind but persists the row (v9)', () => {
+    // approval toasts muted; complete still toasts.
+    env.detector.configureMuteCheck(() => ({
+      global: false,
+      project: () => false,
+      kindEnabled: (kind) => kind !== 'approval'
+    }))
+    env.detector.registerPty('pty-1', PROJECT_A, SESS_1)
+    env.detector.onPtyData('pty-1', APPROVAL_FRAME)
+    env.advanceMs(SETTLE_MS)
+    // No toast event for the muted kind...
+    expect(createdKinds()).toEqual([])
+    // ...but the row is persisted — the dropdown still shows it.
+    const stored = listNotifications(env.db)
+    expect(stored).toHaveLength(1)
+    expect(stored[0]).toMatchObject({ kind: 'approval' })
+  })
 })

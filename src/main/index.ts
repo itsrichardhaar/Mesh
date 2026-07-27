@@ -72,6 +72,7 @@ import {
 import {
   getActiveProvider,
   getGlobalNotificationsMute,
+  getKindToastEnabled,
   getQuotaEnabled,
   getSetting,
   setActiveProvider,
@@ -1098,7 +1099,8 @@ app.whenReady().then(() => {
   // detector — only the toast event is suppressed.
   idleDetector.configureMuteCheck(() => ({
     global: getGlobalNotificationsMute(db),
-    project: (encodedPath: string) => isProjectMuted(db, encodedPath)
+    project: (encodedPath: string) => isProjectMuted(db, encodedPath),
+    kindEnabled: (kind) => getKindToastEnabled(db, kind)
   }))
   const retentionCutoff = new Date(
     Date.now() - NOTIFICATION_RETENTION_DAYS * 24 * 60 * 60 * 1000

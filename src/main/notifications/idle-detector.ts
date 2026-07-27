@@ -61,6 +61,17 @@ const defaultCreateScreen = (): ScreenView => {
   }
 }
 
+/**
+ * Live toast-suppression state read at fire time. `global` / `project`
+ * are the v5 mute gates; `kindEnabled` (v9) is an optional per-kind toast
+ * preference — absent means "every kind toasts."
+ */
+export interface MuteState {
+  global: boolean
+  project: (encodedPath: string) => boolean
+  kindEnabled?: (kind: NotificationKind) => boolean
+}
+
 export interface IdleDetectorDeps {
   db: Database.Database
   now: () => number
@@ -131,7 +142,7 @@ interface PtyEntry {
 export class IdleDetector {
   private readonly entries = new Map<string, PtyEntry>()
   private foregroundPtyId: string | null = null
-  private muteCheck: () => { global: boolean; project: (encodedPath: string) => boolean } = () => ({
+  private muteCheck: () => MuteState = () => ({
     global: false,
     project: () => false
   })
@@ -139,11 +150,14 @@ export class IdleDetector {
   constructor(private readonly deps: IdleDetectorDeps) {}
 
   /**
-   * Slice 43 (v5) hook: mute-controls suppress *toast emission*, not
-   * storage. Bound by `main/index.ts` so the detector reads live mute
-   * state at fire time. Default no-op keeps Slice 41 tests trivial.
+   * Slice 43 (v5) / Slice 66 (v9) hook: mute-controls suppress *toast
+   * emission*, not storage. Bound by `main/index.ts` so the detector
+   * reads live mute state at fire time. `kindEnabled` is optional — when
+   * absent (as in v5-era callers and most tests) every kind toasts,
+   * preserving the original behavior. Default no-op keeps Slice 41 tests
+   * trivial.
    */
-  configureMuteCheck(check: () => { global: boolean; project: (encodedPath: string) => boolean }): void {
+  configureMuteCheck(check: () => MuteState): void {
     this.muteCheck = check
   }
 
@@ -300,12 +314,13 @@ export class IdleDetector {
       labelText: DEFAULT_KIND_LABEL[kind] ?? DEFAULT_KIND_LABEL.idle
     })
 
-    // Slice 43 (v5): mute gates *toast emission*, not storage. The row
-    // is already persisted; only the `notifications:created` event is
-    // suppressed when muted (renderer subscribes to this event for
-    // toast popups).
+    // Slice 43 (v5) / Slice 66 (v9): mute gates *toast emission*, not
+    // storage. The row is already persisted; only the
+    // `notifications:created` event is suppressed. A toast emits only
+    // when global-unmuted AND project-unmuted AND this kind is enabled.
     const mute = this.muteCheck()
-    if (mute.global || mute.project(entry.encodedPath)) return
+    const kindEnabled = mute.kindEnabled ? mute.kindEnabled(kind) : true
+    if (mute.global || mute.project(entry.encodedPath) || !kindEnabled) return
 
     this.deps.emit('notifications:created', row)
   }

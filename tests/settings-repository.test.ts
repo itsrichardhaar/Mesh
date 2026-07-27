@@ -6,9 +6,11 @@ import {
   NOTIFICATIONS_GLOBAL_MUTE_KEY,
   getActiveProvider,
   getGlobalNotificationsMute,
+  getKindToastEnabled,
   getSetting,
   setActiveProvider,
   setGlobalNotificationsMute,
+  setKindToastEnabled,
   setSetting
 } from '@main/settings/repository'
 
@@ -26,6 +28,20 @@ describe('settings repository', () => {
 
   it('returns null for an unset key', () => {
     expect(getSetting(db, 'theme')).toBeNull()
+  })
+
+  it('per-kind toast preference defaults to enabled and round-trips', () => {
+    // Absent row → enabled (v5 baseline preserved until opt-out).
+    expect(getKindToastEnabled(db, 'approval')).toBe(true)
+    expect(getKindToastEnabled(db, 'complete')).toBe(true)
+
+    setKindToastEnabled(db, 'complete', false)
+    expect(getKindToastEnabled(db, 'complete')).toBe(false)
+    // Other kinds are independent.
+    expect(getKindToastEnabled(db, 'approval')).toBe(true)
+
+    setKindToastEnabled(db, 'complete', true)
+    expect(getKindToastEnabled(db, 'complete')).toBe(true)
   })
 
   it('round-trips a string value', () => {

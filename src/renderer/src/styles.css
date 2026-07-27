@@ -3470,6 +3470,57 @@ body.sidebar-resizing .sidebar-resize-handle {
   gap: 8px;
 }
 
+/* v9 / Slice 66: global per-kind toast toggles. On/off is conveyed by
+   shape (strike-through + dimming when off), not colour alone. */
+.notifications-dropdown-kinds {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.notifications-dropdown-kinds-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-right: 2px;
+}
+
+.notifications-kind-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  background: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 2px 8px 2px 6px;
+  cursor: pointer;
+}
+
+.notifications-kind-toggle .notifications-kind-toggle-icon {
+  display: inline-flex;
+  color: var(--notif-accent, var(--text-muted));
+}
+
+.notifications-kind-toggle.is-on {
+  border-color: var(--notif-accent, var(--border-strong));
+  background: var(--bg-elevated);
+}
+
+.notifications-kind-toggle.is-off {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.notifications-kind-toggle.is-off .notifications-kind-toggle-icon {
+  color: var(--text-muted);
+}
+
 .notifications-dropdown-action {
   font-size: 11px;
   font-weight: var(--weight-medium);

@@ -1,5 +1,10 @@
 import type Database from 'better-sqlite3'
-import { isProviderId, type ProviderId } from '@shared/types'
+import {
+  isProviderId,
+  notificationKindToastKey,
+  type NotificationKind,
+  type ProviderId
+} from '@shared/types'
 
 /** Stable SQLite key for the user's Active Provider selection (v4 Slice 36). */
 export const ACTIVE_PROVIDER_KEY = 'active_provider'
@@ -77,6 +82,25 @@ export function getGlobalNotificationsMute(db: Database.Database): boolean {
 
 export function setGlobalNotificationsMute(db: Database.Database, value: boolean): void {
   setSetting(db, NOTIFICATIONS_GLOBAL_MUTE_KEY, value ? '1' : '0')
+}
+
+/**
+ * v9 / Slice 66: whether toasts are enabled for a given Notification Kind.
+ * Defaults to `true` (on) when no row exists, so the v5 baseline is
+ * unchanged until the user opts a kind out. This gates *toast emission*
+ * only — the row is always persisted (ADR-0006 invariant).
+ */
+export function getKindToastEnabled(db: Database.Database, kind: NotificationKind): boolean {
+  const stored = getSetting(db, notificationKindToastKey(kind))
+  return stored === null ? true : stored === '1'
+}
+
+export function setKindToastEnabled(
+  db: Database.Database,
+  kind: NotificationKind,
+  enabled: boolean
+): void {
+  setSetting(db, notificationKindToastKey(kind), enabled ? '1' : '0')
 }
 
 /**

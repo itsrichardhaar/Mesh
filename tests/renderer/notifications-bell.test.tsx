@@ -1,6 +1,7 @@
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Notification } from '@shared/types'
+import { notificationKindToastKey } from '@shared/types'
 import { NotificationsBell } from '@renderer/components/NotificationsBell'
 import { NotificationsProvider } from '@renderer/hooks/useNotifications'
 import { buildNotification, meshApi, meshEmit } from './test-utils'
@@ -96,6 +97,44 @@ describe('NotificationsBell — dropdown', () => {
 
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('dialog', { name: 'Notifications' })).not.toBeInTheDocument()
+  })
+})
+
+describe('NotificationsBell — per-kind toast toggles (v9)', () => {
+  it('renders a toggle per kind, all enabled by default', async () => {
+    const { user } = await renderBell()
+    await user.click(screen.getByRole('button', { name: 'Notifications' }))
+
+    const group = screen.getByRole('group', { name: 'Toast for' })
+    const toggles = within(group).getAllByRole('button')
+    expect(toggles).toHaveLength(3)
+    for (const toggle of toggles) {
+      expect(toggle).toHaveAttribute('aria-pressed', 'true')
+    }
+  })
+
+  it('persists a kind toggle through the generic setting IPC', async () => {
+    const { user } = await renderBell()
+    await user.click(screen.getByRole('button', { name: 'Notifications' }))
+
+    const group = screen.getByRole('group', { name: 'Toast for' })
+    await user.click(within(group).getByRole('button', { name: /Complete/ }))
+
+    expect(meshApi().settings.set).toHaveBeenCalledWith(notificationKindToastKey('complete'), '0')
+  })
+
+  it('reflects a stored disabled kind as off', async () => {
+    meshApi().settings.get.mockImplementation(async (key: string) =>
+      key === notificationKindToastKey('idle') ? '0' : null
+    )
+    const { user } = await renderBell()
+    await user.click(screen.getByRole('button', { name: 'Notifications' }))
+
+    const group = screen.getByRole('group', { name: 'Toast for' })
+    expect(within(group).getByRole('button', { name: /Idle/ })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    )
   })
 })
 

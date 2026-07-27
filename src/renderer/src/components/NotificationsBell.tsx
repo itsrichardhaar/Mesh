@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Bell, BellOff } from 'lucide-react'
-import type { Notification } from '@shared/types'
+import type { Notification, NotificationKind } from '@shared/types'
+import { notificationKindToastKey } from '@shared/types'
 import { useNotifications } from '../hooks/useNotifications'
 import { relativeTime } from '../util/relativeTime'
 import { kindPresentation } from '../util/notificationKind'
+
+/** Per-kind toast toggles, ordered by urgency (v9 / Slice 66). */
+const KIND_TOAST_ORDER: readonly NotificationKind[] = ['approval', 'complete', 'idle']
 
 export interface JumpToSessionInput {
   encodedPath: string
@@ -38,6 +42,32 @@ export function NotificationsBell({ onJumpToSession }: Props): JSX.Element {
   } = useNotifications()
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  // Slice 66 (v9): global per-kind toast preferences. Read live from the
+  // generic setting store (absent = enabled); the toast gate in main
+  // reads the same keys on each fire, so a change applies immediately.
+  const [kindToasts, setKindToasts] = useState<Record<string, boolean>>({})
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const entries = await Promise.all(
+        KIND_TOAST_ORDER.map(
+          async (kind) =>
+            [kind, (await window.api.settings.get(notificationKindToastKey(kind))) !== '0'] as const
+        )
+      )
+      if (!cancelled) setKindToasts(Object.fromEntries(entries))
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const toggleKindToast = (kind: NotificationKind): void => {
+    const next = !(kindToasts[kind] ?? true)
+    setKindToasts((prev) => ({ ...prev, [kind]: next }))
+    void window.api.settings.set(notificationKindToastKey(kind), next ? '1' : '0')
+  }
 
   // Close on outside click + Esc.
   useEffect(() => {
@@ -127,6 +157,32 @@ export function NotificationsBell({ onJumpToSession }: Props): JSX.Element {
               </button>
             </div>
           </header>
+          <div className="notifications-dropdown-kinds" role="group" aria-label="Toast for">
+            <span className="notifications-dropdown-kinds-label">Toast for</span>
+            {KIND_TOAST_ORDER.map((kind) => {
+              const { Icon, className, name } = kindPresentation(kind)
+              const enabled = kindToasts[kind] ?? true
+              return (
+                <button
+                  key={kind}
+                  type="button"
+                  className={`notifications-kind-toggle ${className}${enabled ? ' is-on' : ' is-off'}`}
+                  aria-pressed={enabled}
+                  onClick={() => toggleKindToast(kind)}
+                  title={
+                    enabled
+                      ? `${name} toasts on — click to mute`
+                      : `${name} toasts muted — click to enable`
+                  }
+                >
+                  <span className="notifications-kind-toggle-icon" aria-hidden="true">
+                    <Icon size={13} />
+                  </span>
+                  {name}
+                </button>
+              )
+            })}
+          </div>
           {globalMute && (
             <p className="notifications-dropdown-banner" role="status">
               Notifications are paused. New rows still appear here while muted.

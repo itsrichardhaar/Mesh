@@ -209,6 +209,17 @@ export type NotificationKind = 'idle' | (string & { __brand?: 'notification-kind
 
 export const KNOWN_NOTIFICATION_KINDS: readonly NotificationKind[] = ['idle', 'approval', 'complete']
 
+/**
+ * v9 / Slice 66: the settings key for a Notification Kind's global toast
+ * preference. Stored via the generic setting IPC as `'1'` / `'0'`; an
+ * absent row means enabled (default all-on, preserving v5 behavior).
+ * Shared so main (the toast gate) and the renderer (the toggle UI) agree
+ * on the key without coupling across the process boundary.
+ */
+export function notificationKindToastKey(kind: NotificationKind): string {
+  return `notifications_toast_${kind}`
+}
+
 // --- Usage (v7 / Slice 52) ------------------------------------------------
 
 /**
