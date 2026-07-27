@@ -360,14 +360,40 @@ export interface UsageTurn {
 }
 
 /**
+ * The Usage Filter's Timeframe options (v10 / Slice 69). `all` = no lower
+ * bound; the rest are trailing windows ending at "now". `month` is the
+ * current calendar month to date.
+ */
+export type UsageTimeframe = 'all' | 'month' | '7d' | '30d' | '90d'
+
+export function isUsageTimeframe(value: unknown): value is UsageTimeframe {
+  return value === 'all' || value === 'month' || value === '7d' || value === '30d' || value === '90d'
+}
+
+/**
+ * The Usage Filter argument the renderer sends to `usage:get-dashboard`
+ * (v10 / ADR-0013). `timeframe` and `encodedPath` (a Project, null = all)
+ * re-scope the *filtered* views; the metric toggle and granularity are
+ * applied client-side and never re-fetch.
+ */
+export interface UsageDashboardFilter {
+  timeframe: UsageTimeframe
+  encodedPath: string | null
+}
+
+/**
  * Everything the global Usage dashboard needs in one round-trip (Slice
- * 54): headline totals + a per-day series the renderer buckets into
- * day/week/month and filters by range. Slice 55 adds the by-project
- * breakdown, the by-model breakdown, and the top Sessions by Usage.
+ * 54); v10 (ADR-0013) makes it filterable. `days`, `byProject`, `byModel`,
+ * and `topSessions` are scoped to the active Usage Filter. `summary` and
+ * `heatmapDays` stay **global** (unaffected by the filter): the headline
+ * totals and the rolling-year Activity Heatmap read all-time, all-project.
  */
 export interface UsageDashboard {
   summary: UsageSummary
+  /** Filtered per-day series — the trend chart + Token Composition. */
   days: UsageDayPoint[]
+  /** Global per-day series — the Activity Heatmap (ignores the filter). */
+  heatmapDays: UsageDayPoint[]
   byProject: UsageProjectRow[]
   byModel: UsageModelRow[]
   topSessions: UsageSessionRow[]

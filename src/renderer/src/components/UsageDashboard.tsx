@@ -5,6 +5,7 @@ import type {
   UsageModelRow,
   UsageProjectRow,
   UsageSessionRow,
+  UsageTimeframe,
   UsageTurn
 } from '@shared/types'
 import type { JumpToSessionInput } from './NotificationsBell'
@@ -13,7 +14,6 @@ import {
   bucketTrend,
   tokenComposition,
   type Granularity,
-  type Range,
   type TrendPoint
 } from '../util/trend'
 import { heatmapGrid } from '../util/heatmap'
@@ -63,7 +63,7 @@ export function UsageDashboard({
   onSelectProject,
   onJumpToSession
 }: DashboardProps = {}): JSX.Element {
-  const { dashboard, indexing, metric, granularity, range, setMetric, setGranularity, setRange } =
+  const { dashboard, indexing, metric, granularity, timeframe, setMetric, setGranularity, setTimeframe } =
     useUsage()
   const [timeView, setTimeView] = useState<TimeView>('trend')
 
@@ -75,8 +75,8 @@ export function UsageDashboard({
     )
   }
 
-  const { summary, days } = dashboard
-  const points = bucketTrend(days, granularity, range, Date.now())
+  const { summary, days, heatmapDays } = dashboard
+  const points = bucketTrend(days, granularity)
 
   return (
     <div className="usage-dashboard" aria-label="Usage">
@@ -98,15 +98,17 @@ export function UsageDashboard({
           </div>
         )}
         <label className="usage-range">
-          <span className="visually-hidden">Range</span>
+          <span className="visually-hidden">Timeframe</span>
           <select
-            aria-label="Range"
-            value={range}
-            onChange={(e) => setRange(e.target.value as Range)}
+            aria-label="Timeframe"
+            value={timeframe}
+            onChange={(e) => setTimeframe(e.target.value as UsageTimeframe)}
           >
-            <option value="30d">Last 30 days</option>
-            <option value="90d">Last 90 days</option>
             <option value="all">All time</option>
+            <option value="month">This Month</option>
+            <option value="7d">Last 7 Days</option>
+            <option value="30d">Last 30 Days</option>
+            <option value="90d">Last 90 Days</option>
           </select>
         </label>
       </div>
@@ -121,7 +123,7 @@ export function UsageDashboard({
         />
       </div>
 
-      <SubscriptionUtilization days={days} />
+      <SubscriptionUtilization days={heatmapDays} />
 
       <div className="usage-time">
         <div className="usage-view-toggle" role="group" aria-label="Time view">
@@ -131,12 +133,12 @@ export function UsageDashboard({
         {timeView === 'trend' ? (
           <TrendChart points={points} metric={metric} granularity={granularity} indexing={indexing} />
         ) : (
-          <ActivityHeatmap days={days} metric={metric} />
+          <ActivityHeatmap days={heatmapDays} metric={metric} />
         )}
       </div>
 
       <div className="usage-breakdowns">
-        <TokenCompositionCard days={dashboard.days} range={range} />
+        <TokenCompositionCard days={dashboard.days} />
         <ByModelBreakdown rows={dashboard.byModel} metric={metric} />
         <ByProjectBreakdown
           rows={dashboard.byProject}
@@ -328,18 +330,12 @@ const COMPOSITION_CLASSES = [
 
 /**
  * Token Composition (v8 / Slice 58) — the share of tokens across the four
- * classes over the active range, as a stacked proportion bar + labeled
- * rows. Range-aware (folds the day series), granularity-agnostic, and
- * always a token share regardless of the Tokens/Cost toggle.
+ * classes over the active Usage Filter, as a stacked proportion bar +
+ * labeled rows. The day series is already filter-scoped in main (v10), so
+ * this folds all of it; always a token share regardless of the metric toggle.
  */
-function TokenCompositionCard({
-  days,
-  range
-}: {
-  days: UsageDayPoint[]
-  range: Range
-}): JSX.Element {
-  const comp = tokenComposition(days, range, Date.now())
+function TokenCompositionCard({ days }: { days: UsageDayPoint[] }): JSX.Element {
+  const comp = tokenComposition(days)
   const rows = COMPOSITION_CLASSES.map((c) => {
     const value = comp[c.key]
     return { ...c, value, pct: comp.total === 0 ? 0 : Math.round((value / comp.total) * 100) }

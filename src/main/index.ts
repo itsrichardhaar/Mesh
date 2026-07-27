@@ -12,9 +12,11 @@ import type {
   ProviderId,
   StoredAnalysis,
   StoredValidation,
+  UsageDashboardFilter,
+  UsageTimeframe,
   ValidationResult
 } from '@shared/types'
-import { isProviderId, isThemePreference } from '@shared/types'
+import { isProviderId, isThemePreference, isUsageTimeframe } from '@shared/types'
 import { isModelId, selectedModelSettingKey } from '@shared/models'
 import {
   ClaudeClient,
@@ -106,6 +108,7 @@ import {
   buildSessionRows,
   buildTurns
 } from './usage/dashboard'
+import { resolveTimeframe } from './usage/timeframe'
 
 /** How many top Sessions by Usage the dashboard's session explorer shows. */
 const TOP_SESSIONS = 50
@@ -948,12 +951,22 @@ function registerIpc(): void {
   })
 
   // Everything the global Usage dashboard needs in one round-trip
-  // (Slice 54): headline totals + a per-day series the renderer buckets.
-  ipcMain.handle('usage:get-dashboard', () => {
+  // (Slice 54); v10 (ADR-0013) makes the views filterable via an optional
+  // { timeframe, encodedPath } argument. The filtered views (days / byModel
+  // / byProject / topSessions) honor it; `summary` and `heatmapDays` stay
+  // global. metric + granularity are applied client-side and never re-fetch.
+  ipcMain.handle('usage:get-dashboard', (_event, arg: unknown) => {
     const db = getDatabase()
+    const req = (arg ?? {}) as Partial<UsageDashboardFilter>
+    const timeframe: UsageTimeframe = isUsageTimeframe(req.timeframe) ? req.timeframe : 'all'
+    const encodedPath =
+      typeof req.encodedPath === 'string' && req.encodedPath.length > 0 ? req.encodedPath : null
+    const range = resolveTimeframe(timeframe, new Date())
+    const filter = { start: range.start, end: range.end, encodedPath }
+
+    // Global summary — the Metric Cards are unaffected by the Usage Filter.
     const counts = usageSummaryCounts(db)
-    const groups = sumTokensByGroup(db)
-    const cost = notionalCost(groups)
+    const cost = notionalCost(sumTokensByGroup(db))
     return {
       summary: {
         eventCount: counts.eventCount,
@@ -963,10 +976,13 @@ function registerIpc(): void {
         totalNotionalCostUsd: cost.totalUsd,
         unpricedModels: cost.unpricedModels
       },
-      days: buildDayPoints(sumTokensByDayAndGroup(db)),
-      byProject: buildProjectRows(sumTokensByProjectGroup(db), projectMeta(db)),
-      byModel: buildModelRows(groups),
-      topSessions: buildSessionRows(sumTokensBySessionGroup(db), sessionMeta(db), TOP_SESSIONS)
+      // Filtered views.
+      days: buildDayPoints(sumTokensByDayAndGroup(db, filter)),
+      byProject: buildProjectRows(sumTokensByProjectGroup(db, filter), projectMeta(db, filter)),
+      byModel: buildModelRows(sumTokensByGroup(db, filter)),
+      topSessions: buildSessionRows(sumTokensBySessionGroup(db, filter), sessionMeta(db, filter), TOP_SESSIONS),
+      // Global — the rolling-year Activity Heatmap ignores the filter.
+      heatmapDays: buildDayPoints(sumTokensByDayAndGroup(db))
     }
   })
 

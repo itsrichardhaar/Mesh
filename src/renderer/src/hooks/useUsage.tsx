@@ -29,7 +29,7 @@ export function useUsage() {
   const indexing = useStore(usageStore, (s) => s.indexing)
   const metric = useStore(usageStore, (s) => s.metric)
   const granularity = useStore(usageStore, (s) => s.granularity)
-  const range = useStore(usageStore, (s) => s.range)
-  const { setMetric, setGranularity, setRange } = usageStore.getState()
-  return { dashboard, indexing, metric, granularity, range, setMetric, setGranularity, setRange }
+  const timeframe = useStore(usageStore, (s) => s.timeframe)
+  const { setMetric, setGranularity, setTimeframe } = usageStore.getState()
+  return { dashboard, indexing, metric, granularity, timeframe, setMetric, setGranularity, setTimeframe }
 }

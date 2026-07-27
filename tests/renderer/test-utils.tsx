@@ -192,6 +192,7 @@ export function createMeshApiFake(): MeshApiFake {
           unpricedModels: []
         },
         days: [],
+        heatmapDays: [],
         byProject: [],
         byModel: [],
         topSessions: []

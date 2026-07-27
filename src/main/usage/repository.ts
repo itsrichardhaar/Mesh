@@ -14,6 +14,43 @@ export interface IngestCursor {
   lineCount: number
 }
 
+/**
+ * A resolved Usage Filter for the dashboard's view queries (v10 / ADR-0013):
+ * an inclusive timestamp range plus an optional Project. Absent/empty fields
+ * are omitted from the `WHERE`, so an empty filter reproduces the original
+ * all-time / all-project behavior — existing callers pass nothing.
+ */
+export interface UsageQueryFilter {
+  start?: string | null
+  end?: string | null
+  encodedPath?: string | null
+}
+
+/** Build a `WHERE …` fragment (+ named params) from a Usage Filter. */
+function buildWhere(filter?: UsageQueryFilter): { sql: string; params: Record<string, string> } {
+  const clauses: string[] = []
+  const params: Record<string, string> = {}
+  if (filter?.start) {
+    clauses.push('timestamp >= @fStart')
+    params.fStart = filter.start
+  }
+  if (filter?.end) {
+    clauses.push('timestamp <= @fEnd')
+    params.fEnd = filter.end
+  }
+  if (filter?.encodedPath) {
+    clauses.push('encoded_path = @fEncodedPath')
+    params.fEncodedPath = filter.encodedPath
+  }
+  return { sql: clauses.length > 0 ? `WHERE ${clauses.join(' AND ')} ` : '', params }
+}
+
+/** Run a prepared query, binding named params only when there are any. */
+function allWith<T>(db: Database.Database, sql: string, params: Record<string, string>): T[] {
+  const stmt = db.prepare(sql)
+  return (Object.keys(params).length > 0 ? stmt.all(params) : stmt.all()) as T[]
+}
+
 /** Insert-or-ignore a batch of Usage Events. Returns how many rows were new. */
 export function insertUsageEvents(db: Database.Database, events: readonly UsageEvent[]): number {
   if (events.length === 0) return 0
@@ -105,62 +142,74 @@ export function usageSummaryCounts(db: Database.Database): {
  * lets the caller price each day's Notional Cost accurately.
  */
 export function sumTokensByDayAndGroup(
-  db: Database.Database
+  db: Database.Database,
+  filter?: UsageQueryFilter
 ): Array<TokenGroup & { day: string }> {
-  return db
-    .prepare(
-      `SELECT
-         substr(timestamp, 1, 10) AS day,
-         model,
-         service_tier AS serviceTier,
-         SUM(input_tokens) AS inputTokens,
-         SUM(cache_read_tokens) AS cacheReadTokens,
-         SUM(cache_write_tokens) AS cacheWriteTokens,
-         SUM(output_tokens) AS outputTokens
-       FROM usage_events
-       GROUP BY day, model, service_tier
-       ORDER BY day`
-    )
-    .all() as Array<TokenGroup & { day: string }>
+  const { sql, params } = buildWhere(filter)
+  return allWith<TokenGroup & { day: string }>(
+    db,
+    `SELECT
+       substr(timestamp, 1, 10) AS day,
+       model,
+       service_tier AS serviceTier,
+       SUM(input_tokens) AS inputTokens,
+       SUM(cache_read_tokens) AS cacheReadTokens,
+       SUM(cache_write_tokens) AS cacheWriteTokens,
+       SUM(output_tokens) AS outputTokens
+     FROM usage_events
+     ${sql}GROUP BY day, model, service_tier
+     ORDER BY day`,
+    params
+  )
 }
 
 /** Token groups keyed by an extra column (encoded_path / session_id) for per-entity cost. */
 type KeyedGroup<K extends string> = TokenGroup & Record<K, string | null>
 
-export function sumTokensByProjectGroup(db: Database.Database): Array<KeyedGroup<'encodedPath'>> {
-  return db
-    .prepare(
-      `SELECT encoded_path AS encodedPath, model, service_tier AS serviceTier,
-         SUM(input_tokens) AS inputTokens, SUM(cache_read_tokens) AS cacheReadTokens,
-         SUM(cache_write_tokens) AS cacheWriteTokens, SUM(output_tokens) AS outputTokens
-       FROM usage_events GROUP BY encoded_path, model, service_tier`
-    )
-    .all() as Array<KeyedGroup<'encodedPath'>>
+export function sumTokensByProjectGroup(
+  db: Database.Database,
+  filter?: UsageQueryFilter
+): Array<KeyedGroup<'encodedPath'>> {
+  const { sql, params } = buildWhere(filter)
+  return allWith<KeyedGroup<'encodedPath'>>(
+    db,
+    `SELECT encoded_path AS encodedPath, model, service_tier AS serviceTier,
+       SUM(input_tokens) AS inputTokens, SUM(cache_read_tokens) AS cacheReadTokens,
+       SUM(cache_write_tokens) AS cacheWriteTokens, SUM(output_tokens) AS outputTokens
+     FROM usage_events ${sql}GROUP BY encoded_path, model, service_tier`,
+    params
+  )
 }
 
 export function projectMeta(
-  db: Database.Database
+  db: Database.Database,
+  filter?: UsageQueryFilter
 ): Array<{ encodedPath: string; sessionCount: number; tokens: number; lastActivity: string }> {
-  return db
-    .prepare(
-      `SELECT encoded_path AS encodedPath,
-         COUNT(DISTINCT session_id) AS sessionCount,
-         SUM(input_tokens + cache_read_tokens + cache_write_tokens + output_tokens) AS tokens,
-         MAX(timestamp) AS lastActivity
-       FROM usage_events GROUP BY encoded_path`
-    )
-    .all() as Array<{ encodedPath: string; sessionCount: number; tokens: number; lastActivity: string }>
+  const { sql, params } = buildWhere(filter)
+  return allWith<{ encodedPath: string; sessionCount: number; tokens: number; lastActivity: string }>(
+    db,
+    `SELECT encoded_path AS encodedPath,
+       COUNT(DISTINCT session_id) AS sessionCount,
+       SUM(input_tokens + cache_read_tokens + cache_write_tokens + output_tokens) AS tokens,
+       MAX(timestamp) AS lastActivity
+     FROM usage_events ${sql}GROUP BY encoded_path`,
+    params
+  )
 }
 
-export function sumTokensBySessionGroup(db: Database.Database): Array<KeyedGroup<'sessionId'>> {
-  return db
-    .prepare(
-      `SELECT session_id AS sessionId, model, service_tier AS serviceTier,
-         SUM(input_tokens) AS inputTokens, SUM(cache_read_tokens) AS cacheReadTokens,
-         SUM(cache_write_tokens) AS cacheWriteTokens, SUM(output_tokens) AS outputTokens
-       FROM usage_events GROUP BY session_id, model, service_tier`
-    )
-    .all() as Array<KeyedGroup<'sessionId'>>
+export function sumTokensBySessionGroup(
+  db: Database.Database,
+  filter?: UsageQueryFilter
+): Array<KeyedGroup<'sessionId'>> {
+  const { sql, params } = buildWhere(filter)
+  return allWith<KeyedGroup<'sessionId'>>(
+    db,
+    `SELECT session_id AS sessionId, model, service_tier AS serviceTier,
+       SUM(input_tokens) AS inputTokens, SUM(cache_read_tokens) AS cacheReadTokens,
+       SUM(cache_write_tokens) AS cacheWriteTokens, SUM(output_tokens) AS outputTokens
+     FROM usage_events ${sql}GROUP BY session_id, model, service_tier`,
+    params
+  )
 }
 
 export interface SessionMetaRow {
@@ -172,17 +221,18 @@ export interface SessionMetaRow {
   lastActivity: string
 }
 
-export function sessionMeta(db: Database.Database): SessionMetaRow[] {
-  return db
-    .prepare(
-      `SELECT session_id AS sessionId, encoded_path AS encodedPath,
-         COUNT(*) AS eventCount,
-         SUM(input_tokens + cache_read_tokens + cache_write_tokens + output_tokens) AS tokens,
-         MIN(timestamp) AS firstActivity,
-         MAX(timestamp) AS lastActivity
-       FROM usage_events GROUP BY session_id`
-    )
-    .all() as SessionMetaRow[]
+export function sessionMeta(db: Database.Database, filter?: UsageQueryFilter): SessionMetaRow[] {
+  const { sql, params } = buildWhere(filter)
+  return allWith<SessionMetaRow>(
+    db,
+    `SELECT session_id AS sessionId, encoded_path AS encodedPath,
+       COUNT(*) AS eventCount,
+       SUM(input_tokens + cache_read_tokens + cache_write_tokens + output_tokens) AS tokens,
+       MIN(timestamp) AS firstActivity,
+       MAX(timestamp) AS lastActivity
+     FROM usage_events ${sql}GROUP BY session_id`,
+    params
+  )
 }
 
 /** Headline counts for one Project — the Project Screen's Usage strip. */
@@ -246,26 +296,19 @@ export function sessionEventRows(
  * Token totals grouped by (model, service_tier) — the input to Notional
  * Cost. Grouping by tier keeps the cost service-tier aware.
  */
-export function sumTokensByGroup(db: Database.Database): TokenGroup[] {
-  const rows = db
-    .prepare(
-      `SELECT
-         model,
-         service_tier AS serviceTier,
-         SUM(input_tokens) AS inputTokens,
-         SUM(cache_read_tokens) AS cacheReadTokens,
-         SUM(cache_write_tokens) AS cacheWriteTokens,
-         SUM(output_tokens) AS outputTokens
-       FROM usage_events
-       GROUP BY model, service_tier`
-    )
-    .all() as Array<{
-    model: string | null
-    serviceTier: string | null
-    inputTokens: number
-    cacheReadTokens: number
-    cacheWriteTokens: number
-    outputTokens: number
-  }>
-  return rows
+export function sumTokensByGroup(db: Database.Database, filter?: UsageQueryFilter): TokenGroup[] {
+  const { sql, params } = buildWhere(filter)
+  return allWith<TokenGroup>(
+    db,
+    `SELECT
+       model,
+       service_tier AS serviceTier,
+       SUM(input_tokens) AS inputTokens,
+       SUM(cache_read_tokens) AS cacheReadTokens,
+       SUM(cache_write_tokens) AS cacheWriteTokens,
+       SUM(output_tokens) AS outputTokens
+     FROM usage_events
+     ${sql}GROUP BY model, service_tier`,
+    params
+  )
 }

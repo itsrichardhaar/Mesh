@@ -20,7 +20,7 @@ function project(encodedPath: string, name: string): Project {
 }
 
 function dashboard(overrides: Partial<UsageDashboardData> = {}): UsageDashboardData {
-  return {
+  const base: UsageDashboardData = {
     summary: {
       eventCount: 100,
       sessionCount: 7,
@@ -34,11 +34,15 @@ function dashboard(overrides: Partial<UsageDashboardData> = {}): UsageDashboardD
       { day: '2026-07-12', tokens: 500_000, costUsd: 5, inputTokens: 50_000, outputTokens: 100_000, cacheReadTokens: 300_000, cacheWriteTokens: 50_000 },
       { day: '2026-07-13', tokens: 1_000_000, costUsd: 7.34, inputTokens: 100_000, outputTokens: 200_000, cacheReadTokens: 600_000, cacheWriteTokens: 100_000 }
     ],
+    heatmapDays: [],
     byProject: [],
     byModel: [],
-    topSessions: [],
-    ...overrides
+    topSessions: []
   }
+  const merged = { ...base, ...overrides }
+  // The Activity Heatmap + Subscription Utilization read the global
+  // `heatmapDays`; default it to the effective `days` unless overridden.
+  return { ...merged, heatmapDays: overrides.heatmapDays ?? merged.days }
 }
 
 describe('UsageDashboard', () => {
@@ -49,7 +53,7 @@ describe('UsageDashboard', () => {
   })
 
   it('renders stat cards including Notional Cost with its clarifier', () => {
-    usageStore.setState({ dashboard: dashboard(), range: 'all', granularity: 'day', metric: 'tokens' })
+    usageStore.setState({ dashboard: dashboard(), timeframe: 'all', granularity: 'day', metric: 'tokens' })
     render(<UsageDashboard />)
     expect(screen.getByText('7')).toBeInTheDocument() // sessions
     expect(screen.getByText('1.5M')).toBeInTheDocument() // tokens (compact)
@@ -58,21 +62,21 @@ describe('UsageDashboard', () => {
   })
 
   it('plots one point per bucket for the active granularity/range', () => {
-    usageStore.setState({ dashboard: dashboard(), range: 'all', granularity: 'day', metric: 'tokens' })
+    usageStore.setState({ dashboard: dashboard(), timeframe: 'all', granularity: 'day', metric: 'tokens' })
     render(<UsageDashboard />)
     const chart = screen.getByRole('img', { name: /usage trend by tokens/i })
     expect(chart).toHaveAttribute('data-points', '2')
   })
 
   it('switches the plotted metric when the Cost toggle is clicked', async () => {
-    usageStore.setState({ dashboard: dashboard(), range: 'all', granularity: 'day', metric: 'tokens' })
+    usageStore.setState({ dashboard: dashboard(), timeframe: 'all', granularity: 'day', metric: 'tokens' })
     render(<UsageDashboard />)
     await userEvent.click(screen.getByRole('button', { name: 'Cost', pressed: false }))
     expect(screen.getByRole('img', { name: /usage trend by cost/i })).toBeInTheDocument()
   })
 
   it('toggles to the heatmap, hiding granularity but keeping metric + range', async () => {
-    usageStore.setState({ dashboard: dashboard(), range: 'all', granularity: 'day', metric: 'tokens' })
+    usageStore.setState({ dashboard: dashboard(), timeframe: 'all', granularity: 'day', metric: 'tokens' })
     render(<UsageDashboard />)
     // Trend is the default view: trend chart + granularity control present.
     expect(screen.getByRole('img', { name: /usage trend by tokens/i })).toBeInTheDocument()
@@ -85,15 +89,31 @@ describe('UsageDashboard', () => {
     expect(screen.queryByRole('img', { name: /usage trend/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Week' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cost' })).toBeInTheDocument() // metric toggle stays
-    expect(screen.getByRole('combobox', { name: 'Range' })).toBeInTheDocument() // range stays (drives composition)
+    expect(screen.getByRole('combobox', { name: 'Timeframe' })).toBeInTheDocument() // range stays (drives composition)
   })
 
   it('shades the heatmap by the active metric', async () => {
-    usageStore.setState({ dashboard: dashboard(), range: 'all', granularity: 'day', metric: 'tokens' })
+    usageStore.setState({ dashboard: dashboard(), timeframe: 'all', granularity: 'day', metric: 'tokens' })
     render(<UsageDashboard />)
     await userEvent.click(screen.getByRole('button', { name: 'Cost' }))
     await userEvent.click(screen.getByRole('button', { name: 'Heatmap' }))
     expect(screen.getByRole('img', { name: /activity heatmap by cost/i })).toBeInTheDocument()
+  })
+
+  it('re-fetches with the new timeframe when the Timeframe dropdown changes (v10)', async () => {
+    usageStore.setState({ dashboard: dashboard(), timeframe: 'month', granularity: 'day', metric: 'tokens' })
+    render(<UsageDashboard />)
+    meshApi().usage.getDashboard.mockClear()
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Timeframe' }), 'all')
+    expect(meshApi().usage.getDashboard).toHaveBeenCalledWith({ timeframe: 'all', encodedPath: null })
+  })
+
+  it('does NOT re-fetch when the metric toggle changes (client-side, v10)', async () => {
+    usageStore.setState({ dashboard: dashboard(), timeframe: 'month', granularity: 'day', metric: 'tokens' })
+    render(<UsageDashboard />)
+    meshApi().usage.getDashboard.mockClear()
+    await userEvent.click(screen.getByRole('button', { name: 'Cost' }))
+    expect(meshApi().usage.getDashboard).not.toHaveBeenCalled()
   })
 })
 
@@ -118,7 +138,7 @@ describe('UsageDashboard — by-project + session explorer (Slice 55)', () => {
     })
 
   it('renders by-project rows by name and selects on click', async () => {
-    usageStore.setState({ dashboard: withRows(), range: 'all', metric: 'tokens' })
+    usageStore.setState({ dashboard: withRows(), timeframe: 'all', metric: 'tokens' })
     const onSelectProject = vi.fn()
     render(<UsageDashboard projects={[project('-proj-a', 'Alpha')]} onSelectProject={onSelectProject} />)
     await userEvent.click(screen.getByRole('button', { name: /Alpha: .* sessions/i }))
@@ -138,7 +158,7 @@ describe('UsageDashboard — by-project + session explorer (Slice 55)', () => {
       lastActivity: '2026-07-13T00:00:00Z'
     }))
     const projects = tokens.map((_, i) => project(`-p${i + 1}`, `P${i + 1}`))
-    usageStore.setState({ dashboard: dashboard({ byProject }), range: 'all', metric: 'tokens' })
+    usageStore.setState({ dashboard: dashboard({ byProject }), timeframe: 'all', metric: 'tokens' })
     render(<UsageDashboard projects={projects} />)
 
     const region = screen.getByRole('region', { name: 'By project' })
@@ -162,7 +182,7 @@ describe('UsageDashboard — by-project + session explorer (Slice 55)', () => {
 
   it('hides the Subscription Utilization gauge until a plan fee is set', () => {
     planFeeStore.setState({ planFeeUsd: null })
-    usageStore.setState({ dashboard: dashboard(), range: 'all', metric: 'tokens' })
+    usageStore.setState({ dashboard: dashboard(), timeframe: 'all', metric: 'tokens' })
     render(<UsageDashboard />)
     const region = screen.getByRole('region', { name: 'Subscription Utilization' })
     expect(within(region).getByText(/set your monthly plan fee/i)).toBeInTheDocument()
@@ -170,7 +190,7 @@ describe('UsageDashboard — by-project + session explorer (Slice 55)', () => {
 
   it('shows the utilization percent against the plan fee when set', () => {
     planFeeStore.setState({ planFeeUsd: 20 })
-    usageStore.setState({ dashboard: dashboardToday(12), range: 'all', metric: 'tokens' })
+    usageStore.setState({ dashboard: dashboardToday(12), timeframe: 'all', metric: 'tokens' })
     render(<UsageDashboard />)
     const region = screen.getByRole('region', { name: 'Subscription Utilization' })
     expect(within(region).getByText('60%')).toBeInTheDocument() // 12 of 20
@@ -178,7 +198,7 @@ describe('UsageDashboard — by-project + session explorer (Slice 55)', () => {
 
   it('reads “Paying off” when this month beats the fee', () => {
     planFeeStore.setState({ planFeeUsd: 10 })
-    usageStore.setState({ dashboard: dashboardToday(25), range: 'all', metric: 'tokens' })
+    usageStore.setState({ dashboard: dashboardToday(25), timeframe: 'all', metric: 'tokens' })
     render(<UsageDashboard />)
     const region = screen.getByRole('region', { name: 'Subscription Utilization' })
     expect(within(region).getByText('250%')).toBeInTheDocument()
@@ -186,7 +206,7 @@ describe('UsageDashboard — by-project + session explorer (Slice 55)', () => {
   })
 
   it('renders the token composition card with class shares over the range', () => {
-    usageStore.setState({ dashboard: dashboard(), range: 'all', metric: 'tokens' })
+    usageStore.setState({ dashboard: dashboard(), timeframe: 'all', metric: 'tokens' })
     render(<UsageDashboard />)
     const comp = screen.getByRole('region', { name: 'Token composition' })
     // 10/20/60/10 split across the two fixture days → shares independent of the metric toggle.
@@ -204,7 +224,7 @@ describe('UsageDashboard — by-project + session explorer (Slice 55)', () => {
           { model: null, tokens: 1_000_000, costUsd: 0 }
         ]
       }),
-      range: 'all',
+      timeframe: 'all',
       metric: 'tokens'
     })
     render(<UsageDashboard />)
@@ -215,7 +235,7 @@ describe('UsageDashboard — by-project + session explorer (Slice 55)', () => {
   })
 
   it('jumps to a session via the three-tier resolver (ptyId null)', async () => {
-    usageStore.setState({ dashboard: withRows(), range: 'all', metric: 'tokens' })
+    usageStore.setState({ dashboard: withRows(), timeframe: 'all', metric: 'tokens' })
     const onJumpToSession = vi.fn()
     render(<UsageDashboard projects={[project('-proj-a', 'Alpha')]} onJumpToSession={onJumpToSession} />)
     await userEvent.click(screen.getByRole('button', { name: 'Jump' }))
@@ -231,7 +251,7 @@ describe('UsageDashboard — by-project + session explorer (Slice 55)', () => {
     meshApi().usage.getSessionEvents.mockResolvedValue([
       { eventId: 'e1', timestamp: '2026-07-13T00:00:00Z', model: 'claude-sonnet-4-6', tokens: 1234, costUsd: 0.05 }
     ])
-    usageStore.setState({ dashboard: withRows(), range: 'all', metric: 'tokens' })
+    usageStore.setState({ dashboard: withRows(), timeframe: 'all', metric: 'tokens' })
     render(<UsageDashboard projects={[project('-proj-a', 'Alpha')]} />)
     await userEvent.click(screen.getByRole('button', { expanded: false }))
     expect(await screen.findByText('claude-sonnet-4-6')).toBeInTheDocument()

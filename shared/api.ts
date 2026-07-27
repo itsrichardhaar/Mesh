@@ -21,6 +21,7 @@ import type {
   StoredValidation,
   ThemePreference,
   UsageDashboard,
+  UsageDashboardFilter,
   UsageIngestStatus,
   UsageProjectSummary,
   UsageTurn,
@@ -286,8 +287,12 @@ export interface MeshApi {
     onStatusChanged(cb: (status: UsageIngestStatus) => void): () => void
     /** Aggregate Notional Cost across all Usage Events (Slice 53). */
     getCostSummary(): Promise<CostSummary>
-    /** Everything the global Usage dashboard renders — totals + per-day series (Slice 54). */
-    getDashboard(): Promise<UsageDashboard>
+    /**
+     * Everything the Usage dashboard renders — totals + per-day series
+     * (Slice 54). The optional Usage Filter (v10 / ADR-0013) re-scopes the
+     * filtered views; omit it for the all-time / all-project view.
+     */
+    getDashboard(filter?: UsageDashboardFilter): Promise<UsageDashboard>
     /** Per-turn drill-down for one Session in the explorer (Slice 55). */
     getSessionEvents(sessionId: string): Promise<UsageTurn[]>
     /** One Project's headline Usage for its Project Screen strip (Slice 56). */

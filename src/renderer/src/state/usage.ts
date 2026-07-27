@@ -1,15 +1,15 @@
 /**
- * Renderer cache of the global Usage dashboard (v7 / Slice 54). Zustand
- * vanilla store (ADR-0007). Pull-based: `loadDashboard` fetches the
- * one-round-trip payload from main; the view state (metric / granularity
- * / range) lives here so toggles don't refetch. Selector-based bindings
- * keep high-frequency ingest churn from over-rendering.
+ * Renderer cache of the Usage dashboard (v7 / Slice 54; filterable in v10 /
+ * ADR-0013). Zustand vanilla store (ADR-0007). Pull-based: `loadDashboard`
+ * fetches the one-round-trip payload from main. The metric toggle and
+ * granularity are client-side and never re-fetch; changing the Usage
+ * Filter's Timeframe re-fetches (the scoping happens in main).
  */
 
 import { createStore, type StoreApi } from 'zustand/vanilla'
 import type { MeshApi } from '@shared/api'
-import type { UsageDashboard } from '@shared/types'
-import type { Granularity, Range } from '../util/trend'
+import type { UsageDashboard, UsageTimeframe } from '@shared/types'
+import type { Granularity } from '../util/trend'
 
 type UsageApi = Pick<MeshApi['usage'], 'getDashboard'>
 
@@ -19,13 +19,14 @@ export interface UsageState {
   indexing: boolean
   metric: 'tokens' | 'cost'
   granularity: Granularity
-  range: Range
+  /** Usage Filter: date window. Changing it re-fetches (ADR-0013). */
+  timeframe: UsageTimeframe
 
   loadDashboard(): Promise<void>
   setIndexing(value: boolean): void
   setMetric(metric: 'tokens' | 'cost'): void
   setGranularity(granularity: Granularity): void
-  setRange(range: Range): void
+  setTimeframe(timeframe: UsageTimeframe): void
 }
 
 export interface UsageDeps {
@@ -35,19 +36,26 @@ export interface UsageDeps {
 export type UsageStore = StoreApi<UsageState>
 
 export function createUsageStore(deps: UsageDeps): UsageStore {
-  return createStore<UsageState>()((set) => ({
+  return createStore<UsageState>()((set, get) => ({
     dashboard: null,
     indexing: false,
     metric: 'tokens',
     granularity: 'day',
-    range: '30d',
+    timeframe: 'month',
 
+    // The Usage Filter is applied in main; metric + granularity stay
+    // client-side and do NOT re-fetch. Project scoping lands in Slice 70
+    // (encodedPath stays null here).
     loadDashboard: async () => {
-      set({ dashboard: await deps.api().getDashboard() })
+      const dashboard = await deps.api().getDashboard({ timeframe: get().timeframe, encodedPath: null })
+      set({ dashboard })
     },
     setIndexing: (value) => set({ indexing: value }),
     setMetric: (metric) => set({ metric }),
     setGranularity: (granularity) => set({ granularity }),
-    setRange: (range) => set({ range })
+    setTimeframe: (timeframe) => {
+      set({ timeframe })
+      void get().loadDashboard()
+    }
   }))
 }
