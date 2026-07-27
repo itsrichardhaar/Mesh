@@ -30,6 +30,18 @@ export function useUsage() {
   const metric = useStore(usageStore, (s) => s.metric)
   const granularity = useStore(usageStore, (s) => s.granularity)
   const timeframe = useStore(usageStore, (s) => s.timeframe)
-  const { setMetric, setGranularity, setTimeframe } = usageStore.getState()
-  return { dashboard, indexing, metric, granularity, timeframe, setMetric, setGranularity, setTimeframe }
+  const project = useStore(usageStore, (s) => s.project)
+  const { setMetric, setGranularity, setTimeframe, setProject } = usageStore.getState()
+  return {
+    dashboard,
+    indexing,
+    metric,
+    granularity,
+    timeframe,
+    project,
+    setMetric,
+    setGranularity,
+    setTimeframe,
+    setProject
+  }
 }

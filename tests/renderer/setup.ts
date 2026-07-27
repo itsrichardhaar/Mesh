@@ -22,7 +22,7 @@ afterEach(() => {
   liveSessionsStore.setState({ tabs: [] })
   notificationsStore.setState({ notifications: [], globalMute: false })
   quotaStore.setState({ enabled: false, snapshot: null })
-  usageStore.setState({ dashboard: null, indexing: false, metric: 'tokens', granularity: 'day', timeframe: 'month' })
+  usageStore.setState({ dashboard: null, indexing: false, metric: 'tokens', granularity: 'day', timeframe: 'month', project: null })
   planFeeStore.setState({ planFeeUsd: null })
   ptyHostStore.setState({ mountNode: null, activeSlotId: null })
 })

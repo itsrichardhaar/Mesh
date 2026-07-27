@@ -63,8 +63,18 @@ export function UsageDashboard({
   onSelectProject,
   onJumpToSession
 }: DashboardProps = {}): JSX.Element {
-  const { dashboard, indexing, metric, granularity, timeframe, setMetric, setGranularity, setTimeframe } =
-    useUsage()
+  const {
+    dashboard,
+    indexing,
+    metric,
+    granularity,
+    timeframe,
+    project,
+    setMetric,
+    setGranularity,
+    setTimeframe,
+    setProject
+  } = useUsage()
   const [timeView, setTimeView] = useState<TimeView>('trend')
 
   if (!dashboard) {
@@ -97,6 +107,23 @@ export function UsageDashboard({
             ))}
           </div>
         )}
+        <label className="usage-range">
+          <span className="visually-hidden">Project</span>
+          <select
+            aria-label="Project"
+            value={project ?? ''}
+            onChange={(e) => setProject(e.target.value === '' ? null : e.target.value)}
+          >
+            <option value="">All projects</option>
+            {[...(projects ?? [])]
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((p) => (
+                <option key={p.encodedPath} value={p.encodedPath}>
+                  {p.name}
+                </option>
+              ))}
+          </select>
+        </label>
         <label className="usage-range">
           <span className="visually-hidden">Timeframe</span>
           <select
@@ -140,12 +167,16 @@ export function UsageDashboard({
       <div className="usage-breakdowns">
         <TokenCompositionCard days={dashboard.days} />
         <ByModelBreakdown rows={dashboard.byModel} metric={metric} />
-        <ByProjectBreakdown
-          rows={dashboard.byProject}
-          projects={projects}
-          metric={metric}
-          onSelectProject={onSelectProject}
-        />
+        {/* By-project is redundant when a single Project is selected — the
+            whole filtered view already IS that Project (v10 / Slice 70). */}
+        {project === null && (
+          <ByProjectBreakdown
+            rows={dashboard.byProject}
+            projects={projects}
+            metric={metric}
+            onSelectProject={onSelectProject}
+          />
+        )}
       </div>
 
       <SessionExplorer

@@ -145,6 +145,36 @@ describe('UsageDashboard — by-project + session explorer (Slice 55)', () => {
     expect(onSelectProject).toHaveBeenCalledWith('-proj-a')
   })
 
+  it('re-fetches scoped to the Project when the Project dropdown changes (v10)', async () => {
+    usageStore.setState({ dashboard: withRows(), timeframe: 'month', project: null, metric: 'tokens' })
+    render(<UsageDashboard projects={[project('-proj-a', 'Alpha')]} />)
+    meshApi().usage.getDashboard.mockClear()
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Project' }), '-proj-a')
+    expect(meshApi().usage.getDashboard).toHaveBeenCalledWith({
+      timeframe: 'month',
+      encodedPath: '-proj-a'
+    })
+  })
+
+  it('hides the By-project breakdown when a Project is selected, keeping By-model (v10)', () => {
+    const scoped = dashboard({
+      byProject: [
+        { encodedPath: '-proj-a', tokens: 1_000_000, costUsd: 15, sessionCount: 3, lastActivity: '2026-07-13T00:00:00Z' }
+      ],
+      byModel: [{ model: 'claude-opus-4-8', tokens: 1_000_000, costUsd: 15 }]
+    })
+    usageStore.setState({ dashboard: scoped, timeframe: 'month', project: '-proj-a', metric: 'tokens' })
+    render(<UsageDashboard projects={[project('-proj-a', 'Alpha')]} />)
+    expect(screen.queryByRole('region', { name: 'By project' })).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'By model' })).toBeInTheDocument()
+  })
+
+  it('shows the By-project breakdown when no Project is selected (v10)', () => {
+    usageStore.setState({ dashboard: withRows(), timeframe: 'month', project: null, metric: 'tokens' })
+    render(<UsageDashboard projects={[project('-proj-a', 'Alpha')]} />)
+    expect(screen.getByRole('region', { name: 'By project' })).toBeInTheDocument()
+  })
+
   it('caps By project at the top 5, with shares relative to all projects', () => {
     // 7 projects; top = 1M of a 2M grand total. Tail (p6, p7) must be hidden,
     // and the top row must read 50% (over the full 2M) — not 56% (over the
