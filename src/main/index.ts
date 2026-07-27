@@ -111,7 +111,13 @@ import {
 import { resolveTimeframe } from './usage/timeframe'
 
 /** How many top Sessions by Usage the dashboard's session explorer shows. */
-const TOP_SESSIONS = 50
+/**
+ * Safety backstop for the Usage sessions table (v10 / Slice 71): the
+ * filter (Project + Timeframe) usually bounds the set well under this;
+ * the cap only bites on the widest "All / All time" view, where the UI
+ * shows a "showing N of M" note.
+ */
+const SESSIONS_BACKSTOP = 500
 import type Database from 'better-sqlite3'
 
 const CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects')
@@ -967,6 +973,9 @@ function registerIpc(): void {
     // Global summary — the Metric Cards are unaffected by the Usage Filter.
     const counts = usageSummaryCounts(db)
     const cost = notionalCost(sumTokensByGroup(db))
+    // Filtered sessions, most-recent-first (Slice 71) — computed once so
+    // the full count feeds `sessionsTotal` before the backstop slice.
+    const sessionRows = sessionMeta(db, filter)
     return {
       summary: {
         eventCount: counts.eventCount,
@@ -980,7 +989,10 @@ function registerIpc(): void {
       days: buildDayPoints(sumTokensByDayAndGroup(db, filter)),
       byProject: buildProjectRows(sumTokensByProjectGroup(db, filter), projectMeta(db, filter)),
       byModel: buildModelRows(sumTokensByGroup(db, filter)),
-      topSessions: buildSessionRows(sumTokensBySessionGroup(db, filter), sessionMeta(db, filter), TOP_SESSIONS),
+      // Sessions most-recent-first; `topSessions` is capped at a safety
+      // backstop, `sessionsTotal` is the full filtered count (Slice 71).
+      topSessions: buildSessionRows(sumTokensBySessionGroup(db, filter), sessionRows, SESSIONS_BACKSTOP),
+      sessionsTotal: sessionRows.length,
       // Global — the rolling-year Activity Heatmap ignores the filter.
       heatmapDays: buildDayPoints(sumTokensByDayAndGroup(db))
     }

@@ -182,7 +182,7 @@ export function UsageDashboard({
       <SessionExplorer
         rows={dashboard.topSessions}
         projects={projects}
-        sessionsThisMonth={dashboard.summary.sessionsThisMonth}
+        total={dashboard.sessionsTotal}
         onJumpToSession={onJumpToSession}
       />
     </div>
@@ -483,12 +483,13 @@ function formatDuration(ms: number): string {
 function SessionExplorer({
   rows,
   projects,
-  sessionsThisMonth,
+  total,
   onJumpToSession
 }: {
   rows: UsageSessionRow[]
   projects?: Project[]
-  sessionsThisMonth: number
+  /** Full count of filtered sessions (rows may be capped at the backstop). */
+  total: number
   onJumpToSession?: (input: JumpToSessionInput) => void
 }): JSX.Element | null {
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -509,10 +510,14 @@ function SessionExplorer({
   }
 
   return (
-    <section className="usage-section" aria-label="Top sessions by usage">
+    <section className="usage-section" aria-label="Recent sessions">
       <div className="usage-section-header">
-        <h3 className="usage-section-title">Top sessions</h3>
-        <span className="usage-section-aside">{sessionsThisMonth} this month</span>
+        <h3 className="usage-section-title">Recent sessions</h3>
+        <span className="usage-section-aside">
+          {rows.length < total
+            ? `Showing ${rows.length} of ${total.toLocaleString()}`
+            : `${total.toLocaleString()} ${total === 1 ? 'session' : 'sessions'}`}
+        </span>
       </div>
       <div className="usage-table-wrap">
         <table className="usage-session-table">

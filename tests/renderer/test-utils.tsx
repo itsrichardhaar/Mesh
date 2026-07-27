@@ -195,7 +195,8 @@ export function createMeshApiFake(): MeshApiFake {
         heatmapDays: [],
         byProject: [],
         byModel: [],
-        topSessions: []
+        topSessions: [],
+        sessionsTotal: 0
       })),
       getSessionEvents: vi.fn(async () => []),
       getProjectSummary: vi.fn(async () => ({

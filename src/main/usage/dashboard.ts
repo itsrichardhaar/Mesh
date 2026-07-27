@@ -100,7 +100,12 @@ function dominantModelByKey<K extends string>(
   return out
 }
 
-/** Top-N Sessions by tokens, with Notional Cost, dominant Model, and duration. Pure. */
+/**
+ * Session rows most-recent-first (by last activity), with Notional Cost,
+ * dominant Model, and duration (v10 / Slice 71). `limit` is a safety
+ * backstop, not a top-N — the filter usually bounds the set well under it.
+ * Pure.
+ */
 export function buildSessionRows(
   costGroups: ReadonlyArray<TokenGroup & { sessionId: string | null }>,
   meta: ReadonlyArray<{
@@ -130,7 +135,7 @@ export function buildSessionRows(
         durationMs: Number.isNaN(start) || Number.isNaN(end) ? 0 : Math.max(0, end - start)
       }
     })
-    .sort((a, b) => b.tokens - a.tokens)
+    .sort((a, b) => (a.lastActivity < b.lastActivity ? 1 : a.lastActivity > b.lastActivity ? -1 : 0))
     .slice(0, limit)
 }
 

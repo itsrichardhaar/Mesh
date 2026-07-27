@@ -396,7 +396,13 @@ export interface UsageDashboard {
   heatmapDays: UsageDayPoint[]
   byProject: UsageProjectRow[]
   byModel: UsageModelRow[]
+  /**
+   * Sessions matching the filter, most-recent-first, capped at a safety
+   * backstop (v10 / Slice 71). `sessionsTotal` is the full filtered count
+   * so the UI can show "showing N of M" when the backstop truncates.
+   */
   topSessions: UsageSessionRow[]
+  sessionsTotal: number
 }
 
 // --- Quota (v7 / Slice 51) ------------------------------------------------

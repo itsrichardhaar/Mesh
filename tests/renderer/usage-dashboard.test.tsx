@@ -37,12 +37,18 @@ function dashboard(overrides: Partial<UsageDashboardData> = {}): UsageDashboardD
     heatmapDays: [],
     byProject: [],
     byModel: [],
-    topSessions: []
+    topSessions: [],
+    sessionsTotal: 0
   }
   const merged = { ...base, ...overrides }
   // The Activity Heatmap + Subscription Utilization read the global
   // `heatmapDays`; default it to the effective `days` unless overridden.
-  return { ...merged, heatmapDays: overrides.heatmapDays ?? merged.days }
+  // `sessionsTotal` defaults to the shown session count (no truncation).
+  return {
+    ...merged,
+    heatmapDays: overrides.heatmapDays ?? merged.days,
+    sessionsTotal: overrides.sessionsTotal ?? merged.topSessions.length
+  }
 }
 
 describe('UsageDashboard', () => {
@@ -274,6 +280,34 @@ describe('UsageDashboard — by-project + session explorer (Slice 55)', () => {
       sessionId: 'sess-abcd1234-ef',
       ptyId: null
     })
+  })
+
+  it('notes "Showing N of M" when the sessions backstop truncates (v10)', () => {
+    const sessions = Array.from({ length: 3 }, (_, i) => ({
+      sessionId: `sess-000${i}`,
+      encodedPath: '-proj-a',
+      tokens: 100,
+      costUsd: 1,
+      eventCount: 1,
+      lastActivity: `2026-07-1${i}T00:00:00Z`,
+      model: 'claude-opus-4-8',
+      durationMs: 1000
+    }))
+    usageStore.setState({
+      dashboard: dashboard({ topSessions: sessions, sessionsTotal: 42 }),
+      timeframe: 'month',
+      metric: 'tokens'
+    })
+    render(<UsageDashboard projects={[project('-proj-a', 'Alpha')]} />)
+    const region = screen.getByRole('region', { name: 'Recent sessions' })
+    expect(within(region).getByText('Showing 3 of 42')).toBeInTheDocument()
+  })
+
+  it('shows the plain filtered session count when not truncated (v10)', () => {
+    usageStore.setState({ dashboard: withRows(), timeframe: 'month', metric: 'tokens' })
+    render(<UsageDashboard projects={[project('-proj-a', 'Alpha')]} />)
+    const region = screen.getByRole('region', { name: 'Recent sessions' })
+    expect(within(region).getByText('1 session')).toBeInTheDocument()
   })
 
   it('expands a session to its per-turn detail', async () => {
