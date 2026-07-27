@@ -1,10 +1,20 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { Project, UsageDashboard as UsageDashboardData } from '@shared/types'
+import type { MetricCards, Project, UsageDashboard as UsageDashboardData } from '@shared/types'
 import { UsageDashboard } from '@renderer/components/UsageDashboard'
 import { usageStore } from '@renderer/hooks/useUsage'
-import { planFeeStore } from '@renderer/hooks/usePlanFee'
 import { meshApi } from './test-utils'
+
+/** Global Metric Cards fixture (Slice 72), overridable per-test. */
+function cards(overrides: Partial<MetricCards> = {}): MetricCards {
+  return {
+    today: { tokens: 300_000, sessions: 3 },
+    sevenDay: { tokens: 900_000, activeDays: 5 },
+    month: { tokens: 1_500_000, activeDays: 10, avgPerActiveDay: 150_000 },
+    subscription: null,
+    ...overrides
+  }
+}
 
 function project(encodedPath: string, name: string): Project {
   return {
@@ -29,6 +39,7 @@ function dashboard(overrides: Partial<UsageDashboardData> = {}): UsageDashboardD
       totalNotionalCostUsd: 12.34,
       unpricedModels: []
     },
+    metricCards: cards(),
     days: [
       // 10/20/60/10 class split so composition shares are exact.
       { day: '2026-07-12', tokens: 500_000, costUsd: 5, inputTokens: 50_000, outputTokens: 100_000, cacheReadTokens: 300_000, cacheWriteTokens: 50_000 },
@@ -58,13 +69,17 @@ describe('UsageDashboard', () => {
     expect(screen.getByText('Indexing your usage…')).toBeInTheDocument()
   })
 
-  it('renders stat cards including Notional Cost with its clarifier', () => {
+  it('renders the four global metric cards (Today / 7-day / month)', () => {
     usageStore.setState({ dashboard: dashboard(), timeframe: 'all', granularity: 'day', metric: 'tokens' })
     render(<UsageDashboard />)
-    expect(screen.getByText('7')).toBeInTheDocument() // sessions
-    expect(screen.getByText('1.5M')).toBeInTheDocument() // tokens (compact)
-    expect(screen.getByText('$12.34')).toBeInTheDocument()
-    expect(screen.getByText(/at API rates — not money spent/i)).toBeInTheDocument()
+    // Labels + distinctive sub-captions prove each card's data (the compact
+    // token values collide with the Token Composition card, so assert the subs).
+    expect(screen.getByText('Today')).toBeInTheDocument()
+    expect(screen.getByText('3 sessions')).toBeInTheDocument()
+    expect(screen.getByText('Last 7 days')).toBeInTheDocument()
+    expect(screen.getByText('5 active days')).toBeInTheDocument()
+    expect(screen.getByText('This month')).toBeInTheDocument()
+    expect(screen.getByText('150K avg / active day')).toBeInTheDocument()
   })
 
   it('plots one point per bucket for the active granularity/range', () => {
@@ -205,40 +220,48 @@ describe('UsageDashboard — by-project + session explorer (Slice 55)', () => {
     expect(within(region).getByText('50%')).toBeInTheDocument() // 1M of the full 2M, not 1.8M
   })
 
-  // A dashboard whose only day is today, so the current-calendar-month
-  // sum is deterministic regardless of when the suite runs.
-  const dashboardToday = (costUsd: number): UsageDashboardData => {
-    const today = new Date().toISOString().slice(0, 10)
-    return dashboard({
-      days: [
-        { day: today, tokens: 1_000, costUsd, inputTokens: 100, outputTokens: 200, cacheReadTokens: 600, cacheWriteTokens: 100 }
-      ]
+  it('shows a set-your-fee hint when Subscription is null (no plan fee)', () => {
+    usageStore.setState({
+      dashboard: dashboard({ metricCards: cards({ subscription: null }) }),
+      timeframe: 'all',
+      metric: 'tokens'
     })
-  }
-
-  it('hides the Subscription Utilization gauge until a plan fee is set', () => {
-    planFeeStore.setState({ planFeeUsd: null })
-    usageStore.setState({ dashboard: dashboard(), timeframe: 'all', metric: 'tokens' })
     render(<UsageDashboard />)
     const region = screen.getByRole('region', { name: 'Subscription Utilization' })
     expect(within(region).getByText(/set your monthly plan fee/i)).toBeInTheDocument()
   })
 
-  it('shows the utilization percent against the plan fee when set', () => {
-    planFeeStore.setState({ planFeeUsd: 20 })
-    usageStore.setState({ dashboard: dashboardToday(12), timeframe: 'all', metric: 'tokens' })
+  it('reads "N× your plan fee" with the notional-vs-fee detail (v10)', () => {
+    usageStore.setState({
+      dashboard: dashboard({
+        metricCards: cards({ subscription: { notionalUsd: 12, feeUsd: 20, multiple: 0.6 } })
+      }),
+      timeframe: 'all',
+      metric: 'tokens'
+    })
     render(<UsageDashboard />)
-    const region = screen.getByRole('region', { name: 'Subscription Utilization' })
-    expect(within(region).getByText('60%')).toBeInTheDocument() // 12 of 20
+    const region = screen.getByRole('region', { name: /Subscription Utilization/i })
+    expect(within(region).getByText('0.6×')).toBeInTheDocument()
+    expect(within(region).getByText('your plan fee')).toBeInTheDocument()
+    expect(within(region).getByText(/\$12\.00 vs \$20\.00/)).toBeInTheDocument()
+    // Bar length reinforces the multiple: 0.6 / 3 = 20%.
+    const fill = region.querySelector('.usage-metric-fill') as HTMLElement
+    expect(fill.style.width).toBe('20%')
   })
 
-  it('reads “Paying off” when this month beats the fee', () => {
-    planFeeStore.setState({ planFeeUsd: 10 })
-    usageStore.setState({ dashboard: dashboardToday(25), timeframe: 'all', metric: 'tokens' })
+  it('caps the Subscription bar fill at 3× (min(multiple/3, 1))', () => {
+    usageStore.setState({
+      dashboard: dashboard({
+        metricCards: cards({ subscription: { notionalUsd: 50, feeUsd: 10, multiple: 5 } })
+      }),
+      timeframe: 'all',
+      metric: 'tokens'
+    })
     render(<UsageDashboard />)
-    const region = screen.getByRole('region', { name: 'Subscription Utilization' })
-    expect(within(region).getByText('250%')).toBeInTheDocument()
-    expect(within(region).getByText(/Paying off/)).toBeInTheDocument()
+    const region = screen.getByRole('region', { name: /Subscription Utilization/i })
+    expect(within(region).getByText('5.0×')).toBeInTheDocument()
+    const fill = region.querySelector('.usage-metric-fill') as HTMLElement
+    expect(fill.style.width).toBe('100%') // 5/3 clamps to full
   })
 
   it('renders the token composition card with class shares over the range', () => {

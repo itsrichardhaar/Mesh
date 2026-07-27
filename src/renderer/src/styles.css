@@ -486,35 +486,70 @@ button {
   outline-offset: 1px;
 }
 
-.usage-stats {
+/* Global Metric Cards (v10 / Slice 72): Today / 7-Day / This Month /
+   Subscription. Four equal columns collapsing to two on narrow widths.
+   State reads from the number + label first; the Subscription card's bar
+   length reinforces the multiple — never hue alone. */
+.usage-metric-cards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
 }
 
-.usage-stat-card {
+@media (max-width: 720px) {
+  .usage-metric-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.usage-metric-card {
+  display: flex;
+  flex-direction: column;
   padding: 14px 16px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md, 10px);
   background: var(--bg-elevated);
 }
 
-.usage-stat-value {
+.usage-metric-value {
   font-size: 22px;
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);
 }
 
-.usage-stat-label {
+.usage-metric-value-muted {
+  color: var(--text-muted);
+}
+
+.usage-metric-label {
   margin-top: 2px;
   font-size: 12px;
   color: var(--text-secondary);
 }
 
-.usage-stat-note {
-  margin-top: 4px;
+.usage-metric-sub {
+  margin: 4px 0 0;
   font-size: 11px;
   color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Subscription card's fill bar — same encoding as the old gauge (length,
+   not hue). Sits between the label and the sub caption. */
+.usage-metric-bar {
+  display: block;
+  height: 6px;
+  margin: 8px 0 2px;
+  border-radius: 3px;
+  background: var(--border-subtle);
+  overflow: hidden;
+}
+
+.usage-metric-fill {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  background: var(--accent);
 }
 
 .usage-trend {
@@ -723,76 +758,6 @@ button {
 .usage-composition-seg {
   height: 100%;
   min-width: 2px;
-}
-
-/* Subscription Utilization gauge (v8 / Slice 60). Quota-style encoding:
-   fill length + numeric % + worded verdict — never hue alone. */
-.usage-utilization {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px 16px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md, 10px);
-  background: var(--bg-elevated);
-}
-
-.usage-util-head {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.usage-util-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.usage-util-sub {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.usage-util-gauge {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.usage-util-track {
-  flex: 1;
-  height: 8px;
-  border-radius: 4px;
-  background: var(--border-subtle);
-  overflow: hidden;
-}
-
-.usage-util-fill {
-  display: block;
-  height: 100%;
-  min-width: 2px;
-  background: var(--accent);
-}
-
-.usage-util-pct {
-  flex-shrink: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-}
-
-.usage-util-detail {
-  font-size: 12px;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.usage-utilization-empty .usage-util-hint {
-  margin: 0;
-  font-size: 12px;
-  color: var(--text-muted);
 }
 
 .usage-ranked-item {

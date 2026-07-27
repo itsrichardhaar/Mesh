@@ -1,5 +1,6 @@
 import { Fragment, useLayoutEffect, useRef, useState } from 'react'
 import type {
+  MetricCards as MetricCardsData,
   Project,
   UsageDayPoint,
   UsageModelRow,
@@ -17,8 +18,6 @@ import {
   type TrendPoint
 } from '../util/trend'
 import { heatmapGrid } from '../util/heatmap'
-import { subscriptionUtilization } from '../util/utilization'
-import { usePlanFee } from '../hooks/usePlanFee'
 
 type TimeView = 'trend' | 'heatmap'
 
@@ -85,7 +84,7 @@ export function UsageDashboard({
     )
   }
 
-  const { summary, days, heatmapDays } = dashboard
+  const { days, heatmapDays } = dashboard
   const points = bucketTrend(days, granularity)
 
   return (
@@ -140,17 +139,7 @@ export function UsageDashboard({
         </label>
       </div>
 
-      <div className="usage-stats">
-        <StatCard label="Sessions" value={summary.sessionCount.toLocaleString()} />
-        <StatCard label="Tokens" value={tokenFmt.format(summary.totalTokens)} />
-        <StatCard
-          label="Cost"
-          value={formatUsd(summary.totalNotionalCostUsd)}
-          note="at API rates — not money spent"
-        />
-      </div>
-
-      <SubscriptionUtilization days={heatmapDays} />
+      <MetricCardsRow cards={dashboard.metricCards} />
 
       <div className="usage-time">
         <div className="usage-view-toggle" role="group" aria-label="Time view">
@@ -297,50 +286,102 @@ function RankedList({
 }
 
 /**
- * Subscription Utilization (v8 / Slice 60) — this calendar month's
- * Notional Cost against the user's flat monthly plan fee. Hidden behind a
- * "set your fee" hint until a fee is entered. State is carried by fill
- * length + numeric % + a worded verdict — never hue alone (the
- * reduced-color-vision constraint). Framed value-vs-fee, not spend
- * (ADR-0010): the fee is a constant, never decremented per use.
+ * The four global Metric Cards (v10 / Slice 72) — Today / Last 7 days /
+ * This month / Subscription Utilization. Global: computed in main on the
+ * user's LOCAL calendar day and unaffected by the Usage Filter (they read
+ * `dashboard.metricCards`, not the filtered `days`). Each card leads with a
+ * number + label so state never depends on hue (reduced-color-vision); the
+ * Subscription card adds a fill bar whose *length* encodes the multiple.
  */
-function SubscriptionUtilization({ days }: { days: UsageDayPoint[] }): JSX.Element {
-  const { planFeeUsd } = usePlanFee()
-  const util = subscriptionUtilization(days, planFeeUsd, Date.now())
+function MetricCardsRow({ cards }: { cards: MetricCardsData }): JSX.Element {
+  const { today, sevenDay, month } = cards
+  return (
+    <div className="usage-metric-cards" aria-label="Usage summary">
+      <MetricCard
+        label="Today"
+        value={tokenFmt.format(today.tokens)}
+        sub={`${today.sessions.toLocaleString()} ${today.sessions === 1 ? 'session' : 'sessions'}`}
+      />
+      <MetricCard
+        label="Last 7 days"
+        value={tokenFmt.format(sevenDay.tokens)}
+        sub={`${sevenDay.activeDays} active ${sevenDay.activeDays === 1 ? 'day' : 'days'}`}
+      />
+      <MetricCard
+        label="This month"
+        value={tokenFmt.format(month.tokens)}
+        sub={`${tokenFmt.format(month.avgPerActiveDay)} avg / active day`}
+      />
+      <SubscriptionCard subscription={cards.subscription} />
+    </div>
+  )
+}
 
-  if (!util) {
+function MetricCard({
+  label,
+  value,
+  sub
+}: {
+  label: string
+  value: string
+  sub: string
+}): JSX.Element {
+  return (
+    <div className="usage-metric-card">
+      <div className="usage-metric-value">{value}</div>
+      <div className="usage-metric-label">{label}</div>
+      <div className="usage-metric-sub">{sub}</div>
+    </div>
+  )
+}
+
+/**
+ * Subscription Utilization card (v8 / Slice 60 → v10 / Slice 72) — this
+ * month's Notional Cost as a multiple of the user's flat plan fee, read as
+ * "N× your plan fee" (never "× value" — CONTEXT.md avoid-list). Framed
+ * value-vs-fee, not spend (ADR-0010): the fee is a constant, never
+ * decremented per use. The bar fills `min(multiple/3, 1)` so 3×+ is full.
+ * `subscription === null` (no positive fee) shows a set-your-fee hint.
+ */
+function SubscriptionCard({
+  subscription
+}: {
+  subscription: MetricCardsData['subscription']
+}): JSX.Element {
+  if (!subscription) {
     return (
-      <section className="usage-utilization usage-utilization-empty" aria-label="Subscription Utilization">
-        <span className="usage-util-title">Subscription Utilization</span>
-        <p className="usage-util-hint">
+      <section
+        className="usage-metric-card usage-metric-card-sub"
+        aria-label="Subscription Utilization"
+      >
+        <div className="usage-metric-value usage-metric-value-muted" aria-hidden="true">
+          —
+        </div>
+        <div className="usage-metric-label">Subscription</div>
+        <p className="usage-metric-sub">
           Set your monthly plan fee in Settings to see whether your subscription is paying off.
         </p>
       </section>
     )
   }
 
-  const capped = Math.min(100, util.percent)
-  const verdict = util.percent >= 100 ? 'Paying off' : `${util.percent}% of your plan's value`
+  const { notionalUsd, feeUsd, multiple } = subscription
+  const fill = Math.min(multiple / 3, 1) // 3×+ = full (grill decision #5)
+  const multipleText = `${multiple.toFixed(1)}×`
   return (
-    <section className="usage-utilization" aria-label="Subscription Utilization">
-      <div className="usage-util-head">
-        <span className="usage-util-title">Subscription Utilization</span>
-        <span className="usage-util-sub">this month · at API rates vs your flat fee — not money spent</span>
+    <section
+      className="usage-metric-card usage-metric-card-sub"
+      aria-label={`Subscription Utilization: ${multipleText} your plan fee — ${formatUsd(notionalUsd)} of Notional Cost this month against your ${formatUsd(feeUsd)} plan fee, at API rates not money spent`}
+    >
+      <div className="usage-metric-value" aria-hidden="true">
+        {multipleText}
       </div>
-      <div
-        className="usage-util-gauge"
-        role="group"
-        aria-label={`${util.percent} percent: ${formatUsd(util.costUsd)} of Notional Cost this month against your ${formatUsd(util.feeUsd)} plan; ${verdict}`}
-      >
-        <span className="usage-util-track" aria-hidden="true">
-          <span className="usage-util-fill" style={{ width: `${capped}%` }} />
-        </span>
-        <span className="usage-util-pct" aria-hidden="true">
-          {util.percent}%
-        </span>
-      </div>
-      <div className="usage-util-detail" aria-hidden="true">
-        {formatUsd(util.costUsd)} of {formatUsd(util.feeUsd)} · {verdict}
+      <div className="usage-metric-label">your plan fee</div>
+      <span className="usage-metric-bar" aria-hidden="true">
+        <span className="usage-metric-fill" style={{ width: `${fill * 100}%` }} />
+      </span>
+      <div className="usage-metric-sub" aria-hidden="true">
+        {formatUsd(notionalUsd)} vs {formatUsd(feeUsd)} · at API rates, not money spent
       </div>
     </section>
   )
@@ -836,12 +877,3 @@ function MetricButton({
   )
 }
 
-function StatCard({ label, value, note }: { label: string; value: string; note?: string }): JSX.Element {
-  return (
-    <div className="usage-stat-card">
-      <div className="usage-stat-value">{value}</div>
-      <div className="usage-stat-label">{label}</div>
-      {note && <div className="usage-stat-note">{note}</div>}
-    </div>
-  )
-}

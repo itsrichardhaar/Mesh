@@ -191,6 +191,12 @@ export function createMeshApiFake(): MeshApiFake {
           totalNotionalCostUsd: 0,
           unpricedModels: []
         },
+        metricCards: {
+          today: { tokens: 0, sessions: 0 },
+          sevenDay: { tokens: 0, activeDays: 0 },
+          month: { tokens: 0, activeDays: 0, avgPerActiveDay: 0 },
+          subscription: null
+        },
         days: [],
         heatmapDays: [],
         byProject: [],

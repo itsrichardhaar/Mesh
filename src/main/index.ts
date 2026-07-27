@@ -109,6 +109,7 @@ import {
   buildTurns
 } from './usage/dashboard'
 import { resolveTimeframe } from './usage/timeframe'
+import { metricCards } from './usage/metrics'
 
 /** How many top Sessions by Usage the dashboard's session explorer shows. */
 /**
@@ -967,12 +968,21 @@ function registerIpc(): void {
     const timeframe: UsageTimeframe = isUsageTimeframe(req.timeframe) ? req.timeframe : 'all'
     const encodedPath =
       typeof req.encodedPath === 'string' && req.encodedPath.length > 0 ? req.encodedPath : null
-    const range = resolveTimeframe(timeframe, new Date())
+    const now = new Date()
+    const range = resolveTimeframe(timeframe, now)
     const filter = { start: range.start, end: range.end, encodedPath }
 
-    // Global summary — the Metric Cards are unaffected by the Usage Filter.
+    // Global summary — unaffected by the Usage Filter.
     const counts = usageSummaryCounts(db)
     const cost = notionalCost(sumTokensByGroup(db))
+    // Global Metric Cards (Slice 72) — computed on the user's LOCAL day
+    // (main runs in the user's tz) and outside the {timeframe, encodedPath}
+    // path. `getTimezoneOffset()` returns local→UTC minutes; negate for
+    // UTC→local. Fee gate mirrors the renderer's plan-fee `parseFee`.
+    const feeRaw = getSetting(db, 'plan_fee_usd') // renderer: PLAN_FEE_KEY
+    const feeParsed = feeRaw === null ? NaN : Number.parseFloat(feeRaw)
+    const feeUsd = Number.isFinite(feeParsed) && feeParsed > 0 ? feeParsed : null
+    const cards = metricCards(db, now, -now.getTimezoneOffset(), feeUsd)
     // Filtered sessions, most-recent-first (Slice 71) — computed once so
     // the full count feeds `sessionsTotal` before the backstop slice.
     const sessionRows = sessionMeta(db, filter)
@@ -985,6 +995,8 @@ function registerIpc(): void {
         totalNotionalCostUsd: cost.totalUsd,
         unpricedModels: cost.unpricedModels
       },
+      // Global Metric Cards — ignore the Usage Filter (Slice 72).
+      metricCards: cards,
       // Filtered views.
       days: buildDayPoints(sumTokensByDayAndGroup(db, filter)),
       byProject: buildProjectRows(sumTokensByProjectGroup(db, filter), projectMeta(db, filter)),

@@ -382,14 +382,39 @@ export interface UsageDashboardFilter {
 }
 
 /**
+ * The four global Metric Cards (v10 / Slice 72). Computed in main on the
+ * user's **local calendar day** (not UTC) so "today" matches the wall
+ * clock, and unaffected by the Usage Filter. Averages are over **active
+ * days** (days with any Usage), never calendar days (grill decision #4).
+ */
+export interface MetricCards {
+  /** Local today: total tokens + distinct Sessions active today. */
+  today: { tokens: number; sessions: number }
+  /** Trailing 7 local days inclusive of today: total tokens + count of active days. */
+  sevenDay: { tokens: number; activeDays: number }
+  /** Local month-to-date: total tokens, active-day count, and tokens ÷ active days. */
+  month: { tokens: number; activeDays: number; avgPerActiveDay: number }
+  /**
+   * Month-to-date Subscription Utilization (ADR-0010). `null` when no
+   * positive plan fee is set (the card shows a set-your-fee hint).
+   * `multiple` = notional ÷ fee, surfaced as "N× your plan fee" (never
+   * "× value" — CONTEXT.md avoid-list); the bar fills `min(multiple/3, 1)`.
+   */
+  subscription: { notionalUsd: number; feeUsd: number; multiple: number } | null
+}
+
+/**
  * Everything the global Usage dashboard needs in one round-trip (Slice
  * 54); v10 (ADR-0013) makes it filterable. `days`, `byProject`, `byModel`,
- * and `topSessions` are scoped to the active Usage Filter. `summary` and
- * `heatmapDays` stay **global** (unaffected by the filter): the headline
- * totals and the rolling-year Activity Heatmap read all-time, all-project.
+ * and `topSessions` are scoped to the active Usage Filter. `summary`,
+ * `heatmapDays`, and `metricCards` stay **global** (unaffected by the
+ * filter): the headline totals, the rolling-year Activity Heatmap, and the
+ * Metric Cards read all-time, all-project.
  */
 export interface UsageDashboard {
   summary: UsageSummary
+  /** Global Metric Cards — Today / 7-Day / This Month / Subscription (Slice 72). */
+  metricCards: MetricCards
   /** Filtered per-day series — the trend chart + Token Composition. */
   days: UsageDayPoint[]
   /** Global per-day series — the Activity Heatmap (ignores the filter). */

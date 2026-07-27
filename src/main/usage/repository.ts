@@ -277,6 +277,72 @@ export function countSessionsInMonth(db: Database.Database, monthPrefix: string)
   return n
 }
 
+/**
+ * Global Metric Cards support (v10 / Slice 72). These read a half-open
+ * `[startUtc, endUtc)` window and ignore the Usage Filter entirely — the
+ * cards are global. Boundaries are UTC ISO strings the caller computed
+ * from the user's *local* day (main runs in the user's tz), so string
+ * comparison against `timestamp` buckets to the correct local day. All
+ * three ride `idx_usage_events_time`.
+ */
+
+const RANGE_TOKENS = 'input_tokens + cache_read_tokens + cache_write_tokens + output_tokens'
+
+/** Total tokens + distinct Sessions active in `[startUtc, endUtc)`. */
+export function rangeTokensAndSessions(
+  db: Database.Database,
+  startUtc: string,
+  endUtc: string
+): { tokens: number; sessions: number } {
+  return db
+    .prepare(
+      `SELECT
+         COALESCE(SUM(${RANGE_TOKENS}), 0) AS tokens,
+         COUNT(DISTINCT session_id) AS sessions
+       FROM usage_events WHERE timestamp >= @start AND timestamp < @end`
+    )
+    .get({ start: startUtc, end: endUtc }) as { tokens: number; sessions: number }
+}
+
+/**
+ * Count of distinct **local** calendar days with any usage in
+ * `[startUtc, endUtc)`. `shift` is a SQLite datetime modifier (e.g.
+ * `'-480 minutes'`) that maps each stored UTC timestamp to local wall
+ * clock before the date is taken — so an event just after UTC midnight
+ * counts against the correct local day (grill decision #4).
+ */
+export function rangeActiveDays(
+  db: Database.Database,
+  startUtc: string,
+  endUtc: string,
+  shift: string
+): number {
+  const { n } = db
+    .prepare(
+      `SELECT COUNT(DISTINCT substr(datetime(timestamp, @shift), 1, 10)) AS n
+       FROM usage_events WHERE timestamp >= @start AND timestamp < @end`
+    )
+    .get({ start: startUtc, end: endUtc, shift }) as { n: number }
+  return n
+}
+
+/** Token groups (model, tier) in `[startUtc, endUtc)` — the input to month Notional Cost. */
+export function rangeTokenGroups(
+  db: Database.Database,
+  startUtc: string,
+  endUtc: string
+): TokenGroup[] {
+  return db
+    .prepare(
+      `SELECT model, service_tier AS serviceTier,
+         SUM(input_tokens) AS inputTokens, SUM(cache_read_tokens) AS cacheReadTokens,
+         SUM(cache_write_tokens) AS cacheWriteTokens, SUM(output_tokens) AS outputTokens
+       FROM usage_events WHERE timestamp >= @start AND timestamp < @end
+       GROUP BY model, service_tier`
+    )
+    .all({ start: startUtc, end: endUtc }) as TokenGroup[]
+}
+
 /** Per-turn rows for one Session, oldest-first — the drill-down source. */
 export function sessionEventRows(
   db: Database.Database,
