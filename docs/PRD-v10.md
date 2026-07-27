@@ -128,11 +128,11 @@ Tests assert observable outputs (returned aggregates, rendered rows, re-fetch ca
 
 - **CONTEXT.md** gained **Usage Filter**, **Timeframe**, and **Metric Card** terms this cycle, plus notes that the Activity Heatmap is global and that Subscription Utilization is shown as a multiple ("× your plan fee", never "× value"). **ADR-0013** records the parameterized-query decision.
 - **Reduced-color-vision** (`memory/user-reduced-color-vision.md`) governs the new cards, bars, and Quota panel: numbers + labels + bar length first, hue only as reinforcement.
-- **Slicing (tracer-bullet, foundation-first):**
-  - *Slice A* — **Timeframe filter end-to-end**: `resolveTimeframe` (M1) + parameterized query for the timeframe predicate (M2) + `timeframe` state (M4) + the Timeframe dropdown (M5). Trend / Composition / By-model / Sessions re-scope by Timeframe. Establishes the whole parameterized-fetch architecture.
-  - *Slice B* — **Project filter end-to-end**: the project predicate (M2) + the Project dropdown (M5) + hide By-project + Sessions scoped to Project. Depends on Slice A.
-  - *Slice C* — **Sessions table reshape**: recency ordering + show-all + the 500 backstop/note (M8). Depends on Slice B.
-  - *Slice D* — **Global Metric Cards**: `metricCards` in main (M3) + the four redesigned cards incl. the Subscription-Utilization multiple (M6). Independent of the filter work; parallel with A–C.
-  - *Slice E* — **Quota dropdown**: clickable `QuotaChip` + notifications-styled panel (M7). Independent; parallel with everything.
-  - *Slice F* (HITL) — **PRD-v10 + ADR-0013 close-out + v0.10.0 release ceremonials + packaged-build install.** Planning artifacts (this PRD, ADR-0013, CONTEXT terms) are committed at planning time, so the closing slice does not re-commit them (mirrors Slice 57/61/67).
+- **Slicing (tracer-bullet, foundation-first).** Published under parent issue #68; slice issues #69–#74:
+  - *Slice 69* — **Timeframe filter end-to-end**: `resolveTimeframe` (M1) + parameterized query for the timeframe predicate (M2) + `timeframe` state (M4) + the Timeframe dropdown (M5). Trend / Composition / By-model / Sessions re-scope by Timeframe. Establishes the whole parameterized-fetch architecture.
+  - *Slice 70* — **Project filter end-to-end**: the project predicate (M2) + the Project dropdown (M5) + hide By-project + Sessions scoped to Project. Depends on #69.
+  - *Slice 71* — **Sessions table reshape**: recency ordering + show-all + the 500 backstop/note (M8). Depends on #70.
+  - *Slice 72* — **Global Metric Cards**: `metricCards` in main (M3) + the four redesigned cards incl. the Subscription-Utilization multiple (M6). Independent of the filter work; parallel with #69–#71.
+  - *Slice 73* — **Quota dropdown**: clickable `QuotaChip` + notifications-styled panel (M7). Independent; parallel with everything.
+  - *Slice 74* (HITL) — **PRD-v10 + ADR-0013 close-out + v0.10.0 release ceremonials + packaged-build install.** Planning artifacts (this PRD, ADR-0013, CONTEXT terms) are committed at planning time in `3827721`, so the closing slice does not re-commit them (mirrors Slice 57/61/67).
 - v10 keeps `~/.claude/projects/` as the canonical source (ADR-0002/0009), Notional Cost (ADR-0010), the networked Quota exception (ADR-0011), and the notification subsystem (ADR-0006/0012) all in force and unchanged. `token-usage-analytics` remains the reference for the metric-card and quota-panel layouts; no code crosses over.
