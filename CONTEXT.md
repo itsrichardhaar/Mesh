@@ -78,11 +78,23 @@ The share of a period's Usage tokens across the four token classes — Input, Ou
 _Avoid_: token breakdown, token mix, token split (say Token Composition)
 
 **Activity Heatmap**:
-A calendar view of Usage intensity — each day of a recent span shaded by that day's total, so streaks and gaps read at a glance. One of two view modes (with the usage trend) of the Home Screen's time-visualization; intensity follows the active Tokens / Notional Cost metric. Per the reduced-color-vision constraint, intensity is encoded by lightness *and* cell fill *and* an on-hover value, never hue alone.
+A calendar view of Usage intensity — each day of a recent span shaded by that day's total, so streaks and gaps read at a glance. One of two view modes (with the usage trend) of the Home Screen's time-visualization; intensity follows the active Tokens / Notional Cost metric. **Always global** — a rolling-year calendar across all Projects, unaffected by the Usage Filter (the one filtered-area view that opts out). Per the reduced-color-vision constraint, intensity is encoded by lightness *and* cell fill *and* an on-hover value, never hue alone.
 _Avoid_: contribution graph, calendar chart, activity grid
 
+**Usage Filter**:
+The Home Screen control set that re-scopes the Usage views: the **Tokens / Notional Cost** metric toggle, a **Project** selector, and a **Timeframe** selector. It drives the *filtered* views — the usage trend, Token Composition, By-model, and the Sessions table — but never the **Metric Cards** or the **Activity Heatmap**, which stay global. Selecting a specific Project also hides the By-project breakdown (the view is already that one Project). Mesh has no Provider filter (Claude-only, ADR-0003) and no session search.
+_Avoid_: query, search, facet
+
+**Timeframe**:
+The Usage Filter's date-window selector: **All time**, **This Month**, **Last 7 Days**, **Last 30 Days**, or **Last 90 Days**. Scopes the filtered Usage views to events within the window.
+_Avoid_: date range, period, window (that's a Quota term)
+
+**Metric Card**:
+One of the four headline figures atop the Home Screen's Usage views — **Today** (tokens + sessions), **7-Day** (tokens + active days), **This Month** (tokens + average per active day), and **Subscription Utilization**. Always **global** — computed over all Projects on the user's local calendar day, unaffected by the Usage Filter. An **Active Day** is a day with any Usage.
+_Avoid_: stat, KPI, tile
+
 **Subscription Utilization**:
-A calendar month's Notional Cost compared against a plan's flat monthly fee — answers "is the subscription paying off?" A money metric, and the only thing in Mesh called "Utilization." Requires the user to enter their plan fee. The fee is a flat constant the user states, never decremented per Usage Event — so this remains a value-vs-fee ratio, not money spent (ADR-0010 holds).
+A calendar month's Notional Cost compared against a plan's flat monthly fee — answers "is the subscription paying off?" A money metric, and the only thing in Mesh called "Utilization." Requires the user to enter their plan fee. The fee is a flat constant the user states, never decremented per Usage Event — so this remains a fee-ratio, not money spent (ADR-0010 holds). Displayed as a **multiple of the plan fee** (e.g. "3.9× your plan fee") with the notional dollar figure alongside — phrased as "× your plan fee", never "× value".
 _Avoid_: ROI, savings, value
 
 **Quota**:
