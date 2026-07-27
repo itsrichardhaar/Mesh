@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import type { Notification } from '@shared/types'
 import type { JumpToSessionInput } from './NotificationsBell'
 import { useNotifications } from '../hooks/useNotifications'
+import { kindPresentation } from '../util/notificationKind'
 
 const TOAST_VISIBLE_MS = 6_000
 
@@ -36,17 +37,34 @@ export function NotificationToast({ onJumpToSession }: Props): JSX.Element | nul
   const timersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>())
 
   useEffect(() => {
-    const off = window.api.notifications.onCreated((notification) => {
+    const offCreated = window.api.notifications.onCreated((notification) => {
       const enteredAt = Date.now()
       setActive((prev) => [{ notification, enteredAt }, ...prev])
+      // Sticky kinds (approval) persist until acted on — no auto-dismiss
+      // timer. The user is blocked on this; it should not fade away.
+      if (kindPresentation(notification.kind).sticky) return
       const timer = setTimeout(() => {
         setActive((prev) => prev.filter((t) => t.notification.id !== notification.id))
         timersRef.current.delete(notification.id)
       }, TOAST_VISIBLE_MS)
       timersRef.current.set(notification.id, timer)
     })
+    // When a notification is marked read — e.g. a sticky approval whose
+    // PTY resumed output because the user answered — clear its toast.
+    const offUpdated = window.api.notifications.onUpdated(({ ids }) => {
+      const read = new Set(ids)
+      setActive((prev) => prev.filter((t) => !read.has(t.notification.id)))
+      for (const id of ids) {
+        const timer = timersRef.current.get(id)
+        if (timer !== undefined) {
+          clearTimeout(timer)
+          timersRef.current.delete(id)
+        }
+      }
+    })
     return () => {
-      off()
+      offCreated()
+      offUpdated()
       // Clear any pending timers on unmount so they don't leak.
       for (const timer of timersRef.current.values()) clearTimeout(timer)
       timersRef.current.clear()
@@ -76,19 +94,31 @@ export function NotificationToast({ onJumpToSession }: Props): JSX.Element | nul
 
   return (
     <div className="notification-toast-stack" role="region" aria-label="New notifications">
-      {active.map(({ notification }) => (
-        <div key={notification.id} className="notification-toast" role="status">
+      {active.map(({ notification }) => {
+        const { Icon, className } = kindPresentation(notification.kind)
+        return (
+        <div
+          key={notification.id}
+          className={`notification-toast ${className}`}
+          role="status"
+          data-kind={notification.kind}
+        >
           <button
             type="button"
             className="notification-toast-body"
             onClick={() => void handleJump(notification)}
             aria-label={`${notification.labelText} — jump to session`}
           >
-            <div className="notification-toast-label">{notification.labelText}</div>
-            <div className="notification-toast-meta">
-              Session {notification.sessionId.slice(0, 8)}
+            <span className="notification-toast-icon" aria-hidden="true">
+              <Icon size={16} />
+            </span>
+            <div className="notification-toast-text">
+              <div className="notification-toast-label">{notification.labelText}</div>
+              <div className="notification-toast-meta">
+                Session {notification.sessionId.slice(0, 8)}
+              </div>
+              <div className="notification-toast-jump">Jump to session →</div>
             </div>
-            <div className="notification-toast-jump">Jump to session →</div>
           </button>
           <button
             type="button"
@@ -100,7 +130,8 @@ export function NotificationToast({ onJumpToSession }: Props): JSX.Element | nul
             <X size={14} />
           </button>
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

@@ -124,4 +124,45 @@ describe('NotificationToast', () => {
 
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
+
+  // --- v9: per-kind presentation ------------------------------------------
+
+  it('tags the toast with its kind so kind-specific styling can apply', async () => {
+    await renderToast()
+    await emitCreated({ kind: 'approval', labelText: 'Approval needed' })
+    expect(screen.getByRole('status')).toHaveAttribute('data-kind', 'approval')
+  })
+
+  it('keeps an approval toast sticky — no auto-dismiss even long past the idle timeout', async () => {
+    await renderToast()
+    vi.useFakeTimers()
+    await emitCreated({ kind: 'approval', labelText: 'Approval needed' })
+    await act(async () => {
+      vi.advanceTimersByTime(60_000)
+    })
+    // Still there — the user is blocked on it; it must not fade away.
+    expect(screen.getByRole('status')).toBeInTheDocument()
+  })
+
+  it('auto-dismisses a complete toast (non-sticky) after the 6 s window', async () => {
+    await renderToast()
+    vi.useFakeTimers()
+    await emitCreated({ kind: 'complete', labelText: 'Task complete' })
+    expect(screen.getByRole('status')).toBeInTheDocument()
+    await act(async () => {
+      vi.advanceTimersByTime(6_000)
+    })
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('clears a sticky approval toast when it is marked read (the user answered)', async () => {
+    await renderToast()
+    await emitCreated({ id: 'appr-1', kind: 'approval', labelText: 'Approval needed' })
+    expect(screen.getByRole('status')).toBeInTheDocument()
+    // PTY resumed output → main auto-marks it read → notifications:updated.
+    await act(async () => {
+      meshEmit().notificationsUpdated({ ids: ['appr-1'] })
+    })
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
 })

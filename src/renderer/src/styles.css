@@ -61,6 +61,13 @@
   --mesh-live-border: rgba(80, 160, 110, 0.55);
   --mesh-live-accent: #4a9b6c;
 
+  /* --- v9 notification-kind accents. Secondary cue only — the kind icon
+        shape is the primary signal (reduced-color-vision). Defined via
+        existing tokens so they track the active theme automatically. */
+  --notif-approval: var(--accent); /* attention orange — blocked on you */
+  --notif-complete: var(--mesh-live-accent); /* green — finished */
+  --notif-idle: var(--text-muted); /* muted — went quiet */
+
   /* --- AI-timeline pastels (v6-reserved; tokens introduced now so the
         v6 pattern-matcher slices already have the colors ready). Scoped
         to in-product agent-action visualizations only per Cursor spec —
@@ -3515,6 +3522,27 @@ body.sidebar-resizing .sidebar-resize-handle {
   border-bottom: 1px solid var(--border-subtle);
 }
 
+/* Per-kind accent: sets a local variable both the icon colour and the
+   toast border read from. Icon shape is the primary cue; this colour is
+   redundant reinforcement (v9). */
+.notif-kind-approval {
+  --notif-accent: var(--notif-approval);
+}
+.notif-kind-complete {
+  --notif-accent: var(--notif-complete);
+}
+.notif-kind-idle {
+  --notif-accent: var(--notif-idle);
+}
+
+.notifications-row-icon,
+.notification-toast-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding-top: 1px;
+  color: var(--notif-accent, var(--text-muted));
+}
+
 .notifications-row:last-child {
   border-bottom: none;
 }
@@ -3600,7 +3628,8 @@ body.sidebar-resizing .sidebar-resize-handle {
   display: flex;
   align-items: stretch;
   background: var(--bg-surface);
-  border: 1px solid var(--mesh-live-accent);
+  border: 1px solid var(--notif-accent, var(--mesh-live-accent));
+  border-left-width: 3px;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-popover);
   overflow: hidden;
@@ -3622,8 +3651,9 @@ body.sidebar-resizing .sidebar-resize-handle {
 .notification-toast-body {
   flex: 1;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: flex-start;
+  gap: 10px;
   text-align: left;
   background: none;
   border: none;
@@ -3631,6 +3661,13 @@ body.sidebar-resizing .sidebar-resize-handle {
   cursor: pointer;
   color: inherit;
   font-family: inherit;
+}
+
+.notification-toast-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
 }
 
 .notification-toast-body:hover {

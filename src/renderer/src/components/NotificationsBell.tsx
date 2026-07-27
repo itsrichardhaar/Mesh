@@ -3,6 +3,7 @@ import { Bell, BellOff } from 'lucide-react'
 import type { Notification } from '@shared/types'
 import { useNotifications } from '../hooks/useNotifications'
 import { relativeTime } from '../util/relativeTime'
+import { kindPresentation } from '../util/notificationKind'
 
 export interface JumpToSessionInput {
   encodedPath: string
@@ -163,9 +164,13 @@ function NotificationRow({
   onMarkRead: () => void
 }): JSX.Element {
   const unread = n.readAt === null
-  const className = `notifications-row${unread ? ' notifications-row-unread' : ''}`
+  const { Icon, className: kindClass } = kindPresentation(n.kind)
+  const className = `notifications-row ${kindClass}${unread ? ' notifications-row-unread' : ''}`
   return (
-    <li className={className}>
+    <li className={className} data-kind={n.kind}>
+      <span className="notifications-row-icon" aria-hidden="true">
+        <Icon size={16} />
+      </span>
       <div className="notifications-row-text">
         <div className="notifications-row-label">{n.labelText}</div>
         <div className="notifications-row-meta">

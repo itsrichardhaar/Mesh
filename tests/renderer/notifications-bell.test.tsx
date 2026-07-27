@@ -65,6 +65,22 @@ describe('NotificationsBell — dropdown', () => {
     expect(within(dropdown).getByRole('button', { name: 'Jump to session' })).toBeInTheDocument()
   })
 
+  it('tags each dropdown row with its kind for kind-specific icon/styling (v9)', async () => {
+    seedList([
+      buildNotification({ id: 'a1', kind: 'approval', labelText: 'Approval needed' }),
+      buildNotification({ id: 'c1', kind: 'complete', labelText: 'Task complete' })
+    ])
+    const { user } = await renderBell()
+    await user.click(screen.getByRole('button', { name: '2 unread notifications' }))
+
+    const dropdown = screen.getByRole('dialog', { name: 'Notifications' })
+    const rows = within(dropdown).getAllByRole('listitem')
+    expect(rows[0]).toHaveAttribute('data-kind', 'approval')
+    expect(rows[1]).toHaveAttribute('data-kind', 'complete')
+    // Recency ordering is unchanged — rows paint in list (repository) order.
+    expect(within(rows[0]!).getByText('Approval needed')).toBeInTheDocument()
+  })
+
   it('shows the empty state when no notifications exist', async () => {
     const { user } = await renderBell()
 
