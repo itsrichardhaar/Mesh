@@ -132,6 +132,8 @@ v8 keeps the v6/v7 test policy: **renderer-touching slices ship renderer tests**
 **v9:**
 - **Pattern-matching Notification kind subtypes** (`approval` / `complete` / `question`) via PTY-stdout parsing — the former leading v7 candidate, still fully pre-staged (open `kind` column, reserved `--timeline-*` tokens, the `IdleDetector.onPtyData` seam). Unchanged in readiness.
 
+> **Update — 2026-07-27 (v9 shipped, `v0.9.0`):** v9 shipped `approval` + `complete` Notification kinds via PTY pattern matching (matchers fire-first; `idle` stays the recall floor — ADR-0012), with shape-first kind icons, a sticky `approval` toast, and global per-kind toast mute. `question` remains reserved-but-unimplemented (no reliable structural anchor). **Scope correction:** the `--timeline-*` tokens belong to a *separate* deferred feature (a live tool-activity timeline: thinking/grep/read/edit/done), **not** to notification subtypes — they were not v9's color source. Per-Project Token Composition / Activity Heatmap remain deferred.
+
 **Not planned under any current release:**
 - **Plan-tier presets / live plan pricing** — the plan fee stays a user-entered constant; Mesh does not track Anthropic's plan prices.
 - **Real spend / billing-API integration** — ADR-0010 forbids it without a new ADR; Subscription Utilization is notional-vs-fee, not spend.

@@ -15,6 +15,27 @@ The stable `1.0.0` release ships once every item in the
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-07-27
+
+### Added
+- **Slice 67 (v9): PRD-v9 + ADR-0012 + v0.9.0 release ceremonials.** Closing slice of v9 (Notification subtypes). Docs + release — `approval` and `complete` Notification kinds, detected by Pattern Matchers reading the live Pty Tab's terminal screen, shipped across Slices 63–66. The `notifications` schema is unchanged (`kind` was already open TEXT); no new IPC channel.
+  - **PRD-v9 + ADR-0012 committed** up front at planning, with the **Notification Kind** and **Pattern Matcher** glossary terms; PRD-v8's "Out of Scope → v9" gains a dated close-out note (and a scope correction: the `--timeline-*` tokens belong to a separate deferred tool-activity-timeline feature, not to notification subtypes).
+  - **Release ceremonials.** `package.json` 0.8.0 → 0.9.0. CHANGELOG `[Unreleased]` promoted to `[0.9.0] — 2026-07-27`; new empty `[Unreleased]` opens for v10. `git tag v0.9.0`. This release also folds in the two post-v0.8.0 dashboard-polish commits below that were shipped untagged.
+- **Slice 66 (v9): global per-kind toast mute.** A "Toast for" control in the notifications dropdown with a per-kind toggle (`approval` / `complete` / `idle`), default all-on. Answers "toast me for approvals, but stop toasting every completion" — the gap ADR-0006 deferred until the taxonomy grew.
+  - **Gate.** A toast emits only when `global-unmuted AND project-unmuted AND kind-enabled`. **Storage stays sacred** (ADR-0006): a muted kind still persists to SQLite, still shows in the dropdown, still counts toward the unread badge — only the toast event is suppressed.
+  - **Global only.** No per-Project × per-kind matrix. Preferences ride the generic settings key/value store (absent = enabled); the toast gate reads them live per fire, so a change applies immediately with no restart.
+  - **Reduced-color-vision safe.** On/off is conveyed shape-first (strike-through + dimming), not hue.
+  - **Tests.** Repository default/round-trip; detector kind-gating (toast suppressed, row persisted); renderer toggle render/persist/reflect-stored.
+- **Slice 65 (v9): notification-kind presentation.** Each kind now reads at a glance — a shape-distinct icon (approval = raised hand, complete = check-circle, idle = crescent moon) as the primary cue, with a redundant `--notif-*` accent color. **`approval` toasts are sticky** (no auto-dismiss — the user is blocked on the prompt) and self-clear when the PTY resumes output (the user answered); `complete` / `idle` auto-dismiss. Bell ordering unchanged (recency).
+  - **Reduced-color-vision safe.** The glyph shape carries the signal; color never stands alone.
+- **Slice 64 (v9): matchers wired into the idle detector — fire-first + idle floor.** Notification kinds fire end-to-end. Each Pty Tab's bytes feed a per-Pty screen model; after a short settle the frame is classified, and on a match the kinded notification fires immediately — ahead of the 8 s idle timer. With no match, the idle timer still fires generic `idle`.
+  - **Idle is the recall floor (ADR-0012).** A matcher fire dedups the idle timer (exactly one notification per idle period); a broken/unrecognized frame degrades to generic `idle`, never a silent miss. Foreground suppression, auto-mark-read, and 7-day retention unchanged from v5.
+- **Slice 63 (v9): pattern-matcher parse spine.** The pure, unwired detection core — a `ScreenModel` (headless `@xterm/headless` buffer) that hides all ANSI/repaint handling behind `write()`/`snapshot()`, and pure `(screenText) => kind | null` matchers anchored on TUI *structure* (the numbered permission menu; the ready input prompt), not prose. Fixture replay harness + `record.mjs` for capturing real byte-streams.
+  - **Tests.** ScreenModel (ANSI strip, latest-frame-wins repaint, viewport bounding) + matchers replayed against recorded `.cap` fixtures (approval / completion positives; spinner / mid-tool-`?` / prompt-ish-output negatives).
+- **Dashboard polish (post-v0.8.0, folded into this release).**
+  - **By-project card capped at top 5** (`dd400da`) to match the By-model card's height; `RankedList` gained an optional `limit` while shares/bar-widths stay relative to the full list.
+  - **Trend chart fixes + usage-strip spacing** (`19e6803`): 12% y-domain headroom so a sharp peak no longer clips; a ResizeObserver-measured width so axis text stays 11px and the chart stays 220px tall on wide windows; the Project-screen usage strip no longer touches the Analyze bar.
+
 ## [0.8.0] — 2026-07-22
 
 ### Added
