@@ -577,8 +577,13 @@ button {
   color: var(--text-primary);
 }
 
-.usage-range {
+/* Project + Timeframe filters, grouped and pushed to the right edge as a
+   unit (one auto-margin on the group, not one per dropdown). */
+.usage-filters {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .usage-range select {

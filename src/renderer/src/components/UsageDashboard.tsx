@@ -106,37 +106,43 @@ export function UsageDashboard({
             ))}
           </div>
         )}
-        <label className="usage-range">
-          <span className="visually-hidden">Project</span>
-          <select
-            aria-label="Project"
-            value={project ?? ''}
-            onChange={(e) => setProject(e.target.value === '' ? null : e.target.value)}
-          >
-            <option value="">All projects</option>
-            {[...(projects ?? [])]
-              .sort((a, b) => a.name.localeCompare(b.name))
-              .map((p) => (
-                <option key={p.encodedPath} value={p.encodedPath}>
-                  {p.name}
-                </option>
-              ))}
-          </select>
-        </label>
-        <label className="usage-range">
-          <span className="visually-hidden">Timeframe</span>
-          <select
-            aria-label="Timeframe"
-            value={timeframe}
-            onChange={(e) => setTimeframe(e.target.value as UsageTimeframe)}
-          >
-            <option value="all">All time</option>
-            <option value="month">This Month</option>
-            <option value="7d">Last 7 Days</option>
-            <option value="30d">Last 30 Days</option>
-            <option value="90d">Last 90 Days</option>
-          </select>
-        </label>
+        {/* Project + Timeframe grouped so they sit together on the right —
+            a single margin-left:auto on the group, not one per dropdown
+            (two auto-margins split the free space and stranded Project in
+            the middle). */}
+        <div className="usage-filters">
+          <label className="usage-range">
+            <span className="visually-hidden">Project</span>
+            <select
+              aria-label="Project"
+              value={project ?? ''}
+              onChange={(e) => setProject(e.target.value === '' ? null : e.target.value)}
+            >
+              <option value="">All projects</option>
+              {[...(projects ?? [])]
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((p) => (
+                  <option key={p.encodedPath} value={p.encodedPath}>
+                    {p.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label className="usage-range">
+            <span className="visually-hidden">Timeframe</span>
+            <select
+              aria-label="Timeframe"
+              value={timeframe}
+              onChange={(e) => setTimeframe(e.target.value as UsageTimeframe)}
+            >
+              <option value="all">All time</option>
+              <option value="month">This Month</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+              <option value="90d">Last 90 Days</option>
+            </select>
+          </label>
+        </div>
       </div>
 
       <MetricCardsRow cards={dashboard.metricCards} />
