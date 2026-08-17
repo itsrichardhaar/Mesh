@@ -446,8 +446,13 @@ export interface QuotaWindow {
   label: string
   /** Percent of the window consumed (from the endpoint's `utilization`). */
   percentUsed: number
-  /** ISO 8601 timestamp when this window's percent-used returns to zero. */
-  resetsAt: string
+  /**
+   * ISO 8601 timestamp when this window's percent-used returns to zero,
+   * or `null` when the window is idle (nothing consumed yet, so no
+   * countdown is running — the endpoint returns `resets_at: null`). An
+   * idle window still renders (at 0%); it just shows no reset countdown.
+   */
+  resetsAt: string | null
 }
 
 /**

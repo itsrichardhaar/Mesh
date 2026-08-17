@@ -30,16 +30,35 @@ describe('parseOauthUsage', () => {
     })
   })
 
-  it('skips a window missing resets_at, keeping the valid one', () => {
+  it('keeps an idle window (utilization 0, resets_at null) rather than dropping it', () => {
+    // Real shape from GET /api/oauth/usage when nothing has been consumed
+    // in the current 5-hour window (captured live 2026-08-17). Dropping it
+    // was the "only the 7d bar shows on app open" bug.
     const snapshot = parseOauthUsage(
       {
-        five_hour: { utilization: 5 }, // no resets_at → dropped
+        five_hour: { utilization: 0, resets_at: null, limit_dollars: null },
+        seven_day: { utilization: 12, resets_at: '2026-08-20T00:00:00.491312+00:00' }
+      },
+      FETCHED_AT
+    )
+    expect(snapshot!.windows.map((w) => w.kind)).toEqual(['five_hour', 'seven_day'])
+    expect(snapshot!.windows[0]).toMatchObject({
+      kind: 'five_hour',
+      percentUsed: 0,
+      resetsAt: null
+    })
+  })
+
+  it('normalizes an absent resets_at to null (still kept)', () => {
+    const snapshot = parseOauthUsage(
+      {
+        five_hour: { utilization: 5 }, // no resets_at → idle, resetsAt null
         seven_day: { utilization: 41, resets_at: '2026-07-15T23:59:59Z' }
       },
       FETCHED_AT
     )
-    expect(snapshot!.windows).toHaveLength(1)
-    expect(snapshot!.windows[0]!.kind).toBe('seven_day')
+    expect(snapshot!.windows).toHaveLength(2)
+    expect(snapshot!.windows[0]).toMatchObject({ kind: 'five_hour', resetsAt: null })
   })
 
   it('defaults a missing/non-numeric utilization to 0 percent', () => {
@@ -50,9 +69,10 @@ describe('parseOauthUsage', () => {
     expect(snapshot!.windows[0]!.percentUsed).toBe(0)
   })
 
-  it('returns null when no window is usable', () => {
+  it('returns null only when neither primary window is a present object', () => {
     expect(parseOauthUsage({}, FETCHED_AT)).toBeNull()
-    expect(parseOauthUsage({ five_hour: { utilization: 5 } }, FETCHED_AT)).toBeNull()
+    expect(parseOauthUsage({ five_hour: null, seven_day: null }, FETCHED_AT)).toBeNull()
+    expect(parseOauthUsage({ five_hour: 'nope' }, FETCHED_AT)).toBeNull()
   })
 
   it('returns null for a malformed (non-object) payload', () => {

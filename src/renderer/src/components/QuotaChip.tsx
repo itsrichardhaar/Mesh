@@ -4,10 +4,13 @@ import { useQuota } from '../hooks/useQuota'
 
 /**
  * Format the countdown to a Quota window's reset, e.g. "resets in 2h 41m".
- * Pure (takes `now` so it's testable without the wall clock). Past-due or
- * unparseable timestamps collapse to "resets soon".
+ * Pure (takes `now` so it's testable without the wall clock). A `null` or
+ * empty `resetsAt` means the window is idle with no countdown running, so
+ * we show nothing (`''`) and the caller hides the reset line. A present
+ * but past-due or unparseable timestamp collapses to "resets soon".
  */
-export function formatReset(resetsAt: string, now: number): string {
+export function formatReset(resetsAt: string | null, now: number): string {
+  if (!resetsAt) return ''
   const target = Date.parse(resetsAt)
   if (Number.isNaN(target)) return 'resets soon'
   const ms = target - now
@@ -58,15 +61,16 @@ function QuotaWindowRow({ window: win, now }: { window: QuotaWindow; now: number
   const used = usedPercent(win)
   const remaining = Math.max(0, 100 - used)
   const reset = formatReset(win.resetsAt, now)
+  const summary = `${win.label}: ${used} percent used, ${remaining} percent remaining`
   return (
     <div
       className="quota-window"
       role="group"
-      aria-label={`${win.label}: ${used} percent used, ${remaining} percent remaining, ${reset}`}
+      aria-label={reset ? `${summary}, ${reset}` : summary}
     >
       <div className="quota-window-head">
         <span className="quota-window-label">{win.label}</span>
-        <span className="quota-window-reset">{reset}</span>
+        {reset && <span className="quota-window-reset">{reset}</span>}
       </div>
       <span className="quota-window-track" aria-hidden="true">
         <span className="quota-window-fill" style={{ width: `${used}%` }} />

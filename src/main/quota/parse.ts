@@ -14,10 +14,16 @@ const WINDOW_DEFS = [
 /**
  * Pure transform of the `GET /api/oauth/usage` payload into a
  * `QuotaSnapshot`. No network, no clock, no Electron — the whole point
- * is that this is unit-testable against fixtures. Returns `null` when
- * the payload carries no usable window (missing, malformed, or a window
- * without a `resets_at`), so callers hide the surface rather than
- * render an empty chip.
+ * is that this is unit-testable against fixtures. Returns `null` only
+ * when the payload carries neither primary window as an object (missing
+ * or malformed), so callers hide the surface rather than render an empty
+ * chip.
+ *
+ * A present window with a `null`/absent `resets_at` is an *idle* window
+ * (nothing consumed in the current period, so the endpoint reports no
+ * countdown). It is KEPT at its percent (0 by default) with
+ * `resetsAt: null` — dropping it made the 5-hour bar vanish on app open
+ * whenever the last 5 hours were quiet.
  *
  * `fetchedAt` is passed in (the caller stamps it from its injected
  * clock) to keep this function free of `Date.now()`.
@@ -32,8 +38,8 @@ export function parseOauthUsage(payload: unknown, fetchedAt: string): QuotaSnaps
     if (typeof raw !== 'object' || raw === null) continue
     const win = raw as Record<string, unknown>
 
-    const resetsAt = win['resets_at']
-    if (typeof resetsAt !== 'string' || resetsAt.length === 0) continue
+    const rawReset = win['resets_at']
+    const resetsAt = typeof rawReset === 'string' && rawReset.length > 0 ? rawReset : null
 
     const util = win['utilization']
     const percentUsed = typeof util === 'number' && Number.isFinite(util) ? util : 0
