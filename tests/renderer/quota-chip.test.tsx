@@ -88,6 +88,31 @@ describe('QuotaChip', () => {
     expect(within(weekly).getByText('59% left')).toBeInTheDocument()
   })
 
+  it('renders an idle 5-hour window (0%, no reset) instead of hiding it', async () => {
+    quotaStore.setState({
+      enabled: true,
+      snapshot: snapshot({
+        windows: [
+          { kind: 'five_hour', label: '5-hour window', percentUsed: 0, resetsAt: null },
+          { kind: 'seven_day', label: 'Weekly window', percentUsed: 12, resetsAt: '2099-01-01T00:00:00Z' }
+        ]
+      })
+    })
+    render(<QuotaChip />)
+
+    // The inline 5h bar is present (this is the bar that used to vanish).
+    expect(screen.getByText('0%')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /Claude Code Quota:/i }))
+    const dialog = screen.getByRole('dialog')
+    // The idle window row is present, with no reset countdown in its label.
+    const fiveHour = within(dialog).getByRole('group', {
+      name: '5-hour window: 0 percent used, 100 percent remaining'
+    })
+    expect(within(fiveHour).getByText('0% used')).toBeInTheDocument()
+    expect(within(fiveHour).getByText('100% left')).toBeInTheDocument()
+  })
+
   it('clamps % remaining at 0 when a window is over 100% used', async () => {
     quotaStore.setState({
       enabled: true,
@@ -146,5 +171,10 @@ describe('formatReset', () => {
   it('collapses past-due and unparseable timestamps to "resets soon"', () => {
     expect(formatReset('2026-07-13T11:59:00Z', now)).toBe('resets soon')
     expect(formatReset('not-a-date', now)).toBe('resets soon')
+  })
+
+  it('shows no countdown for a null/empty reset (idle window)', () => {
+    expect(formatReset(null, now)).toBe('')
+    expect(formatReset('', now)).toBe('')
   })
 })
