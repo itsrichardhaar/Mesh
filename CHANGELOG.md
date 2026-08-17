@@ -15,6 +15,11 @@ The stable `1.0.0` release ships once every item in the
 
 ## [Unreleased]
 
+## [0.10.1] — 2026-08-17
+
+### Fixed
+- **Claude Code Quota: the 5-hour window bar vanished on app open when the window was idle.** Anthropic's `GET /api/oauth/usage` endpoint returns an idle window (nothing consumed in the current period) as `{ utilization: 0, resets_at: null }`. `parseOauthUsage` dropped any window whose `resets_at` was not a non-empty string, so on a quiet-morning open the 5-hour window fell out of `snapshot.windows` entirely — leaving only the weekly (7d) bar and collapsing the dropdown to a single short row (confirmed against the live endpoint; the same idle shape appears on other windows in the real payload). An idle window is now a first-class window: kept at its percent (0 by default) with `resetsAt: null`, its bar still renders, and only the reset countdown line is omitted. `QuotaWindow.resetsAt` is now `string | null`; a present-but-unparseable/past-due timestamp still degrades to "resets soon". `parseOauthUsage` returns `null` only when *neither* primary window is a present object. Regression test replays the real idle payload captured live from the endpoint (PR #75).
+
 ## [0.10.0] — 2026-07-27
 
 ### Added
