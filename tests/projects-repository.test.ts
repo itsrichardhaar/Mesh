@@ -232,6 +232,9 @@ function discovered(
     sourcePath,
     name,
     activity: new Date().toISOString(),
-    sourceMissing
+    sourceMissing,
+    kind: 'project',
+    subtype: null,
+    gate: null
   }
 }

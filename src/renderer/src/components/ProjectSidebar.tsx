@@ -6,6 +6,7 @@ import { useProjectIndicator } from '../hooks/useLiveSessions'
 import { useSidebarWidth } from '../hooks/useSidebarWidth'
 import { ActivitySpinner } from './ActivitySpinner'
 import { SidebarResizeHandle } from './SidebarResizeHandle'
+import { buildProjectTree, type RunGroup, type SidebarNode } from './projectTree'
 
 const PROJECTS_SIDEBAR_WIDTH_KEY = 'home.projectsSidebarWidth'
 const PROJECTS_SIDEBAR_MIN_WIDTH = 200
@@ -17,6 +18,21 @@ const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000
 function isIdle(project: Project): boolean {
   if (project.sourceMissing) return false
   return Date.now() - new Date(project.activity).getTime() > FOURTEEN_DAYS_MS
+}
+
+/**
+ * The tag shown on a Worktree Run row (ADR-0014): `no-mistakes` for a Gate Run,
+ * `worktree` for a generic worktree. A labeled pill — meaning carried by text,
+ * not hue (reduced-color-vision constraint).
+ */
+function runTagLabel(project: Project): string {
+  return project.subtype === 'gate' ? 'no-mistakes' : 'worktree'
+}
+
+function runTagTitle(project: Project): string {
+  return project.subtype === 'gate'
+    ? 'no-mistakes gate run'
+    : 'git worktree run'
 }
 
 interface ContextMenuState {
@@ -172,15 +188,46 @@ function SidebarBody({
   onOpen: (project: Project) => void
   onContextMenu: (e: React.MouseEvent, project: Project) => void
 }): JSX.Element {
-  const visible = useMemo(() => {
+  // Which run groups the user has manually expanded. Renderer-local and
+  // session-only (ADR-0014): groups start collapsed and reset on reload.
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set())
+  const toggleGroup = (key: string): void =>
+    setExpandedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+
+  const nodes = useMemo(() => {
     if (state.status !== 'ok') return []
-    const needle = query.trim().toLowerCase()
-    return state.projects.filter((p) => {
-      if (!showHidden && p.hidden) return false
-      if (needle && !p.name.toLowerCase().includes(needle)) return false
+    if (showHidden) return buildProjectTree(state.projects)
+    // A Worktree Run belongs to its Parent Project, so hiding the Parent takes
+    // its runs with it — otherwise a hidden parent's runs would re-appear under a
+    // raw-Encoded-Path synthetic header. Runs whose parent is genuinely
+    // undiscovered still fall under a synthetic grouping node.
+    const hiddenParents = new Set(
+      state.projects.filter((p) => p.hidden).map((p) => p.encodedPath)
+    )
+    const afterHidden = state.projects.filter((p) => {
+      if (p.hidden) return false
+      if (
+        p.kind === 'worktreeRun' &&
+        p.parentEncodedPath !== null &&
+        hiddenParents.has(p.parentEncodedPath)
+      ) {
+        return false
+      }
       return true
     })
-  }, [state, query, showHidden])
+    return buildProjectTree(afterHidden)
+  }, [state, showHidden])
+
+  const needle = query.trim().toLowerCase()
+  const rendered = useMemo(
+    () => renderTree(nodes, needle, expandedGroups),
+    [nodes, needle, expandedGroups]
+  )
 
   if (state.status === 'loading') {
     return <p className="sidebar-status">Loading…</p>
@@ -199,7 +246,7 @@ function SidebarBody({
       </p>
     )
   }
-  if (visible.length === 0) {
+  if (rendered.length === 0) {
     return (
       <p className="sidebar-status">
         {query ? 'No projects match your search.' : 'No visible projects.'}
@@ -208,43 +255,196 @@ function SidebarBody({
   }
   return (
     <ul className="project-list" role="list">
-      {visible.map((p) => (
-        <ProjectRow
-          key={p.encodedPath}
-          project={p}
-          isSelected={p.encodedPath === selectedEncodedPath}
+      {rendered.map((r) => (
+        <NodeRow
+          key={r.node.id}
+          rendered={r}
+          selectedEncodedPath={selectedEncodedPath}
           onSelect={onSelect}
           onOpen={onOpen}
           onContextMenu={onContextMenu}
+          onToggleGroup={toggleGroup}
         />
       ))}
     </ul>
   )
 }
 
+/** A node with search applied: which groups to show, whether each is expanded. */
+interface RenderedNode {
+  node: SidebarNode
+  groups: Array<RunGroup & { expanded: boolean }>
+}
+
+/**
+ * Apply the search needle and collapse state to the tree. A node shows when its
+ * own name matches or when a child matches; a child match auto-expands the
+ * group holding it (and narrows that group to the matches).
+ */
+function renderTree(
+  nodes: SidebarNode[],
+  needle: string,
+  expandedGroups: Set<string>
+): RenderedNode[] {
+  const out: RenderedNode[] = []
+  for (const node of nodes) {
+    const nodeName = (node.type === 'project' ? node.project.name : node.label).toLowerCase()
+    const parentMatches = !needle || nodeName.includes(needle)
+
+    const groups: Array<RunGroup & { expanded: boolean }> = []
+    for (const group of node.groups) {
+      if (needle && !parentMatches) {
+        const runs = group.runs.filter((r) => r.name.toLowerCase().includes(needle))
+        if (runs.length === 0) continue
+        groups.push({ ...group, runs, expanded: true }) // reveal the match
+      } else {
+        groups.push({ ...group, expanded: expandedGroups.has(group.key) })
+      }
+    }
+
+    if (parentMatches || groups.length > 0) out.push({ node, groups })
+  }
+  return out
+}
+
+function NodeRow({
+  rendered,
+  selectedEncodedPath,
+  onSelect,
+  onOpen,
+  onContextMenu,
+  onToggleGroup
+}: {
+  rendered: RenderedNode
+  selectedEncodedPath: string | null
+  onSelect: (encodedPath: string) => void
+  onOpen: (project: Project) => void
+  onContextMenu: (e: React.MouseEvent, project: Project) => void
+  onToggleGroup: (key: string) => void
+}): JSX.Element {
+  const { node, groups } = rendered
+  return (
+    <li>
+      {node.type === 'project' ? (
+        <ProjectRow
+          project={node.project}
+          isSelected={node.project.encodedPath === selectedEncodedPath}
+          onSelect={onSelect}
+          onOpen={onOpen}
+          onContextMenu={onContextMenu}
+        />
+      ) : (
+        <SyntheticNodeRow label={node.label} />
+      )}
+      {groups.map((group) => (
+        <RunGroupDisclosure
+          key={group.key}
+          group={group}
+          selectedEncodedPath={selectedEncodedPath}
+          onSelect={onSelect}
+          onOpen={onOpen}
+          onContextMenu={onContextMenu}
+          onToggle={() => onToggleGroup(group.key)}
+        />
+      ))}
+    </li>
+  )
+}
+
+/**
+ * A grouping-node header for Worktree Runs whose Parent Project isn't a
+ * discovered Project (ADR-0014). Not selectable — it's a label, not a Project.
+ */
+function SyntheticNodeRow({ label }: { label: string }): JSX.Element {
+  return (
+    <div className="project-row project-row-synthetic" title="Runs of a repo with no Claude Code sessions of its own">
+      <span className="project-name">{label}</span>
+      <span className="sidebar-pill sidebar-pill-worktree">runs</span>
+    </div>
+  )
+}
+
+function RunGroupDisclosure({
+  group,
+  selectedEncodedPath,
+  onSelect,
+  onOpen,
+  onContextMenu,
+  onToggle
+}: {
+  group: RunGroup & { expanded: boolean }
+  selectedEncodedPath: string | null
+  onSelect: (encodedPath: string) => void
+  onOpen: (project: Project) => void
+  onContextMenu: (e: React.MouseEvent, project: Project) => void
+  onToggle: () => void
+}): JSX.Element {
+  return (
+    <div className="run-group">
+      <button
+        type="button"
+        className="run-group-toggle"
+        onClick={onToggle}
+        aria-expanded={group.expanded}
+      >
+        {group.expanded ? (
+          <ChevronDown size={13} aria-hidden="true" />
+        ) : (
+          <ChevronRight size={13} aria-hidden="true" />
+        )}
+        <span>{group.label}</span>
+      </button>
+      {group.expanded && (
+        <ul className="run-group-list" role="list">
+          {group.runs.map((run) => (
+            <li key={run.encodedPath}>
+              <ProjectRow
+                project={run}
+                indented
+                isSelected={run.encodedPath === selectedEncodedPath}
+                onSelect={onSelect}
+                onOpen={onOpen}
+                onContextMenu={onContextMenu}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 function ProjectRow({
   project: p,
   isSelected,
+  indented = false,
   onSelect,
   onOpen,
   onContextMenu
 }: {
   project: Project
   isSelected: boolean
+  indented?: boolean
   onSelect: (encodedPath: string) => void
   onOpen: (project: Project) => void
   onContextMenu: (e: React.MouseEvent, project: Project) => void
 }): JSX.Element {
   const { isLive, isActive } = useProjectIndicator(p.encodedPath)
   const idle = isIdle(p)
+  const isRun = p.kind === 'worktreeRun'
   const classes = ['project-row']
   if (isSelected) classes.push('project-row-selected')
-  if (p.sourceMissing) classes.push('project-row-missing')
+  // ADR-0014: a Worktree Run's deleted worktree is expected — suppress the
+  // Source-Missing *alarm* styling for runs (the disk-gone behavior below still
+  // keys off `sourceMissing`).
+  if (p.sourceMissing && !isRun) classes.push('project-row-missing')
+  if (isRun) classes.push('project-row-run')
+  if (indented) classes.push('project-row-child')
   if (idle) classes.push('project-row-idle')
   if (p.hidden) classes.push('project-row-hidden')
   if (isLive) classes.push('project-row-live')
   return (
-    <li>
+    <>
       <button
         type="button"
         className={classes.join(' ')}
@@ -259,11 +459,19 @@ function ProjectRow({
           }
         }}
         onContextMenu={(e) => onContextMenu(e, p)}
-        title={p.sourceMissing ? 'Source folder no longer exists on disk' : undefined}
+        title={
+          isRun
+            ? runTagTitle(p)
+            : p.sourceMissing
+              ? 'Source folder no longer exists on disk'
+              : undefined
+        }
       >
         <span className="project-name">{p.name}</span>
         {isActive && <ActivitySpinner size="small" ariaLabel="Project active" />}
-        {p.sourceMissing ? (
+        {isRun ? (
+          <span className="sidebar-pill sidebar-pill-worktree">{runTagLabel(p)}</span>
+        ) : p.sourceMissing ? (
           <span className="sidebar-pill sidebar-pill-missing">Source missing</span>
         ) : idle ? (
           <span className="sidebar-pill sidebar-pill-idle">Idle</span>
@@ -271,7 +479,7 @@ function ProjectRow({
           <span className="project-activity">{formatRelative(p.activity)}</span>
         )}
       </button>
-    </li>
+    </>
   )
 }
 

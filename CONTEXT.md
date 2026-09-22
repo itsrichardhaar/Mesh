@@ -143,7 +143,21 @@ A specific LLM within a Provider (e.g., `claude-haiku-4-5`, `gpt-4o-mini`, `llam
 A Project the user has flagged to not appear in the Home Screen sidebar. Recoverable via the Project's settings.
 
 **Source-Missing**:
-A Project whose Source Path no longer exists on disk (folder deleted/moved). Rendered greyed-out in the sidebar; Workspace actions (file tree, Resume) are disabled. Distinct from Hidden.
+A Project whose Source Path no longer exists on disk (folder deleted/moved). Rendered greyed-out in the sidebar; Workspace actions (file tree, Resume) are disabled. Distinct from Hidden. **Worktree Runs suppress the *badge*** — a merged run's deleted worktree is expected housekeeping, not a lost Project — but the disk-gone *behavior* (file tree / Resume disabled) still applies when the worktree is gone. "Is the source on disk" and "show the Source-Missing badge" are decoupled.
+
+### Worktree runs
+
+**Worktree Run**:
+A Claude Code Project that lives in a **git worktree** of a Parent Project, rather than a directory the user opened directly. On disk it looks like a Project — Claude Code running in a worktree writes Sessions under that worktree's Encoded Path — but it is *not* a Project: it is work done on a branch/worktree *of* one, and its Usage is that Project's Usage. Recognized either from a known tool's worktree path (see **Gate Run**) or, for a still-live worktree, via git plumbing (`git-common-dir` → the main worktree). Nested under its Parent Project in the sidebar as a collapsed `Worktree runs (N)` group, never shown as a top-level Project. Carries a **worktree** tag.
+_Avoid_: run project, branch project, phantom project
+
+**Gate Run**:
+The `no-mistakes` subtype of a Worktree Run — one validation run of a Parent Project. `no-mistakes` gates each change inside a throwaway git worktree at `…/.no-mistakes/worktrees/<repoId>/<runId>/` (deleted once the branch merges), so its Source Path is usually gone. Recognized from its Source Path alone (the anchored `.no-mistakes/worktrees/<repoId>/<runId>` segment, no external dependency); *attributed* to its Parent and *enriched* — pass/fail status, PR, branch, intent — via a ring-fenced read of `~/.no-mistakes/state.sqlite` (ADR-0014). Carries a **no-mistakes** tag and a pass/fail glyph. The in-app view of *what a run changed* (a read-only diff) is a v12 follow-on; v11 surfaces the run's transcript and its PR link.
+_Avoid_: run project, worktree project, phantom project
+
+**Parent Project**:
+The real Project a Worktree Run belongs to — resolved for a Gate Run by mapping its `repoId` to no-mistakes' recorded `working_path`, or for a live worktree via git plumbing, then matching to a discovered Project's Source Path. A Worktree Run's Usage folds into its Parent Project's Usage views, and every Parent stat (Sessions, tokens, Notional Cost) counts its runs. When the Parent can't be resolved, runs collapse under a single synthetic grouping node — labeled by the repo name when known, else the repoId — which is *not* itself a Project (ADR-0002 holds).
+_Avoid_: owner, host project, root project
 
 ## Relationships
 
@@ -156,6 +170,7 @@ A Project whose Source Path no longer exists on disk (folder deleted/moved). Ren
 - A **Project**'s **Activity** is derived from its Sessions' newest event timestamp
 - A **Session** comprises 0..N **Usage Events** (one per assistant turn that reports usage)
 - A **Usage Event** is attributed to exactly one **Project** (by the containing folder's Encoded Path) and carries a **Notional Cost**
+- A **Worktree Run** (and its **Gate Run** subtype) belongs to exactly one **Parent Project** (or, unresolved, a synthetic grouping node); its **Usage** folds into that Parent at query time, though each Usage Event keeps its own worktree Encoded Path as its stored attribution key
 - **Quota** is account-global — tied to neither a Project nor a Session, and read from Anthropic's OAuth endpoint rather than any Session's JSONL
 
 ## Example dialogue
@@ -180,3 +195,4 @@ A Project whose Source Path no longer exists on disk (folder deleted/moved). Ren
 - **"Suggestion" / "chip"** — discussed in early Analysis design (a fourth panel of clickable actions); deferred to v2. Not part of v1 vocabulary.
 - **"Utilization"** — ambiguous between a Quota window's rate-limit consumption and Notional-Cost-vs-plan-fee. Resolved: **Subscription Utilization** (money) is the only "Utilization"; a Quota window's figure is its **percent used**.
 - **"Analytics"** — the token domain is **Usage**, never "Analytics" (one letter from the LLM **Analysis**, entirely different meaning). "Analytics" is not Mesh vocabulary.
+- **"Project"** vs **"Worktree Run"** — a git worktree looks like a Project (its own Encoded Path, its own Sessions) but is never called one. Resolved: **Worktree Run** for a Project living in a worktree (with **Gate Run** the `no-mistakes` subtype); **Project** only for a directory the user themselves opened Claude Code in. A Worktree Run nests under its **Parent Project**.

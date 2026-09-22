@@ -61,7 +61,11 @@ const PROJECT: Project = {
   activity: '2026-07-07T12:00:00.000Z',
   sourceMissing: false,
   hidden: false,
-  muteNotifications: false
+  muteNotifications: false,
+  kind: 'project',
+  subtype: null,
+  parentEncodedPath: null,
+  gate: null
 }
 
 interface SeedTab {

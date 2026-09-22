@@ -2,6 +2,8 @@ import { createReadStream } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { createInterface } from 'node:readline'
+import type { GateRunMeta, WorktreeRunSubtype } from '@shared/types'
+import { recognizeWorktreeRun } from '../gate/recognize'
 
 /**
  * The raw filesystem-discovered view of a Project — what the enumerator
@@ -15,6 +17,12 @@ export interface DiscoveredProject {
   name: string
   activity: string
   sourceMissing: boolean
+  /** `'worktreeRun'` when the Source Path is a recognized git worktree (ADR-0014). */
+  kind: 'project' | 'worktreeRun'
+  /** Worktree Run subtype (`'gate'` in Slice A), or `null` for ordinary Projects. */
+  subtype: WorktreeRunSubtype | null
+  /** Gate Run ids from path recognition; enrichment fields stay `null` until Slice C. */
+  gate: GateRunMeta | null
 }
 
 /**
@@ -60,12 +68,31 @@ export async function listProjects(rootDir: string): Promise<DiscoveredProject[]
     const name = basename(sourcePath)
     const sourceMissing = await isSourceMissing(sourcePath)
 
+    // ADR-0014: recognize a Worktree Run from its path (disk-independent, so it
+    // works even after a merged run's worktree is deleted). Slice A carries the
+    // gate ids only; attribution + enrichment come in Slices B/C.
+    const recognition = recognizeWorktreeRun(sourcePath)
+    const gate: GateRunMeta | null = recognition
+      ? {
+          repoId: recognition.repoId,
+          runId: recognition.runId,
+          status: null,
+          prUrl: null,
+          prState: null,
+          branch: null,
+          intent: null
+        }
+      : null
+
     projects.push({
       encodedPath,
       sourcePath,
       name,
       activity: new Date(newest.mtimeMs).toISOString(),
-      sourceMissing
+      sourceMissing,
+      kind: recognition ? 'worktreeRun' : 'project',
+      subtype: recognition ? recognition.kind : null,
+      gate
     })
   }
 

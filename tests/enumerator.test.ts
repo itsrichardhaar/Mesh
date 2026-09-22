@@ -142,6 +142,41 @@ describe('listProjects', () => {
     expect(p).toBeDefined()
     expect(p?.sourceMissing).toBe(true)
   })
+
+  it('classifies an ordinary Project as kind="project" with no run metadata', async () => {
+    await createProject(tmpRoot, '-Users-test-Desktop-Plain', '/Users/test/Desktop/Plain', 1000)
+    const projects = await listProjects(tmpRoot)
+    const p = projects.find((x) => x.encodedPath === '-Users-test-Desktop-Plain')
+    expect(p?.kind).toBe('project')
+    expect(p?.subtype).toBeNull()
+    expect(p?.gate).toBeNull()
+  })
+
+  it('recognizes a no-mistakes gate-run worktree (ADR-0014), carrying the repo/run ids', async () => {
+    // Encoded dir whose recorded cwd is a no-mistakes worktree path. The worktree
+    // itself is deleted (source-missing), which is the normal merged-run state.
+    await createProject(
+      tmpRoot,
+      '-Users-test--no-mistakes-worktrees-018d9e76994c-01M320PARHRXZETXMJX80Z382A',
+      '/Users/test/.no-mistakes/worktrees/018d9e76994c/01M320PARHRXZETXMJX80Z382A',
+      4000
+    )
+    const projects = await listProjects(tmpRoot)
+    const run = projects.find((x) => x.kind === 'worktreeRun')
+    expect(run).toBeDefined()
+    expect(run?.subtype).toBe('gate')
+    expect(run?.gate).toEqual({
+      repoId: '018d9e76994c',
+      runId: '01M320PARHRXZETXMJX80Z382A',
+      status: null,
+      prUrl: null,
+      prState: null,
+      branch: null,
+      intent: null
+    })
+    // Slice A recognizes but does not yet attribute a parent.
+    expect(run?.sourceMissing).toBe(true)
+  })
 })
 
 // --- Test helpers -----------------------------------------------------------

@@ -19,7 +19,11 @@ const PROJECT: Project = {
   activity: '2026-06-25T20:00:00.000Z',
   sourceMissing: false,
   hidden: false,
-  muteNotifications: false
+  muteNotifications: false,
+  kind: 'project',
+  subtype: null,
+  parentEncodedPath: null,
+  gate: null
 }
 
 function makeClient(

@@ -13,7 +13,11 @@ function project(): Project {
     activity: '2026-07-13T00:00:00Z',
     sourceMissing: false,
     hidden: false,
-    muteNotifications: false
+    muteNotifications: false,
+    kind: 'project',
+    subtype: null,
+    parentEncodedPath: null,
+    gate: null
   }
 }
 
