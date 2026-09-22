@@ -40,3 +40,30 @@ export function recognizeWorktreeRun(sourcePath: string): WorktreeRunRecognition
   if (!match) return null
   return { kind: 'gate', repoId: match[1], runId: match[2] }
 }
+
+/**
+ * The **Encoded Path** twin of {@link GATE_WORKTREE_RE}: recognizes a Gate Run
+ * from a Claude Code Encoded Path (source path with `/` *and* `.` flattened to
+ * `-`), not a decoded source path.
+ *
+ * Needed because a run's Usage can outlive its discovery: once a run's worktree
+ * merges, its `~/.claude/projects/<encoded>/` session dir may be removed, so the
+ * enumerator no longer discovers it — yet `usage_events` keeps the run's rows
+ * (ADR-0009: the cache is a faithful mirror, never garbage-collected here). The
+ * Usage rollup (Slice D) attributes those undiscovered runs straight from the
+ * Encoded Path so their tokens fold into the Parent instead of leaking as a ULID
+ * row. Decoding the Encoded Path back to a source path is lossy (both `/` and
+ * `.` became `-`), so we match the encoded form directly.
+ *
+ * `<repoId>` is lowercase hex and `<runId>` the uppercase Crockford ULID final
+ * segment, so they stay distinguishable by case (the greedy repoId can't eat
+ * into the ULID).
+ */
+const GATE_WORKTREE_ENCODED_RE =
+  /(?:^|-)no-mistakes-worktrees-([0-9a-f]{6,})-([0-9A-HJKMNP-TV-Z]{26})$/
+
+export function recognizeGateRunEncodedPath(encodedPath: string): WorktreeRunRecognition | null {
+  const match = GATE_WORKTREE_ENCODED_RE.exec(encodedPath)
+  if (!match) return null
+  return { kind: 'gate', repoId: match[1], runId: match[2] }
+}

@@ -41,11 +41,11 @@ export async function attributeWorktreeRuns(
   discovered: DiscoveredProject[],
   deps: AttributionDeps
 ): Promise<AttributedProject[]> {
-  // Index real Projects (never runs) by canonical Source Path so a run can find
-  // the Parent it shares a working directory with.
-  const parentByPath = new Map<string, DiscoveredProject>()
+  // Index real Projects (never runs) by canonical Source Path → Encoded Path so
+  // a run can find the Parent it shares a working directory with.
+  const parentEncodedByPath = new Map<string, string>()
   for (const p of discovered) {
-    if (p.kind === 'project') parentByPath.set(deps.canonicalize(p.sourcePath), p)
+    if (p.kind === 'project') parentEncodedByPath.set(deps.canonicalize(p.sourcePath), p.encodedPath)
   }
 
   return Promise.all(
@@ -55,7 +55,12 @@ export async function attributeWorktreeRuns(
         const workingPath = p.gate ? deps.gateRepos.get(p.gate.repoId) : undefined
         return {
           ...p,
-          parentEncodedPath: resolveParent(workingPath, p.gate?.repoId, parentByPath, deps)
+          parentEncodedPath: resolveGateParentEncodedPath(
+            workingPath,
+            p.gate?.repoId,
+            parentEncodedByPath,
+            deps.canonicalize
+          )
         }
       }
 
@@ -67,7 +72,12 @@ export async function attributeWorktreeRuns(
             ...p,
             kind: 'worktreeRun',
             subtype: 'plain',
-            parentEncodedPath: resolveParent(mainWorktree, undefined, parentByPath, deps)
+            parentEncodedPath: resolveGateParentEncodedPath(
+              mainWorktree,
+              undefined,
+              parentEncodedByPath,
+              deps.canonicalize
+            )
           }
         }
       }
@@ -80,17 +90,19 @@ export async function attributeWorktreeRuns(
 
 /**
  * Resolve a run's Parent to a discovered Project's Encoded Path, or a synthetic
- * grouping-node id when the working path is unknown or undiscovered.
+ * grouping-node id when the working path is unknown or undiscovered. Pure and
+ * exported so the Usage rollup (Slice D) can attribute Gate Runs found only in
+ * the Usage cache with the identical rule.
  */
-function resolveParent(
+export function resolveGateParentEncodedPath(
   workingPath: string | undefined,
   repoId: string | undefined,
-  parentByPath: Map<string, DiscoveredProject>,
-  deps: AttributionDeps
+  parentEncodedByPath: Map<string, string>,
+  canonicalize: (p: string) => string
 ): string {
   if (workingPath) {
-    const parent = parentByPath.get(deps.canonicalize(workingPath))
-    if (parent) return parent.encodedPath
+    const parent = parentEncodedByPath.get(canonicalize(workingPath))
+    if (parent) return parent
     return syntheticParentId(basename(workingPath) || workingPath)
   }
   return syntheticParentId(repoId ?? 'unknown')

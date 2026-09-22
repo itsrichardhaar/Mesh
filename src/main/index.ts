@@ -46,10 +46,11 @@ import {
   listDirectory,
   watchProject
 } from './files/file-tree-service'
-import { attributeWorktreeRuns } from './gate/attribute'
+import { attributeWorktreeRuns, resolveGateParentEncodedPath } from './gate/attribute'
 import { enrichGateRuns } from './gate/enrich'
 import { NoMistakesStateReader } from './gate/no-mistakes-state'
-import { buildRunAttribution, type RunAttribution } from './gate/rollup'
+import { recognizeGateRunEncodedPath } from './gate/recognize'
+import { buildRunAttribution, type AttributionEntry, type RunAttribution } from './gate/rollup'
 import { canonicalizePath, resolveMainWorktree } from './gate/worktree-git'
 import { buildApplicationMenu } from './menu'
 import { listProjects } from './projects/enumerator'
@@ -93,6 +94,7 @@ import { ingestProject, projectDirNames } from './usage/ingest'
 import {
   countSessionsInMonth,
   projectMeta,
+  distinctUsageEncodedPaths,
   projectUsageCounts,
   sessionEventRows,
   sessionMeta,
@@ -150,12 +152,43 @@ const noMistakesState = new NoMistakesStateReader()
  */
 async function currentRunAttribution(): Promise<RunAttribution> {
   const discovered = await listProjects(CLAUDE_PROJECTS_DIR)
+  const gateRepos = noMistakesState.readRepoWorkingPaths()
   const attributed = await attributeWorktreeRuns(discovered, {
-    gateRepos: noMistakesState.readRepoWorkingPaths(),
+    gateRepos,
     resolveMainWorktree,
     canonicalize: canonicalizePath
   })
-  return buildRunAttribution(attributed)
+  const entries: AttributionEntry[] = attributed.map((p) => ({
+    encodedPath: p.encodedPath,
+    parentEncodedPath: p.parentEncodedPath
+  }))
+
+  // Fold in Gate Runs that live only in the Usage cache: their worktree merged
+  // and their `~/.claude/projects/<encoded>/` session dir was later removed, so
+  // the enumerator no longer discovers them — yet `usage_events` keeps their
+  // rows (ADR-0009). Recognize each straight from its Encoded Path and attribute
+  // via the same `repoId → working_path` map, so its Usage folds into the Parent
+  // instead of leaking as a ULID row in the by-Project breakdown.
+  const known = new Set(entries.map((e) => e.encodedPath))
+  const parentEncodedByPath = new Map<string, string>()
+  for (const p of discovered) {
+    if (p.kind === 'project') parentEncodedByPath.set(canonicalizePath(p.sourcePath), p.encodedPath)
+  }
+  for (const encodedPath of distinctUsageEncodedPaths(getDatabase())) {
+    if (known.has(encodedPath)) continue
+    const rec = recognizeGateRunEncodedPath(encodedPath)
+    if (!rec) continue
+    entries.push({
+      encodedPath,
+      parentEncodedPath: resolveGateParentEncodedPath(
+        gateRepos.get(rec.repoId),
+        rec.repoId,
+        parentEncodedByPath,
+        canonicalizePath
+      )
+    })
+  }
+  return buildRunAttribution(entries)
 }
 
 /**
