@@ -46,12 +46,9 @@ function buildWhere(filter?: UsageQueryFilter): { sql: string; params: Record<st
     params.fEnd = filter.end
   }
   if (filter?.encodedPaths && filter.encodedPaths.length > 0) {
-    const names = filter.encodedPaths.map((path, i) => {
-      const name = `fEncodedPath${i}`
-      params[name] = path
-      return `@${name}`
-    })
-    clauses.push(`encoded_path IN (${names.join(', ')})`)
+    const { sql, params: inParams } = encodedPathIn(filter.encodedPaths)
+    Object.assign(params, inParams)
+    clauses.push(sql)
   } else if (filter?.encodedPath) {
     clauses.push('encoded_path = @fEncodedPath')
     params.fEncodedPath = filter.encodedPath
@@ -59,7 +56,11 @@ function buildWhere(filter?: UsageQueryFilter): { sql: string; params: Record<st
   return { sql: clauses.length > 0 ? `WHERE ${clauses.join(' AND ')} ` : '', params }
 }
 
-/** Named-param `IN (…)` fragment for a list of Encoded Paths. */
+/**
+ * Named-param `encoded_path IN (…)` fragment for a list of Encoded Paths — the
+ * single place a member set (Parent + its runs, v11 / ADR-0014) becomes SQL.
+ * Reused by {@link buildWhere} and the Parent-scoped Project queries.
+ */
 function encodedPathIn(encodedPaths: readonly string[]): {
   sql: string
   params: Record<string, string>
