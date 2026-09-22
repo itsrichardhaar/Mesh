@@ -1,13 +1,15 @@
-import { act, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { vi } from 'vitest'
 import type { Project } from '@shared/types'
+import { syntheticParentId } from '@shared/types'
 import { ProjectSidebar } from '@renderer/components/ProjectSidebar'
 import type { ProjectListState } from '@renderer/hooks/useProjectList'
 
 /**
  * Slice A (v11 / ADR-0014): a recognized Worktree Run wears a calm
  * **no-mistakes** / **worktree** tag instead of the Source-Missing alarm.
- * Runs are still flat here; nesting arrives in Slice B.
+ * Slice B nests runs under a Parent, so these tests expand the disclosure
+ * before asserting on the (now nested) run row.
  */
 
 function project(overrides: Partial<Project> = {}): Project {
@@ -36,6 +38,9 @@ function gateRun(overrides: Partial<Project> = {}): Project {
     sourceMissing: true,
     kind: 'worktreeRun',
     subtype: 'gate',
+    // Slice B: a run always nests under a Parent; a synthetic node stands in
+    // when (as here) no real Parent Project is in the list.
+    parentEncodedPath: syntheticParentId('moves'),
     gate: {
       repoId: '018d9e76994c',
       runId: '01M320PARHRXZETXMJX80Z382A',
@@ -64,9 +69,20 @@ async function renderSidebar(projects: Project[]): Promise<void> {
   await act(async () => {})
 }
 
+/** Expand every collapsed run-group disclosure so nested run rows render. */
+async function expandAllGroups(): Promise<void> {
+  const toggles = screen.queryAllByRole('button', { name: /runs \(\d+\)/ })
+  for (const toggle of toggles) {
+    await act(async () => {
+      fireEvent.click(toggle)
+    })
+  }
+}
+
 describe('ProjectSidebar — Worktree Run tag (Slice A)', () => {
   it('tags a gate run "no-mistakes" and never shows the Source-Missing alarm', async () => {
     await renderSidebar([project(), gateRun()])
+    await expandAllGroups()
     expect(screen.getByText('no-mistakes')).toBeInTheDocument()
     // Even though the run's worktree is deleted (sourceMissing), the alarm is suppressed.
     expect(screen.queryByText('Source missing')).not.toBeInTheDocument()
@@ -80,11 +96,13 @@ describe('ProjectSidebar — Worktree Run tag (Slice A)', () => {
 
   it('labels a plain (non-gate) worktree run "worktree"', async () => {
     await renderSidebar([gateRun({ subtype: 'plain', gate: null })])
+    await expandAllGroups()
     expect(screen.getByText('worktree')).toBeInTheDocument()
   })
 
   it('marks the run row as a run (not the missing-alarm styling)', async () => {
     await renderSidebar([gateRun()])
+    await expandAllGroups()
     const runButton = screen.getByRole('button', { name: /01M320PARHRXZETXMJX80Z382A/ })
     expect(runButton.className).toContain('project-row-run')
     expect(runButton.className).not.toContain('project-row-missing')

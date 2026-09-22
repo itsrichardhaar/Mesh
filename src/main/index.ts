@@ -46,6 +46,9 @@ import {
   listDirectory,
   watchProject
 } from './files/file-tree-service'
+import { attributeWorktreeRuns } from './gate/attribute'
+import { NoMistakesStateReader } from './gate/no-mistakes-state'
+import { canonicalizePath, resolveMainWorktree } from './gate/worktree-git'
 import { buildApplicationMenu } from './menu'
 import { listProjects } from './projects/enumerator'
 import { detect } from './projects/metadata-detector'
@@ -128,6 +131,13 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url))
 let mainWindow: BrowserWindow | null = null
 let isQuitting = false
 const ptyManager = new PtyManager()
+
+/**
+ * v11 / ADR-0014: ring-fenced reader of no-mistakes' state store, used to
+ * attribute Gate Runs to their Parent Project in `projects:list`. Cached
+ * in-process so rapid sidebar refreshes reopen the store at most once per TTL.
+ */
+const noMistakesState = new NoMistakesStateReader()
 
 /**
  * v5 / Slice 41: notification subsystem. The idle detector watches each
@@ -286,8 +296,18 @@ function registerIpc(): void {
       )
     }
 
+    // ADR-0014 (Slice B): attribute each Worktree Run to its Parent Project.
+    // Gate Runs resolve via the ring-fenced repoId → working_path map; live
+    // generic worktrees resolve via git plumbing (and are upgraded to the
+    // `plain` subtype here). An unresolved Parent yields a synthetic node id.
+    const attributed = await attributeWorktreeRuns(discovered, {
+      gateRepos: noMistakesState.readRepoWorkingPaths(),
+      resolveMainWorktree,
+      canonicalize: canonicalizePath
+    })
+
     const augmentation = readAugmentation(db)
-    return discovered.map((p) => {
+    return attributed.map((p) => {
       const aug = augmentation.get(p.encodedPath)
       return {
         ...p,
@@ -295,11 +315,11 @@ function registerIpc(): void {
         autoSubtitle: aug?.autoSubtitle ?? null,
         hidden: aug?.hidden ?? false,
         muteNotifications: aug?.muteNotifications ?? false,
-        // ADR-0014: kind/subtype/gate come from path recognition (enumerator);
-        // parentEncodedPath is resolved in Slice B (null here in Slice A).
+        // kind/subtype come from recognition + attribution (a live worktree is
+        // upgraded to `plain` there); parentEncodedPath nests the run.
         kind: p.kind,
         subtype: p.subtype,
-        parentEncodedPath: null,
+        parentEncodedPath: p.parentEncodedPath,
         gate: p.gate
       }
     })

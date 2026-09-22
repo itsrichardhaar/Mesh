@@ -54,6 +54,29 @@ export interface Project {
 export type WorktreeRunSubtype = 'gate' | 'plain'
 
 /**
+ * Prefix for a **synthetic grouping-node** id — the `parentEncodedPath` a
+ * Worktree Run gets when its real Parent Project can't be resolved (the state
+ * read failed, or the repo has no Claude Code Sessions of its own). It is *not*
+ * a fabricated Project (ADR-0002 holds): no Project row carries this id; the
+ * sidebar derives a header row from it. Claude Code Encoded Paths always begin
+ * with `-`, so this prefix can never collide with a real one.
+ */
+export const SYNTHETIC_PARENT_PREFIX = 'worktree-group:'
+
+/** Build a synthetic grouping-node id from its display label (repo name or id). */
+export function syntheticParentId(label: string): string {
+  return SYNTHETIC_PARENT_PREFIX + label
+}
+
+/**
+ * The display label of a synthetic grouping-node id, or `null` when `id` is a
+ * real Encoded Path (i.e. the Parent is a discovered Project).
+ */
+export function syntheticParentLabel(id: string): string | null {
+  return id.startsWith(SYNTHETIC_PARENT_PREFIX) ? id.slice(SYNTHETIC_PARENT_PREFIX.length) : null
+}
+
+/**
  * Metadata for a `no-mistakes` Gate Run. `repoId`/`runId` are recognized from
  * the worktree path; the rest is read (best-effort, read-only) from
  * `~/.no-mistakes/state.sqlite` and is `null` when that read is unavailable
