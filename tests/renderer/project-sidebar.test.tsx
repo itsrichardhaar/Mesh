@@ -110,3 +110,38 @@ describe('ProjectSidebar — Worktree Run tag (Slice A)', () => {
     expect(within(runButton).getByText('no-mistakes')).toBeInTheDocument()
   })
 })
+
+describe('ProjectSidebar — hiding a Parent takes its runs (Slice B)', () => {
+  it('hides a Parent and its runs together, never leaking a raw Encoded Path header', async () => {
+    const parent = project()
+    const run = gateRun({ parentEncodedPath: parent.encodedPath })
+    await renderSidebar([project({ hidden: true }), run])
+
+    // The Parent is hidden, so its run must vanish with it — no run group and no
+    // raw-Encoded-Path synthetic header standing in for the hidden Parent.
+    expect(screen.queryByText('moves')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /runs \(\d+\)/ })).not.toBeInTheDocument()
+    expect(screen.queryByText(parent.encodedPath)).not.toBeInTheDocument()
+
+    // Toggling "Show Hidden" brings the Parent and its run back together.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Show Hidden/ }))
+    })
+    expect(screen.getByText('moves')).toBeInTheDocument()
+    await expandAllGroups()
+    expect(
+      screen.getByRole('button', { name: /01M320PARHRXZETXMJX80Z382A/ })
+    ).toBeInTheDocument()
+  })
+
+  it('keeps runs of a non-hidden Parent visible', async () => {
+    const parent = project()
+    const run = gateRun({ parentEncodedPath: parent.encodedPath })
+    await renderSidebar([parent, run])
+    expect(screen.getByText('moves')).toBeInTheDocument()
+    await expandAllGroups()
+    expect(
+      screen.getByRole('button', { name: /01M320PARHRXZETXMJX80Z382A/ })
+    ).toBeInTheDocument()
+  })
+})

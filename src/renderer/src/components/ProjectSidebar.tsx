@@ -201,9 +201,25 @@ function SidebarBody({
 
   const nodes = useMemo(() => {
     if (state.status !== 'ok') return []
-    const afterHidden = showHidden
-      ? state.projects
-      : state.projects.filter((p) => !p.hidden)
+    if (showHidden) return buildProjectTree(state.projects)
+    // A Worktree Run belongs to its Parent Project, so hiding the Parent takes
+    // its runs with it — otherwise a hidden parent's runs would re-appear under a
+    // raw-Encoded-Path synthetic header. Runs whose parent is genuinely
+    // undiscovered still fall under a synthetic grouping node.
+    const hiddenParents = new Set(
+      state.projects.filter((p) => p.hidden).map((p) => p.encodedPath)
+    )
+    const afterHidden = state.projects.filter((p) => {
+      if (p.hidden) return false
+      if (
+        p.kind === 'worktreeRun' &&
+        p.parentEncodedPath !== null &&
+        hiddenParents.has(p.parentEncodedPath)
+      ) {
+        return false
+      }
+      return true
+    })
     return buildProjectTree(afterHidden)
   }, [state, showHidden])
 

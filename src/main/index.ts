@@ -309,18 +309,15 @@ function registerIpc(): void {
     const augmentation = readAugmentation(db)
     return attributed.map((p) => {
       const aug = augmentation.get(p.encodedPath)
+      // kind/subtype/parentEncodedPath/gate come from recognition + attribution
+      // (a live worktree is upgraded to `plain` there) and ride the `...p` spread;
+      // only the augmentation-derived fields override.
       return {
         ...p,
         name: aug?.autoName ?? p.name,
         autoSubtitle: aug?.autoSubtitle ?? null,
         hidden: aug?.hidden ?? false,
-        muteNotifications: aug?.muteNotifications ?? false,
-        // kind/subtype come from recognition + attribution (a live worktree is
-        // upgraded to `plain` there); parentEncodedPath nests the run.
-        kind: p.kind,
-        subtype: p.subtype,
-        parentEncodedPath: p.parentEncodedPath,
-        gate: p.gate
+        muteNotifications: aug?.muteNotifications ?? false
       }
     })
   })
