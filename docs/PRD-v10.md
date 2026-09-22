@@ -124,6 +124,8 @@ Tests assert observable outputs (returned aggregates, rendered rows, re-fetch ca
 - **Per-Project Metric Cards / per-Project Quota** — Quota stays account-global (ADR-0011); cards stay global.
 - **New schema / new ADR beyond ADR-0013** — no migration; the `0006` indices suffice.
 
+> **Update — 2026-09-22 (v11 shipped, `v0.11.0`):** v11 was **Worktree Runs** (`docs/PRD-v11.md`, ADR-0014), not a Usage-dashboard cycle — it nests `no-mistakes` gate runs under their **Parent Project** (recognition + attribution + a collapsed `Gate runs (N)` disclosure), enriches each run row (pass/fail glyph, intent label, PR link) from a ring-fenced read of `~/.no-mistakes/state.sqlite`, and **rolls each run's Usage up into its Parent at query time** — by-Project merge, Parent-scoped filter expansion, and Project-Screen headline incl. Session count. No Mesh schema change (ADR-0014). The deferrals above still stand (persisted filter state, full local-tz pass, per-Project Quota); the **in-app read-only diff viewer** for a run is deferred to v12 (v11 covers merged-run diffs via the PR link).
+
 ## Further Notes
 
 - **CONTEXT.md** gained **Usage Filter**, **Timeframe**, and **Metric Card** terms this cycle, plus notes that the Activity Heatmap is global and that Subscription Utilization is shown as a multiple ("× your plan fee", never "× value"). **ADR-0013** records the parameterized-query decision.

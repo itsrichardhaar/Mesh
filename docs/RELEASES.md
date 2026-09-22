@@ -11,7 +11,7 @@ This file replaces the "deployment log" pattern that makes sense for self-hosted
 | Channel | Status | Latest version | Notes |
 |---|---|---|---|
 | `dev` | **Active** | git `HEAD` of `main` | Run via `pnpm dev`; no `.app` artifact |
-| `beta` | **Active** ← we are here | `0.1.0` | Documentation-only foundation; no `.app` yet — first beta `.app` ships when slice 1 of the PRD is complete |
+| `beta` | **Active** ← we are here | `0.11.0` | Worktree Runs — no-mistakes gate runs nest under their Parent Project + roll up their Usage (see [CHANGELOG](../CHANGELOG.md)). Unsigned `.app`, installed manually |
 | `stable` | Not yet shipped | — | First stable release will be `1.0.0` once the [Production Checklist](./DEPLOYMENT.md#production-checklist-100) passes |
 
 ---
