@@ -3,7 +3,11 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import Database from 'better-sqlite3'
-import { NoMistakesStateReader, readRepoWorkingPaths } from '@main/gate/no-mistakes-state'
+import {
+  NoMistakesStateReader,
+  readRepoWorkingPaths,
+  readRunEnrichment
+} from '@main/gate/no-mistakes-state'
 
 /**
  * The ring-fenced read of no-mistakes' `state.sqlite` (ADR-0014). Every test
@@ -75,6 +79,97 @@ describe('readRepoWorkingPaths', () => {
   })
 })
 
+describe('readRunEnrichment', () => {
+  let tmpRoot: string
+
+  beforeEach(() => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'mesh-runs-'))
+  })
+  afterEach(() => {
+    rmSync(tmpRoot, { recursive: true, force: true })
+  })
+
+  const RUNS_SCHEMA =
+    'CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT, pr_url TEXT, pr_state TEXT, branch TEXT, intent TEXT)'
+
+  function seedRuns(
+    rows: Array<[string, string | null, string | null, string | null, string | null, string | null]>
+  ): string {
+    const p = join(tmpRoot, 'state.sqlite')
+    const db = new Database(p)
+    db.exec(RUNS_SCHEMA)
+    const ins = db.prepare(
+      'INSERT INTO runs (id, status, pr_url, pr_state, branch, intent) VALUES (?, ?, ?, ?, ?, ?)'
+    )
+    for (const r of rows) ins.run(...r)
+    db.close()
+    return p
+  }
+
+  it('returns the runId → enrichment map from a seeded runs table', () => {
+    const p = seedRuns([
+      [
+        '01M320PARHRXZETXMJX80Z382A',
+        'completed',
+        'https://github.com/x/moves/pull/58',
+        'merged',
+        '16-event-detail-sheet',
+        'Build the consumer event detail sheet'
+      ],
+      ['01M32QJKD6G47N5SPQVCB8RJ7A', 'failed', null, 'none', '17-get-directions', 'Build directions']
+    ])
+    const map = readRunEnrichment(p)
+    expect(map.get('01M320PARHRXZETXMJX80Z382A')).toEqual({
+      status: 'completed',
+      prUrl: 'https://github.com/x/moves/pull/58',
+      prState: 'merged',
+      branch: '16-event-detail-sheet',
+      intent: 'Build the consumer event detail sheet'
+    })
+    expect(map.get('01M32QJKD6G47N5SPQVCB8RJ7A')).toEqual({
+      status: 'failed',
+      prUrl: null,
+      prState: 'none',
+      branch: '17-get-directions',
+      intent: 'Build directions'
+    })
+  })
+
+  it('normalizes an unrecognized status to null (only completed/failed carry a glyph)', () => {
+    const p = seedRuns([['r1', 'running', null, null, 'wip', 'in progress']])
+    expect(readRunEnrichment(p).get('r1')?.status).toBeNull()
+  })
+
+  it('maps empty text columns to null rather than empty strings', () => {
+    const p = seedRuns([['r1', 'completed', '', '', '', '']])
+    expect(readRunEnrichment(p).get('r1')).toEqual({
+      status: 'completed',
+      prUrl: null,
+      prState: null,
+      branch: null,
+      intent: null
+    })
+  })
+
+  it('returns an empty map when the file is absent (never throws)', () => {
+    expect(readRunEnrichment(join(tmpRoot, 'nope.sqlite')).size).toBe(0)
+  })
+
+  it('returns an empty map when the schema has no runs table', () => {
+    const p = join(tmpRoot, 'state.sqlite')
+    const db = new Database(p)
+    db.exec('CREATE TABLE repos (id TEXT PRIMARY KEY, working_path TEXT)')
+    db.close()
+    expect(readRunEnrichment(p).size).toBe(0)
+  })
+
+  it('returns an empty map when the file is not a database', () => {
+    const p = join(tmpRoot, 'garbage.sqlite')
+    writeFileSync(p, 'not a sqlite file at all', 'utf-8')
+    expect(readRunEnrichment(p).size).toBe(0)
+  })
+})
+
 describe('NoMistakesStateReader (cache)', () => {
   let tmpRoot: string
 
@@ -111,5 +206,27 @@ describe('NoMistakesStateReader (cache)', () => {
     // Past the TTL it re-opens and sees the new value.
     now = 7_000
     expect(reader.readRepoWorkingPaths().get('a')).toBe('/two')
+  })
+
+  it('reads repos and runs from one shared cache window', () => {
+    const dbPath = join(tmpRoot, 'state.sqlite')
+    const db = new Database(dbPath)
+    db.exec('CREATE TABLE repos (id TEXT PRIMARY KEY, working_path TEXT NOT NULL)')
+    db.exec('CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT, pr_url TEXT, pr_state TEXT, branch TEXT, intent TEXT)')
+    db.prepare('INSERT INTO repos (id, working_path) VALUES (?, ?)').run('repo1', '/one')
+    db.prepare('INSERT INTO runs (id, status) VALUES (?, ?)').run('run1', 'completed')
+    db.close()
+
+    let now = 1_000
+    const reader = new NoMistakesStateReader({ dbPath, now: () => now, ttlMs: 5_000 })
+    expect(reader.readRepoWorkingPaths().get('repo1')).toBe('/one')
+    expect(reader.readRunEnrichment().get('run1')?.status).toBe('completed')
+
+    // Both reads are served from the same window — deleting the file mid-TTL
+    // doesn't disturb either cached map.
+    rmSync(dbPath, { force: true })
+    now = 3_000
+    expect(reader.readRepoWorkingPaths().get('repo1')).toBe('/one')
+    expect(reader.readRunEnrichment().get('run1')?.status).toBe('completed')
   })
 })

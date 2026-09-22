@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
 import type { Project } from '@shared/types'
 import type { ProjectListState } from '../hooks/useProjectList'
 import { useProjectIndicator } from '../hooks/useLiveSessions'
@@ -33,6 +33,49 @@ function runTagTitle(project: Project): string {
   return project.subtype === 'gate'
     ? 'no-mistakes gate run'
     : 'git worktree run'
+}
+
+/**
+ * A Gate Run's row label (Slice C): what it built, resolved `intent → branch →
+ * short runId` from its enrichment. Non-gate runs keep their worktree basename.
+ * The full string rides the row `title` so an ellipsized intent stays readable.
+ */
+function runDisplayLabel(project: Project): string {
+  if (project.subtype === 'gate' && project.gate) {
+    return (
+      project.gate.intent?.trim() ||
+      project.gate.branch?.trim() ||
+      project.gate.runId.slice(0, 8)
+    )
+  }
+  return project.name
+}
+
+/** Pass/fail glyph for a Gate Run — shape + text, never hue alone (a11y). */
+interface RunGlyph {
+  char: string
+  label: string
+  className: string
+}
+
+function runStatusGlyph(project: Project): RunGlyph | null {
+  if (project.subtype !== 'gate' || !project.gate) return null
+  const { status, prState } = project.gate
+  if (status === 'completed' || prState === 'merged') {
+    return { char: '✓', label: 'passed', className: 'run-glyph-pass' }
+  }
+  if (status === 'failed') {
+    return { char: '✗', label: 'failed', className: 'run-glyph-fail' }
+  }
+  return null
+}
+
+/** The text a run row matches sidebar search against — name plus intent/branch. */
+function runSearchText(project: Project): string {
+  return [project.name, project.gate?.intent, project.gate?.branch]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
 }
 
 interface ContextMenuState {
@@ -294,7 +337,7 @@ function renderTree(
     const groups: Array<RunGroup & { expanded: boolean }> = []
     for (const group of node.groups) {
       if (needle && !parentMatches) {
-        const runs = group.runs.filter((r) => r.name.toLowerCase().includes(needle))
+        const runs = group.runs.filter((r) => runSearchText(r).includes(needle))
         if (runs.length === 0) continue
         groups.push({ ...group, runs, expanded: true }) // reveal the match
       } else {
@@ -443,44 +486,93 @@ function ProjectRow({
   if (idle) classes.push('project-row-idle')
   if (p.hidden) classes.push('project-row-hidden')
   if (isLive) classes.push('project-row-live')
-  return (
-    <>
-      <button
-        type="button"
-        className={classes.join(' ')}
-        onClick={() => onSelect(p.encodedPath)}
-        onDoubleClick={() => {
-          if (!p.sourceMissing) onOpen(p)
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !p.sourceMissing) {
-            e.preventDefault()
-            onOpen(p)
-          }
-        }}
-        onContextMenu={(e) => onContextMenu(e, p)}
-        title={
-          isRun
-            ? runTagTitle(p)
-            : p.sourceMissing
-              ? 'Source folder no longer exists on disk'
-              : undefined
-        }
-      >
-        <span className="project-name">{p.name}</span>
-        {isActive && <ActivitySpinner size="small" ariaLabel="Project active" />}
-        {isRun ? (
-          <span className="sidebar-pill sidebar-pill-worktree">{runTagLabel(p)}</span>
-        ) : p.sourceMissing ? (
-          <span className="sidebar-pill sidebar-pill-missing">Source missing</span>
-        ) : idle ? (
-          <span className="sidebar-pill sidebar-pill-idle">Idle</span>
-        ) : (
-          <span className="project-activity">{formatRelative(p.activity)}</span>
-        )}
-      </button>
-    </>
+
+  // Slice C: a Gate Run reads like a validation run — a pass/fail glyph, an
+  // intent-first label, its relative time, and (when it opened one) a PR link.
+  const isGate = p.subtype === 'gate'
+  const glyph = runStatusGlyph(p)
+  const label = isRun ? runDisplayLabel(p) : p.name
+  const prUrl = isRun ? (p.gate?.prUrl ?? null) : null
+
+  const trailing = isRun ? (
+    isGate ? (
+      <>
+        <span className="sidebar-pill sidebar-pill-worktree">{runTagLabel(p)}</span>
+        <span className="project-activity">{formatRelative(p.activity)}</span>
+      </>
+    ) : (
+      <span className="sidebar-pill sidebar-pill-worktree">{runTagLabel(p)}</span>
+    )
+  ) : p.sourceMissing ? (
+    <span className="sidebar-pill sidebar-pill-missing">Source missing</span>
+  ) : idle ? (
+    <span className="sidebar-pill sidebar-pill-idle">Idle</span>
+  ) : (
+    <span className="project-activity">{formatRelative(p.activity)}</span>
   )
+
+  const rowButton = (
+    <button
+      type="button"
+      className={classes.join(' ')}
+      onClick={() => onSelect(p.encodedPath)}
+      onDoubleClick={() => {
+        if (!p.sourceMissing) onOpen(p)
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && !p.sourceMissing) {
+          e.preventDefault()
+          onOpen(p)
+        }
+      }}
+      onContextMenu={(e) => onContextMenu(e, p)}
+      title={
+        isRun
+          ? isGate
+            ? runDisplayLabel(p)
+            : runTagTitle(p)
+          : p.sourceMissing
+            ? 'Source folder no longer exists on disk'
+            : undefined
+      }
+    >
+      {glyph && (
+        <span
+          className={`run-glyph ${glyph.className}`}
+          aria-label={glyph.label}
+          title={glyph.label}
+        >
+          {glyph.char}
+        </span>
+      )}
+      <span className="project-name">{label}</span>
+      {isActive && <ActivitySpinner size="small" ariaLabel="Project active" />}
+      {trailing}
+    </button>
+  )
+
+  // The PR affordance is a sibling button, not nested inside the row button
+  // (interactive elements can't nest); a flex wrapper keeps it on the row.
+  if (prUrl) {
+    return (
+      <div className="project-row-wrap">
+        {rowButton}
+        <button
+          type="button"
+          className="run-pr-link"
+          title="Open pull request"
+          aria-label="Open pull request"
+          onClick={(e) => {
+            e.stopPropagation()
+            void window.api.shell.openExternal(prUrl)
+          }}
+        >
+          <ExternalLink size={12} aria-hidden="true" />
+        </button>
+      </div>
+    )
+  }
+  return rowButton
 }
 
 function SidebarFooter({
