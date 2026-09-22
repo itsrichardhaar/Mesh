@@ -24,6 +24,54 @@ export interface Project {
    * DND behavior — silencing the toast, not the record.
    */
   muteNotifications: boolean
+  /**
+   * v11 / ADR-0014: `'worktreeRun'` when this "Project" is actually a git
+   * worktree Claude Code ran in (a Worktree Run), rather than a directory the
+   * user opened directly. `'project'` otherwise. Derived at discovery time.
+   */
+  kind: 'project' | 'worktreeRun'
+  /**
+   * The Worktree Run subtype: `'gate'` for a `no-mistakes` Gate Run,
+   * `'plain'` for a generic git worktree. `null` for ordinary Projects.
+   */
+  subtype: WorktreeRunSubtype | null
+  /**
+   * The Encoded Path of the Parent Project a Worktree Run belongs to, or a
+   * synthetic grouping-node id when the parent can't be resolved. `null` for
+   * ordinary Projects. Populated in Slice B (attribution); `null` in Slice A.
+   */
+  parentEncodedPath: string | null
+  /**
+   * no-mistakes Gate Run metadata. The `repoId`/`runId` come from path
+   * recognition (Slice A); `status`/`prUrl`/`prState`/`branch`/`intent` are
+   * enriched from the ring-fenced state read (Slice C) and stay `null` until
+   * then. `null` for non-gate Projects.
+   */
+  gate: GateRunMeta | null
+}
+
+/** The two Worktree Run subtypes (v11 / ADR-0014). */
+export type WorktreeRunSubtype = 'gate' | 'plain'
+
+/**
+ * Metadata for a `no-mistakes` Gate Run. `repoId`/`runId` are recognized from
+ * the worktree path; the rest is read (best-effort, read-only) from
+ * `~/.no-mistakes/state.sqlite` and is `null` when that read is unavailable
+ * or hasn't run yet (Slice A carries ids only).
+ */
+export interface GateRunMeta {
+  repoId: string
+  runId: string
+  /** `'completed'` / `'failed'` from the run's step outcome, or `null`. */
+  status: 'completed' | 'failed' | null
+  /** The run's pull-request URL, or `null` when it has none. */
+  prUrl: string | null
+  /** `'merged'` / `'none'` (or another endpoint value), or `null`. */
+  prState: string | null
+  /** The run's git branch, or `null`. */
+  branch: string | null
+  /** A human description of what the run was building, or `null`. */
+  intent: string | null
 }
 
 /**

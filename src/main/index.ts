@@ -294,7 +294,13 @@ function registerIpc(): void {
         name: aug?.autoName ?? p.name,
         autoSubtitle: aug?.autoSubtitle ?? null,
         hidden: aug?.hidden ?? false,
-        muteNotifications: aug?.muteNotifications ?? false
+        muteNotifications: aug?.muteNotifications ?? false,
+        // ADR-0014: kind/subtype/gate come from path recognition (enumerator);
+        // parentEncodedPath is resolved in Slice B (null here in Slice A).
+        kind: p.kind,
+        subtype: p.subtype,
+        parentEncodedPath: null,
+        gate: p.gate
       }
     })
   })
@@ -551,7 +557,8 @@ function registerIpc(): void {
         name: aug?.autoName ?? base.name,
         autoSubtitle: aug?.autoSubtitle ?? null,
         hidden: aug?.hidden ?? false,
-        muteNotifications: aug?.muteNotifications ?? false
+        muteNotifications: aug?.muteNotifications ?? false,
+        parentEncodedPath: null
       }
 
       // Slice 36: resolve which Provider's client to use from the

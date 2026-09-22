@@ -1528,6 +1528,18 @@ body.sidebar-resizing .sidebar-resize-handle {
   color: #e6b558;
 }
 
+/* Worktree Run tag (ADR-0014) — a calm, informational flag (not the amber
+   Source-Missing alarm). Reads as "this is a run", not "something is wrong". */
+.sidebar-pill-worktree {
+  background: rgba(99, 110, 250, 0.14);
+  color: #4b56c0;
+}
+
+[data-theme='dark'] .sidebar-pill-worktree {
+  background: rgba(129, 140, 248, 0.2);
+  color: #a5b0f5;
+}
+
 /* --- Sidebar footer + Show Hidden toggle ---------------------------------- */
 
 .sidebar-footer {

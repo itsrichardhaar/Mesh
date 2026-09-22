@@ -19,6 +19,21 @@ function isIdle(project: Project): boolean {
   return Date.now() - new Date(project.activity).getTime() > FOURTEEN_DAYS_MS
 }
 
+/**
+ * The tag shown on a Worktree Run row (ADR-0014): `no-mistakes` for a Gate Run,
+ * `worktree` for a generic worktree. A labeled pill — meaning carried by text,
+ * not hue (reduced-color-vision constraint).
+ */
+function runTagLabel(project: Project): string {
+  return project.subtype === 'gate' ? 'no-mistakes' : 'worktree'
+}
+
+function runTagTitle(project: Project): string {
+  return project.subtype === 'gate'
+    ? 'no-mistakes gate run'
+    : 'git worktree run'
+}
+
 interface ContextMenuState {
   encodedPath: string
   hidden: boolean
@@ -237,9 +252,14 @@ function ProjectRow({
 }): JSX.Element {
   const { isLive, isActive } = useProjectIndicator(p.encodedPath)
   const idle = isIdle(p)
+  const isRun = p.kind === 'worktreeRun'
   const classes = ['project-row']
   if (isSelected) classes.push('project-row-selected')
-  if (p.sourceMissing) classes.push('project-row-missing')
+  // ADR-0014: a Worktree Run's deleted worktree is expected — suppress the
+  // Source-Missing *alarm* styling for runs (the disk-gone behavior below still
+  // keys off `sourceMissing`).
+  if (p.sourceMissing && !isRun) classes.push('project-row-missing')
+  if (isRun) classes.push('project-row-run')
   if (idle) classes.push('project-row-idle')
   if (p.hidden) classes.push('project-row-hidden')
   if (isLive) classes.push('project-row-live')
@@ -259,11 +279,19 @@ function ProjectRow({
           }
         }}
         onContextMenu={(e) => onContextMenu(e, p)}
-        title={p.sourceMissing ? 'Source folder no longer exists on disk' : undefined}
+        title={
+          isRun
+            ? runTagTitle(p)
+            : p.sourceMissing
+              ? 'Source folder no longer exists on disk'
+              : undefined
+        }
       >
         <span className="project-name">{p.name}</span>
         {isActive && <ActivitySpinner size="small" ariaLabel="Project active" />}
-        {p.sourceMissing ? (
+        {isRun ? (
+          <span className="sidebar-pill sidebar-pill-worktree">{runTagLabel(p)}</span>
+        ) : p.sourceMissing ? (
           <span className="sidebar-pill sidebar-pill-missing">Source missing</span>
         ) : idle ? (
           <span className="sidebar-pill sidebar-pill-idle">Idle</span>
