@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { syntheticParentId } from '@shared/types'
-import { attributeWorktreeRuns, type AttributionDeps } from '@main/gate/attribute'
+import {
+  attributeWorktreeRuns,
+  resolveGateParentEncodedPath,
+  type AttributionDeps
+} from '@main/gate/attribute'
 import type { DiscoveredProject } from '@main/projects/enumerator'
 
 /**
@@ -135,5 +139,28 @@ describe('attributeWorktreeRuns', () => {
       })
     )
     expect(probed).toBe(false)
+  })
+})
+
+describe('resolveGateParentEncodedPath (shared by attribution + Usage rollup)', () => {
+  const canonical = (p: string): string => p
+  const parents = new Map([['/Users/x/Desktop/Mesh', '-Users-x-Desktop-Mesh']])
+
+  it('maps a known working_path to the discovered Parent Encoded Path', () => {
+    expect(resolveGateParentEncodedPath('/Users/x/Desktop/Mesh', 'f9184ba0b6db', parents, canonical)).toBe(
+      '-Users-x-Desktop-Mesh'
+    )
+  })
+
+  it('falls back to a synthetic node (repo name) when the working_path is undiscovered', () => {
+    expect(resolveGateParentEncodedPath('/Users/x/Desktop/Gone', 'abc123', parents, canonical)).toBe(
+      syntheticParentId('Gone')
+    )
+  })
+
+  it('falls back to a synthetic node (repoId) when the working_path is unknown', () => {
+    expect(resolveGateParentEncodedPath(undefined, 'abc123', parents, canonical)).toBe(
+      syntheticParentId('abc123')
+    )
   })
 })

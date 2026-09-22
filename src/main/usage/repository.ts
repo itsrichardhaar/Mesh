@@ -147,6 +147,20 @@ export function usageEventCount(db: Database.Database): number {
   return n
 }
 
+/**
+ * Every distinct Encoded Path in the Usage cache — the domain the rollup
+ * resolver must cover (v11 / ADR-0014, Slice D). A Gate Run can appear here
+ * without being discovered on disk: its session dir was removed but its events
+ * remain (ADR-0009), so the resolver recognizes and attributes it from this set.
+ */
+export function distinctUsageEncodedPaths(db: Database.Database): string[] {
+  return (
+    db.prepare('SELECT DISTINCT encoded_path AS encodedPath FROM usage_events').all() as Array<{
+      encodedPath: string
+    }>
+  ).map((r) => r.encodedPath)
+}
+
 /** Headline counts for the dashboard stat cards. */
 export function usageSummaryCounts(db: Database.Database): {
   eventCount: number
