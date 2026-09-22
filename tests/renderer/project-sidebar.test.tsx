@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { vi } from 'vitest'
-import type { Project } from '@shared/types'
+import type { GateRunMeta, Project } from '@shared/types'
 import { syntheticParentId } from '@shared/types'
 import { ProjectSidebar } from '@renderer/components/ProjectSidebar'
 import type { ProjectListState } from '@renderer/hooks/useProjectList'
@@ -103,7 +103,7 @@ describe('ProjectSidebar — Worktree Run tag (Slice A)', () => {
   it('marks the run row as a run (not the missing-alarm styling)', async () => {
     await renderSidebar([gateRun()])
     await expandAllGroups()
-    const runButton = screen.getByRole('button', { name: /01M320PARHRXZETXMJX80Z382A/ })
+    const runButton = screen.getByRole('button', { name: /01M320PA/ })
     expect(runButton.className).toContain('project-row-run')
     expect(runButton.className).not.toContain('project-row-missing')
     // The tag lives inside the run row.
@@ -130,7 +130,7 @@ describe('ProjectSidebar — hiding a Parent takes its runs (Slice B)', () => {
     expect(screen.getByText('moves')).toBeInTheDocument()
     await expandAllGroups()
     expect(
-      screen.getByRole('button', { name: /01M320PARHRXZETXMJX80Z382A/ })
+      screen.getByRole('button', { name: /01M320PA/ })
     ).toBeInTheDocument()
   })
 
@@ -141,7 +141,119 @@ describe('ProjectSidebar — hiding a Parent takes its runs (Slice B)', () => {
     expect(screen.getByText('moves')).toBeInTheDocument()
     await expandAllGroups()
     expect(
-      screen.getByRole('button', { name: /01M320PARHRXZETXMJX80Z382A/ })
+      screen.getByRole('button', { name: /01M320PA/ })
     ).toBeInTheDocument()
+  })
+})
+
+describe('ProjectSidebar — Gate Run enrichment (Slice C)', () => {
+  /** A gate run with specific enrichment merged over the all-null defaults. */
+  function enriched(gate: Partial<GateRunMeta>): Project {
+    return gateRun({
+      gate: {
+        repoId: '018d9e76994c',
+        runId: '01M320PARHRXZETXMJX80Z382A',
+        status: null,
+        prUrl: null,
+        prState: null,
+        branch: null,
+        intent: null,
+        ...gate
+      }
+    })
+  }
+
+  it('shows a ✓ pass glyph, labeled for screen readers, on a completed run', async () => {
+    await renderSidebar([enriched({ status: 'completed' })])
+    await expandAllGroups()
+    expect(screen.getByText('✓')).toHaveAttribute('aria-label', 'passed')
+  })
+
+  it('shows a ✗ fail glyph on a failed run', async () => {
+    await renderSidebar([enriched({ status: 'failed' })])
+    await expandAllGroups()
+    expect(screen.getByText('✗')).toHaveAttribute('aria-label', 'failed')
+  })
+
+  it('treats a merged PR as a pass even without a completed status', async () => {
+    await renderSidebar([enriched({ status: null, prState: 'merged' })])
+    await expandAllGroups()
+    expect(screen.getByText('✓')).toHaveAttribute('aria-label', 'passed')
+  })
+
+  it('labels the row by intent when present', async () => {
+    await renderSidebar([enriched({ intent: 'Build the event detail sheet', branch: 'x' })])
+    await expandAllGroups()
+    expect(screen.getByText('Build the event detail sheet')).toBeInTheDocument()
+  })
+
+  it('falls back to the branch when there is no intent', async () => {
+    await renderSidebar([enriched({ intent: null, branch: '16-event-detail-sheet' })])
+    await expandAllGroups()
+    expect(screen.getByText('16-event-detail-sheet')).toBeInTheDocument()
+  })
+
+  it('falls back to a short runId when there is neither intent nor branch', async () => {
+    await renderSidebar([enriched({ intent: null, branch: null })])
+    await expandAllGroups()
+    expect(screen.getByText('01M320PA')).toBeInTheDocument()
+  })
+
+  it('opens the PR in the default browser from the run row', async () => {
+    const url = 'https://github.com/itsrichardhaar/moves/pull/58'
+    await renderSidebar([enriched({ prUrl: url })])
+    await expandAllGroups()
+    const link = screen.getByRole('button', { name: 'Open pull request' })
+    await act(async () => {
+      fireEvent.click(link)
+    })
+    expect(window.api.shell.openExternal).toHaveBeenCalledWith(url)
+  })
+
+  it('shows no PR affordance when the run has no PR', async () => {
+    await renderSidebar([enriched({ prUrl: null })])
+    await expandAllGroups()
+    expect(screen.queryByRole('button', { name: 'Open pull request' })).not.toBeInTheDocument()
+  })
+
+  it('leaves a plain worktree run un-enriched — worktree tag, no glyph, no PR', async () => {
+    await renderSidebar([gateRun({ subtype: 'plain', gate: null, name: 'feature-x' })])
+    await expandAllGroups()
+    expect(screen.getByText('worktree')).toBeInTheDocument()
+    expect(screen.queryByText('✓')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Open pull request' })).not.toBeInTheDocument()
+  })
+
+  it('reveals a run (and its Parent) when search matches the intent', async () => {
+    const parent = project()
+    const run = gateRun({
+      parentEncodedPath: parent.encodedPath,
+      gate: enriched({ intent: 'Wire the get-directions route' }).gate
+    })
+    await renderSidebar([
+      parent,
+      project({ encodedPath: '-other', sourcePath: '/o', name: 'other' }),
+      run
+    ])
+    const search = screen.getByLabelText('Search projects')
+    await act(async () => {
+      fireEvent.change(search, { target: { value: 'directions' } })
+    })
+    expect(screen.getByText('Wire the get-directions route')).toBeInTheDocument()
+    expect(screen.queryByText('other')).not.toBeInTheDocument()
+  })
+
+  it('reveals a run when search matches the branch', async () => {
+    const parent = project()
+    const run = gateRun({
+      parentEncodedPath: parent.encodedPath,
+      gate: enriched({ intent: null, branch: 'fix/map-marker-drift' }).gate
+    })
+    await renderSidebar([parent, run])
+    const search = screen.getByLabelText('Search projects')
+    await act(async () => {
+      fireEvent.change(search, { target: { value: 'marker-drift' } })
+    })
+    expect(screen.getByText('fix/map-marker-drift')).toBeInTheDocument()
   })
 })

@@ -1592,6 +1592,65 @@ body.sidebar-resizing .sidebar-resize-handle {
   font-style: italic;
 }
 
+/* --- Gate Run enrichment (ADR-0014, Slice C) ------------------------------ */
+
+/* Pass/fail glyph on a Gate Run row. Meaning is carried by the ✓ / ✗ *shape*
+   and its aria-label — the color is a redundant reinforcement, never the sole
+   cue (reduced-color-vision constraint). */
+.run-glyph {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  line-height: 1;
+}
+
+.run-glyph-pass {
+  color: #2f855a;
+}
+
+.run-glyph-fail {
+  color: #c0392b;
+}
+
+[data-theme='dark'] .run-glyph-pass {
+  color: #6ee7a8;
+}
+
+[data-theme='dark'] .run-glyph-fail {
+  color: #f0857a;
+}
+
+/* Wraps the row button + its PR link so both sit on one line — the link is a
+   sibling, since a button can't nest inside the row's button. */
+.project-row-wrap {
+  display: flex;
+  align-items: center;
+}
+
+.project-row-wrap .project-row {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The "open this run's PR" affordance. Dim by default, lifts on hover/focus so
+   it reads as secondary to selecting the run. */
+.run-pr-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 4px;
+  margin-right: 8px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+}
+
+.run-pr-link:hover,
+.run-pr-link:focus-visible {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
 /* --- Sidebar footer + Show Hidden toggle ---------------------------------- */
 
 .sidebar-footer {

@@ -47,6 +47,7 @@ import {
   watchProject
 } from './files/file-tree-service'
 import { attributeWorktreeRuns } from './gate/attribute'
+import { enrichGateRuns } from './gate/enrich'
 import { NoMistakesStateReader } from './gate/no-mistakes-state'
 import { canonicalizePath, resolveMainWorktree } from './gate/worktree-git'
 import { buildApplicationMenu } from './menu'
@@ -306,8 +307,13 @@ function registerIpc(): void {
       canonicalize: canonicalizePath
     })
 
+    // ADR-0014 (Slice C): enrich each Gate Run with its no-mistakes run metadata
+    // (status, PR, branch, intent) from the same ring-fenced read, so a nested
+    // row reads like a validation run rather than a ULID.
+    const enriched = enrichGateRuns(attributed, noMistakesState.readRunEnrichment())
+
     const augmentation = readAugmentation(db)
-    return attributed.map((p) => {
+    return enriched.map((p) => {
       const aug = augmentation.get(p.encodedPath)
       // kind/subtype/parentEncodedPath/gate come from recognition + attribution
       // (a live worktree is upgraded to `plain` there) and ride the `...p` spread;

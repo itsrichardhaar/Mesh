@@ -43,9 +43,9 @@ export interface Project {
   parentEncodedPath: string | null
   /**
    * no-mistakes Gate Run metadata. The `repoId`/`runId` come from path
-   * recognition (Slice A); `status`/`prUrl`/`prState`/`branch`/`intent` are
-   * enriched from the ring-fenced state read (Slice C) and stay `null` until
-   * then. `null` for non-gate Projects.
+   * recognition; `status`/`prUrl`/`prState`/`branch`/`intent` are enriched
+   * from the ring-fenced state read and are `null` when that read is
+   * unavailable. `null` for non-gate Projects.
    */
   gate: GateRunMeta | null
 }
@@ -79,8 +79,7 @@ export function syntheticParentLabel(id: string): string | null {
 /**
  * Metadata for a `no-mistakes` Gate Run. `repoId`/`runId` are recognized from
  * the worktree path; the rest is read (best-effort, read-only) from
- * `~/.no-mistakes/state.sqlite` and is `null` when that read is unavailable
- * or hasn't run yet (Slice A carries ids only).
+ * `~/.no-mistakes/state.sqlite` and is `null` when that read is unavailable.
  */
 export interface GateRunMeta {
   repoId: string

@@ -21,7 +21,7 @@ export interface DiscoveredProject {
   kind: 'project' | 'worktreeRun'
   /** Worktree Run subtype (`'gate'` in Slice A), or `null` for ordinary Projects. */
   subtype: WorktreeRunSubtype | null
-  /** Gate Run ids from path recognition; enrichment fields stay `null` until Slice C. */
+  /** Gate Run ids from path recognition; enrichment fields are `null` here and filled by the `projects:list` handler. */
   gate: GateRunMeta | null
 }
 
@@ -69,8 +69,9 @@ export async function listProjects(rootDir: string): Promise<DiscoveredProject[]
     const sourceMissing = await isSourceMissing(sourcePath)
 
     // ADR-0014: recognize a Worktree Run from its path (disk-independent, so it
-    // works even after a merged run's worktree is deleted). Slice A carries the
-    // gate ids only; attribution + enrichment come in Slices B/C.
+    // works even after a merged run's worktree is deleted). This layer carries
+    // the gate ids only; attribution + enrichment are folded in downstream at
+    // `projects:list` time.
     const recognition = recognizeWorktreeRun(sourcePath)
     const gate: GateRunMeta | null = recognition
       ? {
