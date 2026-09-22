@@ -115,13 +115,38 @@ describe('usage repository', () => {
       makeEvent({ eventId: 'b', encodedPath: '-a', sessionId: 's2', ...zeros, outputTokens: 5 }),
       makeEvent({ eventId: 'c', encodedPath: '-b', sessionId: 's3', ...zeros, inputTokens: 99 })
     ])
-    const a = projectUsageCounts(db, '-a')
+    const a = projectUsageCounts(db, ['-a'])
     expect(a.eventCount).toBe(2)
     expect(a.sessionCount).toBe(2)
     expect(a.tokens).toBe(15)
     // Only -a's groups come back.
-    const groups = sumTokensByGroupForProject(db, '-a')
+    const groups = sumTokensByGroupForProject(db, ['-a'])
     expect(groups.reduce((s, g) => s + g.inputTokens + g.outputTokens, 0)).toBe(15)
+  })
+
+  it('rolls a Parent + its runs up into one member-set count (Slice D)', () => {
+    const zeros = { inputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0 }
+    insertUsageEvents(db, [
+      makeEvent({ eventId: 'a', encodedPath: '-parent', sessionId: 's1', ...zeros, inputTokens: 10 }),
+      makeEvent({ eventId: 'b', encodedPath: '-run1', sessionId: 's2', ...zeros, outputTokens: 5 }),
+      makeEvent({ eventId: 'c', encodedPath: '-run2', sessionId: 's3', ...zeros, inputTokens: 3 }),
+      makeEvent({ eventId: 'd', encodedPath: '-other', sessionId: 's4', ...zeros, inputTokens: 99 })
+    ])
+    const members = ['-parent', '-run1', '-run2']
+    const counts = projectUsageCounts(db, members)
+    expect(counts.eventCount).toBe(3)
+    // Sessions are globally unique across worktrees — summed, not de-collided.
+    expect(counts.sessionCount).toBe(3)
+    expect(counts.tokens).toBe(18)
+    const groups = sumTokensByGroupForProject(db, members)
+    expect(groups.reduce((s, g) => s + g.inputTokens + g.outputTokens, 0)).toBe(18)
+  })
+
+  it('an empty member set counts nothing (best-effort guard)', () => {
+    insertUsageEvents(db, [makeEvent({ eventId: 'a', encodedPath: '-a', inputTokens: 10 })])
+    const counts = projectUsageCounts(db, [])
+    expect(counts).toEqual({ eventCount: 0, sessionCount: 0, tokens: 0 })
+    expect(sumTokensByGroupForProject(db, [])).toEqual([])
   })
 
   it('wipeAllUsage drops events and cursors together (rebuild path)', () => {

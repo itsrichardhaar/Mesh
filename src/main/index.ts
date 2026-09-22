@@ -49,6 +49,7 @@ import {
 import { attributeWorktreeRuns } from './gate/attribute'
 import { enrichGateRuns } from './gate/enrich'
 import { NoMistakesStateReader } from './gate/no-mistakes-state'
+import { buildRunAttribution, type RunAttribution } from './gate/rollup'
 import { canonicalizePath, resolveMainWorktree } from './gate/worktree-git'
 import { buildApplicationMenu } from './menu'
 import { listProjects } from './projects/enumerator'
@@ -139,6 +140,23 @@ const ptyManager = new PtyManager()
  * in-process so rapid sidebar refreshes reopen the store at most once per TTL.
  */
 const noMistakesState = new NoMistakesStateReader()
+
+/**
+ * v11 / ADR-0014 (Slice D): the run-attribution resolver the Usage aggregation
+ * layer folds each Worktree Run's Usage into its Parent with. Rebuilt per query
+ * from the freshly attributed Project list (the state read is TTL-cached, so
+ * this is cheap) rather than at ingest — the `usage_events` cache stays a
+ * faithful mirror (ADR-0009).
+ */
+async function currentRunAttribution(): Promise<RunAttribution> {
+  const discovered = await listProjects(CLAUDE_PROJECTS_DIR)
+  const attributed = await attributeWorktreeRuns(discovered, {
+    gateRepos: noMistakesState.readRepoWorkingPaths(),
+    resolveMainWorktree,
+    canonicalize: canonicalizePath
+  })
+  return buildRunAttribution(attributed)
+}
 
 /**
  * v5 / Slice 41: notification subsystem. The idle detector watches each
@@ -992,7 +1010,7 @@ function registerIpc(): void {
   // { timeframe, encodedPath } argument. The filtered views (days / byModel
   // / byProject / topSessions) honor it; `summary` and `heatmapDays` stay
   // global. metric + granularity are applied client-side and never re-fetch.
-  ipcMain.handle('usage:get-dashboard', (_event, arg: unknown) => {
+  ipcMain.handle('usage:get-dashboard', async (_event, arg: unknown) => {
     const db = getDatabase()
     const req = (arg ?? {}) as Partial<UsageDashboardFilter>
     const timeframe: UsageTimeframe = isUsageTimeframe(req.timeframe) ? req.timeframe : 'all'
@@ -1000,7 +1018,16 @@ function registerIpc(): void {
       typeof req.encodedPath === 'string' && req.encodedPath.length > 0 ? req.encodedPath : null
     const now = new Date()
     const range = resolveTimeframe(timeframe, now)
-    const filter = { start: range.start, end: range.end, encodedPath }
+    // v11 / ADR-0014 (Slice D): roll Worktree Run Usage into its Parent. A
+    // selected Parent expands to its member set (`[parent, ...runs]`), so a
+    // run's events count toward it; the by-project breakdown merges runs into
+    // their Parent's row via `displayEncodedPath`.
+    const attribution = await currentRunAttribution()
+    const filter = {
+      start: range.start,
+      end: range.end,
+      encodedPaths: encodedPath ? attribution.membersOf(encodedPath) : null
+    }
 
     // Global summary — unaffected by the Usage Filter.
     const counts = usageSummaryCounts(db)
@@ -1029,7 +1056,11 @@ function registerIpc(): void {
       metricCards: cards,
       // Filtered views.
       days: buildDayPoints(sumTokensByDayAndGroup(db, filter)),
-      byProject: buildProjectRows(sumTokensByProjectGroup(db, filter), projectMeta(db, filter)),
+      byProject: buildProjectRows(
+        sumTokensByProjectGroup(db, filter),
+        projectMeta(db, filter),
+        attribution.displayEncodedPath
+      ),
       byModel: buildModelRows(sumTokensByGroup(db, filter)),
       // Sessions most-recent-first; `topSessions` is capped at a safety
       // backstop, `sessionsTotal` is the full filtered count (Slice 71).
@@ -1049,13 +1080,16 @@ function registerIpc(): void {
   })
 
   // One Project's headline Usage — the Project Screen strip (Slice 56).
-  ipcMain.handle('usage:get-project-summary', (_event, encodedPath: unknown) => {
+  ipcMain.handle('usage:get-project-summary', async (_event, encodedPath: unknown) => {
     if (typeof encodedPath !== 'string' || encodedPath.length === 0) {
       throw new Error('usage:get-project-summary: encodedPath must be a non-empty string')
     }
     const db = getDatabase()
-    const counts = projectUsageCounts(db, encodedPath)
-    const cost = notionalCost(sumTokensByGroupForProject(db, encodedPath))
+    // v11 / ADR-0014 (Slice D): a Parent's headline (tokens, Notional Cost, and
+    // Session count) includes its Worktree Runs — count over the member set.
+    const members = (await currentRunAttribution()).membersOf(encodedPath)
+    const counts = projectUsageCounts(db, members)
+    const cost = notionalCost(sumTokensByGroupForProject(db, members))
     return { ...counts, costUsd: cost.totalUsd }
   })
 }

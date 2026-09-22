@@ -130,6 +130,27 @@ describe('buildProjectRows', () => {
     expect(rows[1]!.costUsd).toBeCloseTo(1, 5)
     expect(rows[0]!.sessionCount).toBe(2)
   })
+
+  it('rolls a run into its Parent — one merged row, no ULID rows (Slice D)', () => {
+    // -run rolls up into -parent; tokens/sessions summed, cost merged, no -run row.
+    const resolve = (e: string): string => (e === '-run' ? '-parent' : e)
+    const rows = buildProjectRows(
+      [
+        { ...tg({ inputTokens: 1_000_000 }), encodedPath: '-parent' }, // opus → $15
+        { ...tg({ inputTokens: 1_000_000 }), encodedPath: '-run' } // opus → $15
+      ],
+      [
+        { encodedPath: '-parent', sessionCount: 1, tokens: 1_000_000, lastActivity: '2026-07-13T00:00:00Z' },
+        { encodedPath: '-run', sessionCount: 2, tokens: 1_000_000, lastActivity: '2026-07-14T00:00:00Z' }
+      ],
+      resolve
+    )
+    expect(rows.map((r) => r.encodedPath)).toEqual(['-parent']) // no ULID/run row
+    expect(rows[0]!.tokens).toBe(2_000_000)
+    expect(rows[0]!.sessionCount).toBe(3) // 1 + 2 (Session ids globally unique)
+    expect(rows[0]!.costUsd).toBeCloseTo(30, 5) // 15 + 15 rolled up
+    expect(rows[0]!.lastActivity).toBe('2026-07-14T00:00:00Z') // maxed
+  })
 })
 
 describe('buildSessionRows', () => {

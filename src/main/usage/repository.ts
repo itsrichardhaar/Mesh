@@ -24,6 +24,13 @@ export interface UsageQueryFilter {
   start?: string | null
   end?: string | null
   encodedPath?: string | null
+  /**
+   * A set of Encoded Paths to scope to (v11 / ADR-0014, Slice D): a Parent
+   * Project selected in the Usage Filter expands to `[parent, ...its runs]`
+   * so a run's events count toward the Parent. Emitted as `encoded_path IN
+   * (…)`; takes precedence over the single `encodedPath` when non-empty.
+   */
+  encodedPaths?: readonly string[] | null
 }
 
 /** Build a `WHERE …` fragment (+ named params) from a Usage Filter. */
@@ -38,11 +45,32 @@ function buildWhere(filter?: UsageQueryFilter): { sql: string; params: Record<st
     clauses.push('timestamp <= @fEnd')
     params.fEnd = filter.end
   }
-  if (filter?.encodedPath) {
+  if (filter?.encodedPaths && filter.encodedPaths.length > 0) {
+    const names = filter.encodedPaths.map((path, i) => {
+      const name = `fEncodedPath${i}`
+      params[name] = path
+      return `@${name}`
+    })
+    clauses.push(`encoded_path IN (${names.join(', ')})`)
+  } else if (filter?.encodedPath) {
     clauses.push('encoded_path = @fEncodedPath')
     params.fEncodedPath = filter.encodedPath
   }
   return { sql: clauses.length > 0 ? `WHERE ${clauses.join(' AND ')} ` : '', params }
+}
+
+/** Named-param `IN (…)` fragment for a list of Encoded Paths. */
+function encodedPathIn(encodedPaths: readonly string[]): {
+  sql: string
+  params: Record<string, string>
+} {
+  const params: Record<string, string> = {}
+  const names = encodedPaths.map((path, i) => {
+    const name = `ep${i}`
+    params[name] = path
+    return `@${name}`
+  })
+  return { sql: `encoded_path IN (${names.join(', ')})`, params }
 }
 
 /** Run a prepared query, binding named params only when there are any. */
@@ -235,11 +263,17 @@ export function sessionMeta(db: Database.Database, filter?: UsageQueryFilter): S
   )
 }
 
-/** Headline counts for one Project — the Project Screen's Usage strip. */
+/**
+ * Headline counts for one Project — the Project Screen's Usage strip. Pass the
+ * Parent's member set (`[parent, ...runs]`, v11 / ADR-0014) so a Worktree Run's
+ * events count toward the Parent, including its distinct Session count.
+ */
 export function projectUsageCounts(
   db: Database.Database,
-  encodedPath: string
+  encodedPaths: readonly string[]
 ): { eventCount: number; sessionCount: number; tokens: number } {
+  if (encodedPaths.length === 0) return { eventCount: 0, sessionCount: 0, tokens: 0 }
+  const { sql, params } = encodedPathIn(encodedPaths)
   return db
     .prepare(
       `SELECT
@@ -247,24 +281,30 @@ export function projectUsageCounts(
          COUNT(DISTINCT session_id) AS sessionCount,
          COALESCE(SUM(input_tokens + cache_read_tokens + cache_write_tokens + output_tokens), 0)
            AS tokens
-       FROM usage_events WHERE encoded_path = ?`
+       FROM usage_events WHERE ${sql}`
     )
-    .get(encodedPath) as { eventCount: number; sessionCount: number; tokens: number }
+    .get(params) as { eventCount: number; sessionCount: number; tokens: number }
 }
 
-/** Token groups for one Project (model, service_tier) — the input to its Notional Cost. */
+/**
+ * Token groups (model, service_tier) for one Project — the input to its
+ * Notional Cost. Takes the Parent's member set so a run's spend rolls up
+ * (v11 / ADR-0014).
+ */
 export function sumTokensByGroupForProject(
   db: Database.Database,
-  encodedPath: string
+  encodedPaths: readonly string[]
 ): TokenGroup[] {
+  if (encodedPaths.length === 0) return []
+  const { sql, params } = encodedPathIn(encodedPaths)
   return db
     .prepare(
       `SELECT model, service_tier AS serviceTier,
          SUM(input_tokens) AS inputTokens, SUM(cache_read_tokens) AS cacheReadTokens,
          SUM(cache_write_tokens) AS cacheWriteTokens, SUM(output_tokens) AS outputTokens
-       FROM usage_events WHERE encoded_path = ? GROUP BY model, service_tier`
+       FROM usage_events WHERE ${sql} GROUP BY model, service_tier`
     )
-    .all(encodedPath) as TokenGroup[]
+    .all(params) as TokenGroup[]
 }
 
 /** Distinct Sessions active in a given `YYYY-MM` month (UTC). */
