@@ -119,7 +119,10 @@ export function UsageDashboard({
               onChange={(e) => setProject(e.target.value === '' ? null : e.target.value)}
             >
               <option value="">All projects</option>
+              {/* Only real Projects — a Worktree Run's Usage rolls up into its
+                  Parent (v11 / ADR-0014), so runs are never selectable here. */}
               {[...(projects ?? [])]
+                .filter((p) => p.kind === 'project')
                 .sort((a, b) => a.name.localeCompare(b.name))
                 .map((p) => (
                   <option key={p.encodedPath} value={p.encodedPath}>

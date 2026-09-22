@@ -30,13 +30,52 @@ function costByKey<K extends string>(
   return cost
 }
 
-/** by-project breakdown rows, ranked by tokens descending. Pure. */
+/** Project-meta shape the by-project breakdown aggregates. */
+type ProjectMetaRow = { encodedPath: string; sessionCount: number; tokens: number; lastActivity: string }
+
+/**
+ * Fold each row's Encoded Path up to its display (Parent) path, merging a
+ * Worktree Run's totals into its Parent's row (v11 / ADR-0014, Slice D):
+ * tokens and Sessions summed (Session ids are globally unique across
+ * worktrees), `lastActivity` maxed. A Project with no runs is unchanged.
+ * The default `resolve` is identity, so callers that don't roll up behave
+ * exactly as before. Pure.
+ */
+export function rollupProjectMeta(
+  meta: ReadonlyArray<ProjectMetaRow>,
+  resolve: (encodedPath: string) => string = (e) => e
+): ProjectMetaRow[] {
+  const merged = new Map<string, ProjectMetaRow>()
+  for (const m of meta) {
+    const key = resolve(m.encodedPath)
+    const cur = merged.get(key)
+    if (!cur) {
+      merged.set(key, { ...m, encodedPath: key })
+    } else {
+      cur.tokens += m.tokens
+      cur.sessionCount += m.sessionCount
+      if (m.lastActivity > cur.lastActivity) cur.lastActivity = m.lastActivity
+    }
+  }
+  return [...merged.values()]
+}
+
+/**
+ * by-project breakdown rows, ranked by tokens descending. `resolve` folds each
+ * Worktree Run's Usage into its Parent (v11 / ADR-0014); the default identity
+ * leaves every path standing alone. Pure.
+ */
 export function buildProjectRows(
   costGroups: ReadonlyArray<TokenGroup & { encodedPath: string | null }>,
-  meta: ReadonlyArray<{ encodedPath: string; sessionCount: number; tokens: number; lastActivity: string }>
+  meta: ReadonlyArray<ProjectMetaRow>,
+  resolve: (encodedPath: string) => string = (e) => e
 ): UsageProjectRow[] {
-  const cost = costByKey(costGroups, 'encodedPath')
-  return meta
+  const remapped = costGroups.map((g) => ({
+    ...g,
+    encodedPath: g.encodedPath === null ? null : resolve(g.encodedPath)
+  }))
+  const cost = costByKey(remapped, 'encodedPath')
+  return rollupProjectMeta(meta, resolve)
     .map((m) => ({
       encodedPath: m.encodedPath,
       tokens: m.tokens,

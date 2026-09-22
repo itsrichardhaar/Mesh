@@ -80,4 +80,13 @@ describe('Usage Filter — parameterized view queries', () => {
     const sessions = sessionMeta(db, filter).map((s) => s.sessionId)
     expect(sessions).toEqual(['s-a2'])
   })
+
+  it('encodedPaths scopes to a member set (Parent + runs) via IN (Slice D)', () => {
+    // A Parent selected in the Usage Filter expands to [parent, ...runs].
+    const sessions = sessionMeta(db, { encodedPaths: ['-alpha', '-beta'] }).map((s) => s.sessionId)
+    expect(sessions.sort()).toEqual(['s-a1', 's-a2', 's-b1'])
+    // encodedPaths takes precedence over a single encodedPath when both present.
+    const rows = sumTokensByProjectGroup(db, { encodedPath: '-beta', encodedPaths: ['-alpha'] })
+    expect(rows.map((r) => r.encodedPath)).toEqual(['-alpha'])
+  })
 })
