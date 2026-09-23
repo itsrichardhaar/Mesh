@@ -398,21 +398,6 @@ export function rangeTokenGroups(
     .all({ start: startUtc, end: endUtc }) as TokenGroup[]
 }
 
-/** Per-turn rows for one Session, oldest-first — the drill-down source. */
-export function sessionEventRows(
-  db: Database.Database,
-  sessionId: string
-): Array<TokenGroup & { eventId: string; timestamp: string }> {
-  return db
-    .prepare(
-      `SELECT event_id AS eventId, timestamp, model, service_tier AS serviceTier,
-         input_tokens AS inputTokens, cache_read_tokens AS cacheReadTokens,
-         cache_write_tokens AS cacheWriteTokens, output_tokens AS outputTokens
-       FROM usage_events WHERE session_id = ? ORDER BY timestamp`
-    )
-    .all(sessionId) as Array<TokenGroup & { eventId: string; timestamp: string }>
-}
-
 /**
  * Token totals grouped by (model, service_tier) — the input to Notional
  * Cost. Grouping by tier keeps the cost service-tier aware.

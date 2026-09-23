@@ -155,6 +155,7 @@ describe('UsageDashboard — by-project + session explorer (Slice 55)', () => {
           tokens: 500_000,
           costUsd: 7,
           eventCount: 5,
+          startedAt: '2026-07-12T23:00:00Z',
           lastActivity: '2026-07-13T00:00:00Z',
           model: 'claude-opus-4-8',
           durationMs: 3_600_000
@@ -316,6 +317,7 @@ describe('UsageDashboard — by-project + session explorer (Slice 55)', () => {
       tokens: 100,
       costUsd: 1,
       eventCount: 1,
+      startedAt: `2026-07-1${i}T00:00:00Z`,
       lastActivity: `2026-07-1${i}T00:00:00Z`,
       model: 'claude-opus-4-8',
       durationMs: 1000
@@ -337,15 +339,100 @@ describe('UsageDashboard — by-project + session explorer (Slice 55)', () => {
     expect(within(region).getByText('1 session')).toBeInTheDocument()
   })
 
-  it('expands a session to its per-turn detail', async () => {
-    // Distinct turn model so the assertion doesn't collide with the row's Model cell.
-    meshApi().usage.getSessionEvents.mockResolvedValue([
-      { eventId: 'e1', timestamp: '2026-07-13T00:00:00Z', model: 'claude-sonnet-4-6', tokens: 1234, costUsd: 0.05 }
-    ])
+  it('expands a session to its summary, fetched lazily', async () => {
+    meshApi().usage.getSessionSummary.mockResolvedValue('Wired up the login flow and fixed the redirect.')
     usageStore.setState({ dashboard: withRows(), timeframe: 'all', metric: 'tokens' })
     render(<UsageDashboard projects={[project('-proj-a', 'Alpha')]} />)
     await userEvent.click(screen.getByRole('button', { expanded: false }))
-    expect(await screen.findByText('claude-sonnet-4-6')).toBeInTheDocument()
-    expect(meshApi().usage.getSessionEvents).toHaveBeenCalledWith('sess-abcd1234-ef')
+    expect(
+      await screen.findByText('Wired up the login flow and fixed the redirect.')
+    ).toBeInTheDocument()
+    expect(meshApi().usage.getSessionSummary).toHaveBeenCalledWith('-proj-a', 'sess-abcd1234-ef')
+  })
+
+  it('shows an empty note when a session has no summary', async () => {
+    meshApi().usage.getSessionSummary.mockResolvedValue(null)
+    usageStore.setState({ dashboard: withRows(), timeframe: 'all', metric: 'tokens' })
+    render(<UsageDashboard projects={[project('-proj-a', 'Alpha')]} />)
+    await userEvent.click(screen.getByRole('button', { expanded: false }))
+    expect(await screen.findByText(/No summary was recorded/i)).toBeInTheDocument()
+  })
+
+  it('shows a recoverable error (not a stuck spinner) when the summary fetch rejects', async () => {
+    meshApi().usage.getSessionSummary
+      .mockRejectedValueOnce(new Error('ipc failed'))
+      .mockResolvedValueOnce('Recovered on the second try.')
+    usageStore.setState({ dashboard: withRows(), timeframe: 'all', metric: 'tokens' })
+    render(<UsageDashboard projects={[project('-proj-a', 'Alpha')]} />)
+    // First open: the rejection surfaces an error note rather than hanging on "Loading…".
+    await userEvent.click(screen.getByRole('button', { expanded: false }))
+    expect(await screen.findByText(/couldn.t be loaded/i)).toBeInTheDocument()
+    // Reopen retries (the guard lets an errored entry re-fetch) and succeeds.
+    await userEvent.click(screen.getByRole('button', { expanded: true })) // collapse
+    await userEvent.click(screen.getByRole('button', { expanded: false })) // reopen
+    expect(await screen.findByText('Recovered on the second try.')).toBeInTheDocument()
+    expect(meshApi().usage.getSessionSummary).toHaveBeenCalledTimes(2)
+  })
+
+  it('shows the session start date/time', () => {
+    usageStore.setState({ dashboard: withRows(), timeframe: 'all', metric: 'tokens' })
+    render(<UsageDashboard projects={[project('-proj-a', 'Alpha')]} />)
+    const region = screen.getByRole('region', { name: 'Recent sessions' })
+    // startedAt 2026-07-12T23:00:00Z formats to a "Jul 12" (or local-tz) date label.
+    expect(within(region).getByText(/Jul 1[23],/)).toBeInTheDocument()
+  })
+
+  describe('Worktree Run sessions', () => {
+    const gateRun = (): Project => ({
+      ...project('-run-xyz', '01M35ATS3JQH6KA3G5VF89H2NS'),
+      kind: 'worktreeRun',
+      subtype: 'gate',
+      parentEncodedPath: '-proj-a',
+      gate: {
+        repoId: 'f9184b',
+        runId: '01M35ATS3JQH6KA3G5VF89H2NS',
+        status: 'completed',
+        prUrl: null,
+        prState: null,
+        branch: null,
+        intent: 'Ship the gate run summary on the Project Screen.'
+      }
+    })
+
+    const gateSessions = (): UsageDashboardData =>
+      dashboard({
+        topSessions: [
+          {
+            sessionId: 'sess-gate01-ab',
+            encodedPath: '-run-xyz',
+            tokens: 100,
+            costUsd: 1,
+            eventCount: 1,
+            startedAt: '2026-07-12T23:00:00Z',
+            lastActivity: '2026-07-13T00:00:00Z',
+            model: 'claude-opus-4-8',
+            durationMs: 1000
+          }
+        ]
+      })
+
+    it('shows the Parent Project name and a no-mistakes tag instead of the ULID', () => {
+      usageStore.setState({ dashboard: gateSessions(), timeframe: 'all', metric: 'tokens' })
+      render(<UsageDashboard projects={[project('-proj-a', 'Alpha'), gateRun()]} />)
+      const region = screen.getByRole('region', { name: 'Recent sessions' })
+      expect(within(region).getByText('Alpha')).toBeInTheDocument()
+      expect(within(region).getByText('no-mistakes')).toBeInTheDocument()
+      expect(within(region).queryByText('01M35ATS3JQH6KA3G5VF89H2NS')).not.toBeInTheDocument()
+    })
+
+    it('uses the gate intent as the summary without a round-trip', async () => {
+      usageStore.setState({ dashboard: gateSessions(), timeframe: 'all', metric: 'tokens' })
+      render(<UsageDashboard projects={[project('-proj-a', 'Alpha'), gateRun()]} />)
+      await userEvent.click(screen.getByRole('button', { expanded: false }))
+      expect(
+        await screen.findByText('Ship the gate run summary on the Project Screen.')
+      ).toBeInTheDocument()
+      expect(meshApi().usage.getSessionSummary).not.toHaveBeenCalled()
+    })
   })
 })

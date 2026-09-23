@@ -24,7 +24,6 @@ import type {
   UsageDashboardFilter,
   UsageIngestStatus,
   UsageProjectSummary,
-  UsageTurn,
   ValidationResult
 } from './types'
 
@@ -293,8 +292,12 @@ export interface MeshApi {
      * filtered views; omit it for the all-time / all-project view.
      */
     getDashboard(filter?: UsageDashboardFilter): Promise<UsageDashboard>
-    /** Per-turn drill-down for one Session in the explorer (Slice 55). */
-    getSessionEvents(sessionId: string): Promise<UsageTurn[]>
+    /**
+     * A Session's human summary for the explorer accordion — the latest
+     * `away_summary` or, failing that, its first user message. `null` when the
+     * Session's JSONL is missing or carries neither.
+     */
+    getSessionSummary(encodedPath: string, sessionId: string): Promise<string | null>
     /** One Project's headline Usage for its Project Screen strip (Slice 56). */
     getProjectSummary(encodedPath: string): Promise<UsageProjectSummary>
   }

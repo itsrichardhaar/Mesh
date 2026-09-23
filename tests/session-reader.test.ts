@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import {
   listSessions,
   readLatestAwaySummary,
+  readSessionSummary,
   readTranscript
 } from '@main/sessions/session-reader'
 
@@ -441,6 +442,43 @@ describe('session reader', () => {
       )
       const result = await readLatestAwaySummary(dir, 's')
       expect(result).toBe('Latest checkpoint — picked up RAG work.')
+    })
+  })
+
+  describe('readSessionSummary', () => {
+    it('returns null when the session file does not exist', async () => {
+      const dir = await mkProjectDir('sum-missing')
+      expect(await readSessionSummary(dir, 'nope')).toBeNull()
+    })
+
+    it('prefers the latest away_summary when present', async () => {
+      const dir = await mkProjectDir('sum-away')
+      const away = JSON.stringify({
+        type: 'system',
+        subtype: 'away_summary',
+        content: 'Checkpoint: finished the migration.',
+        timestamp: '2026-06-25T18:00:00.000Z'
+      })
+      await writeFile(
+        join(dir, 's.jsonl'),
+        [userLine('Do the migration', '2026-06-25T10:00:00.000Z'), away].join('\n') + '\n',
+        'utf-8'
+      )
+      expect(await readSessionSummary(dir, 's')).toBe('Checkpoint: finished the migration.')
+    })
+
+    it('falls back to the first user message when there is no away_summary', async () => {
+      const dir = await mkProjectDir('sum-first')
+      await writeFile(
+        join(dir, 's.jsonl'),
+        [
+          userLine('Help me refactor the auth module', '2026-06-25T10:00:00.000Z'),
+          assistantTextLine('sure', '2026-06-25T10:01:00.000Z'),
+          userLine('and then add tests', '2026-06-25T10:02:00.000Z')
+        ].join('\n') + '\n',
+        'utf-8'
+      )
+      expect(await readSessionSummary(dir, 's')).toBe('Help me refactor the auth module')
     })
   })
 

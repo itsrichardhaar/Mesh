@@ -413,20 +413,13 @@ export interface UsageSessionRow {
   tokens: number
   costUsd: number
   eventCount: number
+  /** ISO 8601 timestamp of the Session's first Usage Event — when it began. */
+  startedAt: string
   lastActivity: string
   /** The Session's dominant Model (most tokens), or null when unlabeled. */
   model: string | null
   /** Wall-clock span from the Session's first to last Usage Event, in ms. */
   durationMs: number
-}
-
-/** One assistant turn within a Session — the per-turn drill-down (Slice 55). */
-export interface UsageTurn {
-  eventId: string
-  timestamp: string
-  model: string | null
-  tokens: number
-  costUsd: number
 }
 
 /**

@@ -64,7 +64,7 @@ import {
   upsertDiscovered
 } from './projects/repository'
 import { compute as computeStats } from './projects/stats-computer'
-import { listSessions, readTranscript } from './sessions/session-reader'
+import { listSessions, readSessionSummary, readTranscript } from './sessions/session-reader'
 import {
   closeAllSessionWatchers,
   watchSessions
@@ -96,7 +96,6 @@ import {
   projectMeta,
   distinctUsageEncodedPaths,
   projectUsageCounts,
-  sessionEventRows,
   sessionMeta,
   sumTokensByDayAndGroup,
   sumTokensByGroupForProject,
@@ -112,8 +111,7 @@ import {
   buildDayPoints,
   buildModelRows,
   buildProjectRows,
-  buildSessionRows,
-  buildTurns
+  buildSessionRows
 } from './usage/dashboard'
 import { resolveTimeframe } from './usage/timeframe'
 import { metricCards } from './usage/metrics'
@@ -1104,13 +1102,20 @@ function registerIpc(): void {
     }
   })
 
-  // Per-turn drill-down for one Session (Slice 55).
-  ipcMain.handle('usage:get-session-events', (_event, sessionId: unknown) => {
-    if (typeof sessionId !== 'string' || sessionId.length === 0) {
-      throw new Error('usage:get-session-events: sessionId must be a non-empty string')
+  // A Session's human summary for the explorer accordion — away_summary or
+  // first user message, read on demand from the Session's JSONL.
+  ipcMain.handle(
+    'usage:get-session-summary',
+    (_event, encodedPath: unknown, sessionId: unknown) => {
+      if (typeof encodedPath !== 'string' || encodedPath.length === 0) {
+        throw new Error('usage:get-session-summary: encodedPath must be a non-empty string')
+      }
+      if (typeof sessionId !== 'string' || sessionId.length === 0) {
+        throw new Error('usage:get-session-summary: sessionId must be a non-empty string')
+      }
+      return readSessionSummary(join(CLAUDE_PROJECTS_DIR, encodedPath), sessionId)
     }
-    return buildTurns(sessionEventRows(getDatabase(), sessionId))
-  })
+  )
 
   // One Project's headline Usage — the Project Screen strip (Slice 56).
   ipcMain.handle('usage:get-project-summary', async (_event, encodedPath: unknown) => {
