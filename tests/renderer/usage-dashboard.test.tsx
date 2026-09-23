@@ -358,6 +358,22 @@ describe('UsageDashboard — by-project + session explorer (Slice 55)', () => {
     expect(await screen.findByText(/No summary was recorded/i)).toBeInTheDocument()
   })
 
+  it('shows a recoverable error (not a stuck spinner) when the summary fetch rejects', async () => {
+    meshApi().usage.getSessionSummary
+      .mockRejectedValueOnce(new Error('ipc failed'))
+      .mockResolvedValueOnce('Recovered on the second try.')
+    usageStore.setState({ dashboard: withRows(), timeframe: 'all', metric: 'tokens' })
+    render(<UsageDashboard projects={[project('-proj-a', 'Alpha')]} />)
+    // First open: the rejection surfaces an error note rather than hanging on "Loading…".
+    await userEvent.click(screen.getByRole('button', { expanded: false }))
+    expect(await screen.findByText(/couldn.t be loaded/i)).toBeInTheDocument()
+    // Reopen retries (the guard lets an errored entry re-fetch) and succeeds.
+    await userEvent.click(screen.getByRole('button', { expanded: true })) // collapse
+    await userEvent.click(screen.getByRole('button', { expanded: false })) // reopen
+    expect(await screen.findByText('Recovered on the second try.')).toBeInTheDocument()
+    expect(meshApi().usage.getSessionSummary).toHaveBeenCalledTimes(2)
+  })
+
   it('shows the session start date/time', () => {
     usageStore.setState({ dashboard: withRows(), timeframe: 'all', metric: 'tokens' })
     render(<UsageDashboard projects={[project('-proj-a', 'Alpha')]} />)

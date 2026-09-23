@@ -582,7 +582,10 @@ function parentProjectName(projects: Project[] | undefined, run: Project): strin
   return syntheticParentLabel(parentId) ?? projects?.find((p) => p.encodedPath === parentId)?.name ?? null
 }
 
-type SummaryState = { status: 'loading' } | { status: 'ok'; text: string | null }
+type SummaryState =
+  | { status: 'loading' }
+  | { status: 'ok'; text: string | null }
+  | { status: 'error' }
 
 function SessionExplorer({
   rows,
@@ -608,7 +611,9 @@ function SessionExplorer({
       return
     }
     setExpanded(id)
-    if (summaries[id]) return
+    // Re-fetch on reopen only when a prior attempt errored; a resolved
+    // 'ok'/'loading' entry is left alone so the summary isn't refetched.
+    if (summaries[id] && summaries[id].status !== 'error') return
     // A Gate Run's Session shows the run's intent — already in hand from the
     // Project's gate metadata, no round-trip needed.
     const proj = projects?.find((p) => p.encodedPath === row.encodedPath)
@@ -617,8 +622,14 @@ function SessionExplorer({
       return
     }
     setSummaries((prev) => ({ ...prev, [id]: { status: 'loading' } }))
-    const text = await window.api.usage.getSessionSummary(row.encodedPath, id)
-    setSummaries((prev) => ({ ...prev, [id]: { status: 'ok', text } }))
+    try {
+      const text = await window.api.usage.getSessionSummary(row.encodedPath, id)
+      setSummaries((prev) => ({ ...prev, [id]: { status: 'ok', text } }))
+    } catch {
+      // Leave an 'error' marker so the guard above lets a reopen retry
+      // instead of the accordion being stuck on "Loading…" forever.
+      setSummaries((prev) => ({ ...prev, [id]: { status: 'error' } }))
+    }
   }
 
   return (
@@ -700,6 +711,11 @@ function SessionExplorer({
                       <td colSpan={7}>
                         {!summary || summary.status === 'loading' ? (
                           <span className="usage-session-summary-loading">Loading…</span>
+                        ) : summary.status === 'error' ? (
+                          <p className="usage-session-summary usage-session-summary-empty">
+                            This session&rsquo;s summary couldn&rsquo;t be loaded. Close and reopen
+                            to try again.
+                          </p>
                         ) : summary.text ? (
                           <p className="usage-session-summary">{summary.text}</p>
                         ) : (
