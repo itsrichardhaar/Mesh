@@ -169,6 +169,7 @@ export function buildSessionRows(
         tokens: m.tokens,
         costUsd: cost.get(m.sessionId) ?? 0,
         eventCount: m.eventCount,
+        startedAt: m.firstActivity,
         lastActivity: m.lastActivity,
         model: model.get(m.sessionId) ?? null,
         durationMs: Number.isNaN(start) || Number.isNaN(end) ? 0 : Math.max(0, end - start)

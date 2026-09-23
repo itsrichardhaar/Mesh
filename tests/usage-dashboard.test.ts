@@ -175,6 +175,7 @@ describe('buildSessionRows', () => {
     expect(rows[0]!.costUsd).toBeCloseTo(45.2, 5) // 3M opus input ($45) + 200K haiku input ($0.20)
     expect(rows[0]!.model).toBe('claude-opus-4-8') // most tokens
     expect(rows[0]!.durationMs).toBe(3_600_000)
+    expect(rows[0]!.startedAt).toBe('2026-07-13T00:00:00Z') // first-event timestamp
   })
 
   it('orders most-recent-first by last activity, not by tokens (Slice 71)', () => {

@@ -464,6 +464,59 @@ async function summarizeSession(jsonlPath: string, sessionId: string): Promise<S
   return { sessionId, title, preview, lastActivityAt }
 }
 
+/**
+ * A short human summary of what a Session was about, for the Usage session
+ * explorer's per-session accordion. Prefers the latest `away_summary` (Claude
+ * Code's own checkpoint digest, a fuller paragraph) when the Session carries
+ * one; otherwise falls back to the Session's first user message, collapsed to a
+ * few lines. Both are gathered in a single pass over the JSONL. Returns `null`
+ * when the file is missing or carries neither. (Gate Runs surface their intent
+ * instead — resolved in the renderer from the Project's gate metadata.)
+ */
+export async function readSessionSummary(
+  projectDir: string,
+  sessionId: string
+): Promise<string | null> {
+  const jsonlPath = join(projectDir, `${sessionId}.jsonl`)
+  try {
+    const s = await stat(jsonlPath)
+    if (!s.isFile()) return null
+  } catch {
+    return null
+  }
+
+  let away: string | null = null
+  let awayAt = ''
+  let firstUser: string | null = null
+  const stream = createReadStream(jsonlPath, { encoding: 'utf-8' })
+  const rl = createInterface({ input: stream, crlfDelay: Infinity })
+  try {
+    for await (const line of rl) {
+      const obj = parseLine(line)
+      if (!obj) continue
+      if (obj['type'] === 'system' && obj['subtype'] === 'away_summary') {
+        const content = obj['content']
+        if (typeof content === 'string' && content.length > 0) {
+          const ts = typeof obj['timestamp'] === 'string' ? (obj['timestamp'] as string) : ''
+          if (ts >= awayAt) {
+            away = content
+            awayAt = ts
+          }
+        }
+        continue
+      }
+      if (firstUser === null) {
+        const u = extractFirstUserText(obj)
+        if (u) firstUser = previewOf(u)
+      }
+    }
+  } finally {
+    rl.close()
+    stream.close()
+  }
+  return away ?? firstUser
+}
+
 function extractFirstUserText(obj: Record<string, unknown>): string | null {
   if (obj['isSidechain'] === true) return null
   if (obj['type'] !== 'user') return null

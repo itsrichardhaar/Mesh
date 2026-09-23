@@ -413,6 +413,8 @@ export interface UsageSessionRow {
   tokens: number
   costUsd: number
   eventCount: number
+  /** ISO 8601 timestamp of the Session's first Usage Event — when it began. */
+  startedAt: string
   lastActivity: string
   /** The Session's dominant Model (most tokens), or null when unlabeled. */
   model: string | null

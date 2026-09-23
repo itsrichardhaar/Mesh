@@ -112,6 +112,8 @@ const api: MeshApi = {
     getCostSummary: () => ipcRenderer.invoke('usage:get-cost-summary'),
     getDashboard: (filter) => ipcRenderer.invoke('usage:get-dashboard', filter),
     getSessionEvents: (sessionId) => ipcRenderer.invoke('usage:get-session-events', sessionId),
+    getSessionSummary: (encodedPath, sessionId) =>
+      ipcRenderer.invoke('usage:get-session-summary', encodedPath, sessionId),
     getProjectSummary: (encodedPath) => ipcRenderer.invoke('usage:get-project-summary', encodedPath)
   }
 }

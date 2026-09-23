@@ -64,7 +64,7 @@ import {
   upsertDiscovered
 } from './projects/repository'
 import { compute as computeStats } from './projects/stats-computer'
-import { listSessions, readTranscript } from './sessions/session-reader'
+import { listSessions, readSessionSummary, readTranscript } from './sessions/session-reader'
 import {
   closeAllSessionWatchers,
   watchSessions
@@ -1111,6 +1111,21 @@ function registerIpc(): void {
     }
     return buildTurns(sessionEventRows(getDatabase(), sessionId))
   })
+
+  // A Session's human summary for the explorer accordion — away_summary or
+  // first user message, read on demand from the Session's JSONL.
+  ipcMain.handle(
+    'usage:get-session-summary',
+    (_event, encodedPath: unknown, sessionId: unknown) => {
+      if (typeof encodedPath !== 'string' || encodedPath.length === 0) {
+        throw new Error('usage:get-session-summary: encodedPath must be a non-empty string')
+      }
+      if (typeof sessionId !== 'string' || sessionId.length === 0) {
+        throw new Error('usage:get-session-summary: sessionId must be a non-empty string')
+      }
+      return readSessionSummary(join(CLAUDE_PROJECTS_DIR, encodedPath), sessionId)
+    }
+  )
 
   // One Project's headline Usage — the Project Screen strip (Slice 56).
   ipcMain.handle('usage:get-project-summary', async (_event, encodedPath: unknown) => {

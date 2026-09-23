@@ -205,6 +205,7 @@ export function createMeshApiFake(): MeshApiFake {
         sessionsTotal: 0
       })),
       getSessionEvents: vi.fn(async () => []),
+      getSessionSummary: vi.fn(async () => null),
       getProjectSummary: vi.fn(async () => ({
         eventCount: 0,
         sessionCount: 0,

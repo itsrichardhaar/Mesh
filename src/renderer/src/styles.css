@@ -967,6 +967,10 @@ button {
   overflow-x: auto;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md, 10px);
+  /* Establish an inline-size container so the table can shed low-value columns
+     as the pane narrows (keeping Session / Project / Tokens / Jump), instead of
+     scrolling the Jump button off the right edge. */
+  container-type: inline-size;
 }
 
 .usage-session-table {
@@ -1032,29 +1036,77 @@ button {
   border-color: var(--accent);
 }
 
-.usage-turn-detail-row td {
+/* Session's absolute start date/time, beneath the id (relative on hover). */
+.usage-session-started {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Project cell: name truncates so the numeric columns + Jump never clip; the
+   run tag pill drops to its own line beneath the name. */
+.usage-session-project-name {
+  display: block;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.usage-session-tag {
+  margin-top: 4px;
+}
+
+/* Per-session summary accordion (what the session was about). */
+.usage-session-summary-row td {
   background: var(--bg-canvas);
 }
 
-.usage-turn-list {
-  list-style: none;
+.usage-session-summary {
   margin: 0;
-  padding: 4px 0 4px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+  padding: 2px 12px 2px 12px;
+  max-width: 92ch;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
 }
 
-.usage-turn-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
+/* Shed the lowest-value columns as the table's container narrows so the numeric
+   columns and the Jump action stay on screen. Column order: 1 Session,
+   2 Project, 3 Model, 4 Tokens, 5 Notional, 6 Duration, 7 Actions. */
+@container (max-width: 820px) {
+  .usage-session-table th:nth-child(3),
+  .usage-session-table td:nth-child(3) {
+    display: none; /* Model — near-constant, lowest information */
+  }
+}
+
+@container (max-width: 680px) {
+  .usage-session-table th:nth-child(6),
+  .usage-session-table td:nth-child(6) {
+    display: none; /* Duration */
+  }
+}
+
+@container (max-width: 560px) {
+  .usage-session-table th:nth-child(5),
+  .usage-session-table td:nth-child(5) {
+    display: none; /* Notional */
+  }
+}
+
+.usage-session-summary-empty {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.usage-session-summary-loading {
+  display: inline-block;
+  padding: 2px 0 2px 12px;
   font-size: 12px;
   color: var(--text-muted);
-}
-
-.usage-turn-meta {
-  font-variant-numeric: tabular-nums;
 }
 
 /* Project Screen: Usage strip + Analysis accordion (v7 / Slice 56). */

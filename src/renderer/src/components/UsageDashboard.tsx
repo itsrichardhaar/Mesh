@@ -6,9 +6,9 @@ import type {
   UsageModelRow,
   UsageProjectRow,
   UsageSessionRow,
-  UsageTimeframe,
-  UsageTurn
+  UsageTimeframe
 } from '@shared/types'
+import { syntheticParentLabel } from '@shared/types'
 import type { JumpToSessionInput } from './NotificationsBell'
 import { useUsage } from '../hooks/useUsage'
 import {
@@ -18,6 +18,8 @@ import {
   type TrendPoint
 } from '../util/trend'
 import { heatmapGrid } from '../util/heatmap'
+import { relativeTime } from '../util/relativeTime'
+import { gateRunSummaryText, isGateRun } from '../util/gateRun'
 
 type TimeView = 'trend' | 'heatmap'
 
@@ -530,6 +532,58 @@ function formatDuration(ms: number): string {
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`
 }
 
+const startedFmt = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit'
+})
+
+/** Absolute local date/time a Session began, e.g. `Sep 22, 8:14 PM`. */
+function formatStarted(iso: string): string {
+  const t = Date.parse(iso)
+  return Number.isNaN(t) ? '' : startedFmt.format(new Date(t))
+}
+
+type SessionTag = 'no-mistakes' | 'worktree'
+
+interface SessionProjectDisplay {
+  /** The name to show — the Parent Project's for a Worktree Run, else the Project's own. */
+  label: string
+  /** Fuller string for the cell's `title` tooltip. */
+  title: string
+  /** The run tag pill, or `null` for an ordinary Project. */
+  tag: SessionTag | null
+}
+
+/**
+ * What the Project column shows for a Session. A Worktree Run's Session resolves
+ * to its **Parent Project**'s name plus a run tag — otherwise the ULID-named run
+ * folder is meaningless to the user. Ordinary Projects show their own name.
+ */
+function sessionProjectDisplay(
+  projects: Project[] | undefined,
+  encodedPath: string
+): SessionProjectDisplay {
+  const proj = projects?.find((p) => p.encodedPath === encodedPath)
+  if (!proj) return { label: encodedPath, title: encodedPath, tag: null }
+  if (proj.kind === 'worktreeRun') {
+    const tag: SessionTag = proj.subtype === 'gate' ? 'no-mistakes' : 'worktree'
+    const parent = parentProjectName(projects, proj) ?? proj.name
+    return { label: parent, title: `${parent} · ${tag} run`, tag }
+  }
+  return { label: proj.name, title: proj.name, tag: null }
+}
+
+/** A Worktree Run's Parent Project display name — the real Project's, or the synthetic group label. */
+function parentProjectName(projects: Project[] | undefined, run: Project): string | null {
+  const parentId = run.parentEncodedPath
+  if (!parentId) return null
+  return syntheticParentLabel(parentId) ?? projects?.find((p) => p.encodedPath === parentId)?.name ?? null
+}
+
+type SummaryState = { status: 'loading' } | { status: 'ok'; text: string | null }
+
 function SessionExplorer({
   rows,
   projects,
@@ -543,20 +597,28 @@ function SessionExplorer({
   onJumpToSession?: (input: JumpToSessionInput) => void
 }): JSX.Element | null {
   const [expanded, setExpanded] = useState<string | null>(null)
-  const [turns, setTurns] = useState<Record<string, UsageTurn[]>>({})
+  const [summaries, setSummaries] = useState<Record<string, SummaryState>>({})
 
   if (rows.length === 0) return null
 
-  const toggle = async (sessionId: string): Promise<void> => {
-    if (expanded === sessionId) {
+  const toggle = async (row: UsageSessionRow): Promise<void> => {
+    const id = row.sessionId
+    if (expanded === id) {
       setExpanded(null)
       return
     }
-    setExpanded(sessionId)
-    if (!turns[sessionId]) {
-      const detail = await window.api.usage.getSessionEvents(sessionId)
-      setTurns((prev) => ({ ...prev, [sessionId]: detail }))
+    setExpanded(id)
+    if (summaries[id]) return
+    // A Gate Run's Session shows the run's intent — already in hand from the
+    // Project's gate metadata, no round-trip needed.
+    const proj = projects?.find((p) => p.encodedPath === row.encodedPath)
+    if (proj && isGateRun(proj)) {
+      setSummaries((prev) => ({ ...prev, [id]: { status: 'ok', text: gateRunSummaryText(proj) } }))
+      return
     }
+    setSummaries((prev) => ({ ...prev, [id]: { status: 'loading' } }))
+    const text = await window.api.usage.getSessionSummary(row.encodedPath, id)
+    setSummaries((prev) => ({ ...prev, [id]: { status: 'ok', text } }))
   }
 
   return (
@@ -584,8 +646,9 @@ function SessionExplorer({
           </thead>
           <tbody>
             {rows.map((row) => {
-              const name = projectName(projects, row.encodedPath)
+              const proj = sessionProjectDisplay(projects, row.encodedPath)
               const isOpen = expanded === row.sessionId
+              const summary = summaries[row.sessionId]
               return (
                 <Fragment key={row.sessionId}>
                   <tr>
@@ -594,12 +657,24 @@ function SessionExplorer({
                         type="button"
                         className="usage-session-id-btn"
                         aria-expanded={isOpen}
-                        onClick={() => void toggle(row.sessionId)}
+                        onClick={() => void toggle(row)}
                       >
                         {row.sessionId.slice(0, 8)}
                       </button>
+                      <div className="usage-session-started" title={relativeTime(row.startedAt)}>
+                        {formatStarted(row.startedAt)}
+                      </div>
                     </td>
-                    <td>{name}</td>
+                    <td className="usage-session-project">
+                      <span className="usage-session-project-name" title={proj.title}>
+                        {proj.label}
+                      </span>
+                      {proj.tag && (
+                        <span className="sidebar-pill sidebar-pill-worktree usage-session-tag">
+                          {proj.tag}
+                        </span>
+                      )}
+                    </td>
                     <td className="usage-session-model">{row.model ?? 'unknown'}</td>
                     <td className="num">{tokenFmt.format(row.tokens)}</td>
                     <td className="num">{formatUsd(row.costUsd)}</td>
@@ -621,18 +696,17 @@ function SessionExplorer({
                     </td>
                   </tr>
                   {isOpen && (
-                    <tr className="usage-turn-detail-row">
+                    <tr className="usage-session-summary-row">
                       <td colSpan={7}>
-                        <ul className="usage-turn-list">
-                          {(turns[row.sessionId] ?? []).map((turn) => (
-                            <li key={turn.eventId} className="usage-turn-row">
-                              <span className="usage-turn-model">{turn.model ?? 'unknown'}</span>
-                              <span className="usage-turn-meta">
-                                {tokenFmt.format(turn.tokens)} tokens · {formatUsd(turn.costUsd)}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
+                        {!summary || summary.status === 'loading' ? (
+                          <span className="usage-session-summary-loading">Loading…</span>
+                        ) : summary.text ? (
+                          <p className="usage-session-summary">{summary.text}</p>
+                        ) : (
+                          <p className="usage-session-summary usage-session-summary-empty">
+                            No summary was recorded for this session.
+                          </p>
+                        )}
                       </td>
                     </tr>
                   )}
