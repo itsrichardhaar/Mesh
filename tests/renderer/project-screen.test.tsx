@@ -21,6 +21,29 @@ function project(): Project {
   }
 }
 
+function gateProject(overrides: Partial<Project['gate']> = {}): Project {
+  return {
+    ...project(),
+    encodedPath: '-run-xyz',
+    sourcePath: '/Users/x/.no-mistakes/worktrees/f9184b/01M35ATS',
+    name: '01M35ATS',
+    sourceMissing: true,
+    kind: 'worktreeRun',
+    subtype: 'gate',
+    parentEncodedPath: '-proj-a',
+    gate: {
+      repoId: 'f9184b',
+      runId: '01M35ATS3JQH6KA3G5VF89H2NS',
+      status: 'completed',
+      prUrl: null,
+      prState: null,
+      branch: null,
+      intent: null,
+      ...overrides
+    }
+  }
+}
+
 function okAnalysis(summary: string): StoredAnalysis {
   return {
     encodedPath: '-proj-a',
@@ -35,13 +58,13 @@ function okAnalysis(summary: string): StoredAnalysis {
   }
 }
 
-async function renderScreen(): Promise<void> {
+async function renderScreen(p: Project = project()): Promise<void> {
   meshApi().projects.stats.mockResolvedValue({
     sessionCount: 3,
     filesTouchedCount: 5,
     lastActivityAt: '2026-07-13T00:00:00Z'
   })
-  render(<ProjectScreen project={project()} onBack={vi.fn()} onOpenWorkspace={vi.fn()} />)
+  render(<ProjectScreen project={p} onBack={vi.fn()} onOpenWorkspace={vi.fn()} />)
   await act(async () => {}) // settle stats / analysis / usage fetches
 }
 
@@ -80,5 +103,33 @@ describe('ProjectScreen', () => {
     // /^Analyze/ hits the Analyze action, not the accordion's "Analysis …" header.
     await userEvent.click(screen.getByRole('button', { name: /^Analyze/ }))
     expect(await screen.findByText('Fresh summary')).toBeInTheDocument()
+  })
+
+  describe('Gate Run', () => {
+    it('surfaces the run intent and drops the Analyze bar + Analysis accordion', async () => {
+      await renderScreen(gateProject({ intent: 'Build issue #17, the Get directions interaction' }))
+
+      expect(
+        screen.getByText('Build issue #17, the Get directions interaction')
+      ).toBeInTheDocument()
+      // No Analyze action and no Analysis accordion for a Gate Run.
+      expect(screen.queryByRole('button', { name: /^Analyze/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Analysis/i })).not.toBeInTheDocument()
+      // The analysis fetch is skipped entirely.
+      expect(meshApi().analyses.latest).not.toHaveBeenCalled()
+    })
+
+    it('falls back to branch then short runId when intent is absent', async () => {
+      await renderScreen(gateProject({ intent: null, branch: 'feat/get-directions' }))
+      expect(screen.getByText('feat/get-directions')).toBeInTheDocument()
+    })
+
+    it('opens the pull request when the run has one', async () => {
+      await renderScreen(
+        gateProject({ intent: 'Ship the thing', prUrl: 'https://github.com/x/y/pull/17' })
+      )
+      await userEvent.click(screen.getByRole('button', { name: /pull request/i }))
+      expect(meshApi().shell.openExternal).toHaveBeenCalledWith('https://github.com/x/y/pull/17')
+    })
   })
 })

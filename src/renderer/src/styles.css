@@ -2034,6 +2034,66 @@ body.sidebar-resizing .sidebar-resize-handle {
   list-style: none;
 }
 
+/* --- Gate Run summary -----------------------------------------------------
+   Replaces the Analyze bar + Analysis accordion on a Gate Run's Project
+   Screen (a Gate Run can't be analyzed, ADR-0014): surfaces what the run
+   built — the intent text, a pass/fail glyph, and a PR link. */
+
+.gate-summary {
+  margin: 0 0 24px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+}
+
+.gate-summary-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.gate-summary-label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.gate-summary-pr {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 3px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.gate-summary-pr:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.gate-summary-pr:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.gate-summary-intent {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
 /* --- Analyze bar (Slice 24) ----------------------------------------------
    Unified state-aware bar consolidating the never / analyzing / success
    / failed states. Button anchored right; hidden during in-flight. */

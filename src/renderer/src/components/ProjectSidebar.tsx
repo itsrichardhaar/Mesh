@@ -7,6 +7,7 @@ import { useSidebarWidth } from '../hooks/useSidebarWidth'
 import { ActivitySpinner } from './ActivitySpinner'
 import { SidebarResizeHandle } from './SidebarResizeHandle'
 import { buildProjectTree, type RunGroup, type SidebarNode } from './projectTree'
+import { gateRunSummaryText, runStatusGlyph } from '../util/gateRun'
 
 const PROJECTS_SIDEBAR_WIDTH_KEY = 'home.projectsSidebarWidth'
 const PROJECTS_SIDEBAR_MIN_WIDTH = 200
@@ -42,32 +43,9 @@ function runTagTitle(project: Project): string {
  */
 function runDisplayLabel(project: Project): string {
   if (project.subtype === 'gate' && project.gate) {
-    return (
-      project.gate.intent?.trim() ||
-      project.gate.branch?.trim() ||
-      project.gate.runId.slice(0, 8)
-    )
+    return gateRunSummaryText(project) ?? project.name
   }
   return project.name
-}
-
-/** Pass/fail glyph for a Gate Run — shape + text, never hue alone (a11y). */
-interface RunGlyph {
-  char: string
-  label: string
-  className: string
-}
-
-function runStatusGlyph(project: Project): RunGlyph | null {
-  if (project.subtype !== 'gate' || !project.gate) return null
-  const { status, prState } = project.gate
-  if (status === 'completed' || prState === 'merged') {
-    return { char: '✓', label: 'passed', className: 'run-glyph-pass' }
-  }
-  if (status === 'failed') {
-    return { char: '✗', label: 'failed', className: 'run-glyph-fail' }
-  }
-  return null
 }
 
 /** The text a run row matches sidebar search against — name plus intent/branch. */
