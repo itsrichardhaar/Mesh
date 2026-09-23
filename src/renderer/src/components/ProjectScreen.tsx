@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import {
   ArrowRight,
   ChevronRight,
+  ExternalLink,
   FileText,
   Lightbulb,
   ListChecks,
@@ -14,6 +15,7 @@ import { useActiveProviderModel } from '../hooks/useActiveProviderModel'
 import { useProjectIndicator } from '../hooks/useLiveSessions'
 import { relativeTime } from '../util/relativeTime'
 import { tildify } from '../util/tildify'
+import { gateRunSummaryText, isGateRun, runStatusGlyph } from '../util/gateRun'
 import { ActivitySpinner } from './ActivitySpinner'
 
 type StatsState =
@@ -65,6 +67,9 @@ export function ProjectScreen({ project, onBack, onOpenWorkspace }: Props): JSX.
   // expands it (the user's grill decision), and it stays toggleable.
   const [analysisOpen, setAnalysisOpen] = useState(false)
   const { isLive, isActive } = useProjectIndicator(project.encodedPath)
+  // A Gate Run can't be analyzed (ADR-0014); its page swaps the Analyze bar +
+  // Analysis accordion for a read-only summary of what the run built.
+  const gateRun = isGateRun(project)
 
   useEffect(() => {
     let cancelled = false
@@ -88,6 +93,11 @@ export function ProjectScreen({ project, onBack, onOpenWorkspace }: Props): JSX.
   }, [project.encodedPath])
 
   useEffect(() => {
+    // Gate Runs never render the Analysis section, so skip the fetch entirely.
+    if (gateRun) {
+      setAnalysis({ status: 'ok', analysis: null })
+      return
+    }
     let cancelled = false
     setAnalysis({ status: 'loading' })
     window.api.analyses
@@ -106,7 +116,7 @@ export function ProjectScreen({ project, onBack, onOpenWorkspace }: Props): JSX.
     return () => {
       cancelled = true
     }
-  }, [project.encodedPath])
+  }, [project.encodedPath, gateRun])
 
   // Per-Project Usage strip (Slice 56).
   useEffect(() => {
@@ -197,19 +207,68 @@ export function ProjectScreen({ project, onBack, onOpenWorkspace }: Props): JSX.
 
       <UsageStrip usage={usage} />
 
-      <AnalyzeBar
-        project={project}
-        analysis={analysis}
-        run={run}
-        onAnalyze={() => void analyze()}
-      />
+      {gateRun ? (
+        <GateRunSummary project={project} />
+      ) : (
+        <>
+          <AnalyzeBar
+            project={project}
+            analysis={analysis}
+            run={run}
+            onAnalyze={() => void analyze()}
+          />
 
-      <AnalysisAccordion
-        state={analysis}
-        open={analysisOpen}
-        onToggle={() => setAnalysisOpen((v) => !v)}
-      />
+          <AnalysisAccordion
+            state={analysis}
+            open={analysisOpen}
+            onToggle={() => setAnalysisOpen((v) => !v)}
+          />
+        </>
+      )}
     </div>
+  )
+}
+
+/**
+ * Gate Run summary — replaces the Analyze bar + Analysis accordion on a Gate
+ * Run's Project Screen. A Gate Run can't be analyzed (ADR-0014), so instead of
+ * an inert "Not analyzed yet" bar we surface what the run built: the same
+ * intent text the sidebar shows on hover, a pass/fail glyph, and a link to the
+ * run's pull request when it has one.
+ */
+function GateRunSummary({ project }: { project: Project }): JSX.Element {
+  const summary = gateRunSummaryText(project)
+  const glyph = runStatusGlyph(project)
+  const prUrl = project.gate?.prUrl ?? null
+  return (
+    <section className="gate-summary" aria-label="Gate run summary">
+      <div className="gate-summary-head">
+        {glyph && (
+          <span
+            className={`run-glyph ${glyph.className}`}
+            title={glyph.label}
+            aria-label={glyph.label}
+          >
+            {glyph.char}
+          </span>
+        )}
+        <span className="gate-summary-label">no-mistakes gate run</span>
+        {prUrl && (
+          <button
+            type="button"
+            className="gate-summary-pr"
+            title="Open pull request"
+            onClick={() => void window.api.shell.openExternal(prUrl)}
+          >
+            <ExternalLink size={12} aria-hidden="true" />
+            <span>Pull request</span>
+          </button>
+        )}
+      </div>
+      <p className="gate-summary-intent">
+        {summary ?? 'No summary was recorded for this run.'}
+      </p>
+    </section>
   )
 }
 

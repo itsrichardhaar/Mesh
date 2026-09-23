@@ -32,7 +32,7 @@ A Project's decoded absolute path on disk (e.g., `/Users/richardhaar/Desktop/Mes
 Mesh's landing view: Project sidebar on the left, the global **Usage** views on the right (across all Projects). Single-click a Project in the sidebar opens its **Project Screen**; double-click opens its **Workspace Screen**.
 
 **Project Screen**:
-A single Project's overview — the "refresh myself after stepping away" view. Top to bottom: the Project's **Usage** strip, the **Analyze** bar, and the **Analysis** in a collapsible accordion beneath it. The middle altitude between the Home Screen (all Projects) and the Workspace Screen (deep work in one Project).
+A single Project's overview — the "refresh myself after stepping away" view. Top to bottom: the Project's **Usage** strip, the **Analyze** bar, and the **Analysis** in a collapsible accordion beneath it. On a **Gate Run**'s Project Screen the Analyze bar and Analysis accordion are replaced by a read-only **Gate Run summary** — a Gate Run can't be analyzed (ADR-0014), so it surfaces the run's intent (branch or short runId as fallback), a pass/fail glyph, and a PR link instead. The middle altitude between the Home Screen (all Projects) and the Workspace Screen (deep work in one Project).
 
 **Workspace Screen**:
 The per-Project view: file tree on the left, Sessions list in the middle, transcript or file content on the right.
