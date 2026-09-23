@@ -2,8 +2,7 @@ import type {
   UsageDayPoint,
   UsageModelRow,
   UsageProjectRow,
-  UsageSessionRow,
-  UsageTurn
+  UsageSessionRow
 } from '@shared/types'
 import { notionalCost, type TokenGroup } from './cost'
 
@@ -177,19 +176,6 @@ export function buildSessionRows(
     })
     .sort((a, b) => (a.lastActivity < b.lastActivity ? 1 : a.lastActivity > b.lastActivity ? -1 : 0))
     .slice(0, limit)
-}
-
-/** Per-turn drill-down rows for one Session. Pure. */
-export function buildTurns(
-  rows: ReadonlyArray<TokenGroup & { eventId: string; timestamp: string }>
-): UsageTurn[] {
-  return rows.map((r) => ({
-    eventId: r.eventId,
-    timestamp: r.timestamp,
-    model: r.model,
-    tokens: tokensOf(r),
-    costUsd: notionalCost([r]).totalUsd
-  }))
 }
 
 /**

@@ -4,7 +4,6 @@ import {
   buildModelRows,
   buildProjectRows,
   buildSessionRows,
-  buildTurns,
   type DayGroupRow
 } from '@main/usage/dashboard'
 import type { TokenGroup } from '@main/usage/cost'
@@ -201,16 +200,5 @@ describe('buildSessionRows', () => {
     const groups = meta.map((m) => ({ ...tg({ inputTokens: 1 }), sessionId: m.sessionId }))
     const rows = buildSessionRows(groups, meta, 1)
     expect(rows.map((r) => r.sessionId)).toEqual(['s-newest']) // most-recent kept
-  })
-})
-
-describe('buildTurns', () => {
-  it('maps per-turn rows with summed tokens and per-turn cost', () => {
-    const turns = buildTurns([
-      { ...tg({ inputTokens: 1_000_000 }), eventId: 'e1', timestamp: '2026-07-13T00:00:00Z' }
-    ])
-    expect(turns).toEqual([
-      { eventId: 'e1', timestamp: '2026-07-13T00:00:00Z', model: 'claude-opus-4-8', tokens: 1_000_000, costUsd: 15 }
-    ])
   })
 })

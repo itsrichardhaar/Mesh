@@ -96,7 +96,6 @@ import {
   projectMeta,
   distinctUsageEncodedPaths,
   projectUsageCounts,
-  sessionEventRows,
   sessionMeta,
   sumTokensByDayAndGroup,
   sumTokensByGroupForProject,
@@ -112,8 +111,7 @@ import {
   buildDayPoints,
   buildModelRows,
   buildProjectRows,
-  buildSessionRows,
-  buildTurns
+  buildSessionRows
 } from './usage/dashboard'
 import { resolveTimeframe } from './usage/timeframe'
 import { metricCards } from './usage/metrics'
@@ -1102,14 +1100,6 @@ function registerIpc(): void {
       // Global — the rolling-year Activity Heatmap ignores the filter.
       heatmapDays: buildDayPoints(sumTokensByDayAndGroup(db))
     }
-  })
-
-  // Per-turn drill-down for one Session (Slice 55).
-  ipcMain.handle('usage:get-session-events', (_event, sessionId: unknown) => {
-    if (typeof sessionId !== 'string' || sessionId.length === 0) {
-      throw new Error('usage:get-session-events: sessionId must be a non-empty string')
-    }
-    return buildTurns(sessionEventRows(getDatabase(), sessionId))
   })
 
   // A Session's human summary for the explorer accordion — away_summary or

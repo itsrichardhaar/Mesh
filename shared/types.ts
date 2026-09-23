@@ -422,15 +422,6 @@ export interface UsageSessionRow {
   durationMs: number
 }
 
-/** One assistant turn within a Session — the per-turn drill-down (Slice 55). */
-export interface UsageTurn {
-  eventId: string
-  timestamp: string
-  model: string | null
-  tokens: number
-  costUsd: number
-}
-
 /**
  * The Usage Filter's Timeframe options (v10 / Slice 69). `all` = no lower
  * bound; the rest are trailing windows ending at "now". `month` is the
