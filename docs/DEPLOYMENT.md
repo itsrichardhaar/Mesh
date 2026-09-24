@@ -56,10 +56,11 @@ pnpm install
 pnpm package
 ```
 
-The build produces `dist/Mesh.app`. Move it to your Applications folder:
+The build produces `Mesh.app` for your Mac's architecture: `dist/mac-arm64/Mesh.app` on Apple Silicon, `dist/mac/Mesh.app` on Intel. Move it to your Applications folder:
 
 ```bash
-mv dist/Mesh.app /Applications/
+mv dist/mac-arm64/Mesh.app /Applications/   # Apple Silicon
+mv dist/mac/Mesh.app /Applications/         # Intel
 ```
 
 A future v1.x release will ship `.dmg` artifacts via [GitHub Releases](https://github.com/itsrichardhaar/Mesh/releases) and you'll be able to skip the build step entirely.
@@ -134,7 +135,7 @@ cd path/to/Mesh
 git pull
 pnpm install                          # only needed when dependencies changed
 pnpm package
-mv dist/Mesh.app /Applications/       # replaces the existing .app
+mv dist/mac-arm64/Mesh.app /Applications/   # replaces the existing .app (Intel: dist/mac/Mesh.app)
 ```
 
 Your `mesh.db` and Keychain entry are preserved across rebuilds. SQLite schema migrations apply automatically on first launch after an update — you don't run them manually.
@@ -178,7 +179,7 @@ These gates were closed during v3 (`0.3.0`). Mesh is now production-grade intern
 
 These gates remain open and gate the eventual public `1.0.0` release. They are deferred because v3 is explicitly an internal-only hardening pass — public release is not the goal until v4/v5 feature work makes Mesh complete enough to publish.
 
-- [ ] **`.dmg` for macOS arm64.** Needs arm64 hardware for verification. Adding arm64 once that's available is a single-line `arch: [x64, arm64]` change in `electron-builder.yml` plus a re-run of Slice 31's smoke-test journey on the arm64 build.
+- [x] **`.dmg` for macOS arm64.** `electron-builder.yml` now targets `arch: [x64, arm64]`, so `pnpm dist` produces `dist/Mesh-<version>.dmg` (x64) and `dist/Mesh-<version>-arm64.dmg`. Verified on Apple Silicon hardware ([#89](https://github.com/itsrichardhaar/Mesh/pull/89)): native modules are arm64 in the arm64 bundle and x86_64 in the x64 bundle, and Slice 31's smoke-test journey passed on the installed arm64 build.
 - [ ] **Apple Developer ID code signing + notarization.** Needs an Apple Developer account + Developer ID cert. With signing in place, Gatekeeper accepts the build without right-click → Open.
 - [ ] **In-app auto-update wired via `electron-updater`** against GitHub Releases. Needs a public release channel — published `.dmg` + `.dmg.blockmap` artifacts per release. Pre-Go-Public, updates are manual (see [Updates](#updates-beta)).
 - [ ] **The `.app` launches on a fresh macOS machine** with no Node, pnpm, or Xcode tools installed. Needs a true clean-room Mac to verify. v3's Slice 31 verified the weaker form — launching from `/Applications/` on the developer's own machine, which still has dev tools — and that's all internal hardening requires.
