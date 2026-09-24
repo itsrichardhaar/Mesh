@@ -174,4 +174,4 @@ Mesh is in **beta** (`0.x`), and breaking changes between releases are allowed. 
 
 ## License
 
-Proprietary. © 2026 Richard Haar. All rights reserved.
+Proprietary. © 2026 Richard Haar. All rights reserved. See [LICENSE](LICENSE).
