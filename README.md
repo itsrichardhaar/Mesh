@@ -4,6 +4,12 @@
 
 ![Version](https://img.shields.io/badge/version-0.11.0-blue) ![Channel](https://img.shields.io/badge/channel-beta-orange) ![Platform](https://img.shields.io/badge/platform-macOS%20(arm64%20%7C%20x64)-lightgrey) ![Tests](https://img.shields.io/badge/tests-588%20passing-brightgreen)
 
+<p align="center">
+  <img src="docs/screenshots/home.png" width="900" alt="Mesh Home screen: projects in the sidebar, usage metric cards, a token trend chart, and breakdowns by model and project">
+</p>
+
+<p align="center"><sub>Screenshots use sample projects and usage data. The Mesh project, its transcript, and the Quota readings are real.</sub></p>
+
 ---
 
 ## Why Mesh
@@ -18,30 +24,66 @@ Mesh answers those questions without asking you to set anything up. It reads the
 
 ## Features
 
-**Projects and sessions**
-- **Auto-discovery.** Every directory you've opened Claude Code in appears in the sidebar, sorted by last activity. There's nothing to register.
-- **Transcripts.** Browse any past Session, including sub-agent conversations (Sidechains), which appear inline.
-- **Workspace.** A gitignore-aware live file tree with read-only, syntax-highlighted file viewing (Monaco + Shiki).
+### Projects and sessions
 
-**Live terminals**
+<p align="center">
+  <img src="docs/screenshots/workspace-transcript.png" width="49%" alt="Mesh Workspace showing the file tree, the Sessions list, and a past session's transcript with its tool calls">
+  <img src="docs/screenshots/workspace-file.png" width="49%" alt="Mesh Workspace File Editor showing a syntax-highlighted TypeScript file next to the expanded file tree">
+</p>
+
+- **Auto-discovery.** Every directory you've opened Claude Code in appears in the sidebar, sorted by last activity. There's nothing to register.
+- **Transcripts.** Browse any past Session as a readable conversation. Tool calls appear as one-line summaries, and sub-agent conversations (Sidechains) appear inline. **Resume in terminal** picks the Session back up in one click.
+- **Workspace.** Double-click a Project to open it. You get a gitignore-aware live file tree, the Project's Sessions, and read-only, syntax-highlighted file viewing (Monaco + Shiki).
+
+### Live terminals
+
 - **Resume** any Session in an embedded terminal (`claude --resume`) across multiple tabs.
 - Terminals keep their scrollback and state when you switch screens. They close only when their process ends.
 
-**Notifications**
-- Mesh reads each live terminal's screen and tells you when an agent is **waiting for approval**, **finished**, or **idle**.
-- Approval toasts stay up until you answer. Mute by notification type or by project. Muted notifications are still saved, so you never lose one.
+### Notifications
 
-**Analysis**
+<p align="center">
+  <img src="docs/screenshots/notifications.png" width="440" alt="Mesh notification panel listing Approval needed, Task complete, and Agent is idle alerts, each with a Jump to session link">
+</p>
+
+Run several agents at once without watching every terminal. Mesh reads each live terminal's screen and tells you when an agent needs you.
+
+- **Three signals.** *Approval needed* when an agent is waiting on a permission prompt, *Task complete* when it finishes, and *Agent is idle* when it has gone quiet. The idle signal catches anything the other two miss.
+- **Jump to session** takes you straight to the agent's terminal so you can answer it.
+- **Toasts you control.** Choose which signals pop up a toast with the **Toast for** filters, or mute a whole project. **Pause** silences all toasts until you resume. Approval toasts stay up until you answer.
+- **Nothing gets lost.** Every notification is saved to the panel, including muted ones. Unread ones are highlighted until you read or clear them.
+
+### Claude Code Quota
+
+<p align="center">
+  <img src="docs/screenshots/quota.png" width="330" alt="Claude Code Quota dropdown showing the 5-hour window at 10% used, resetting in 3h 51m, and the weekly window at 9% used, resetting in 1d 2h">
+</p>
+
+Know where you stand before you start a long run.
+
+- **Always visible.** The toolbar shows how much of your Claude subscription's **5-hour** and **weekly** windows you've used, on every screen.
+- **Time to reset.** Open the gauge to see percent used, percent left, and a countdown to each window's reset.
+- **Opt-in.** Quota is off by default. It's Mesh's only outbound call besides Analyze, and it reads Claude Code's existing sign-in. You don't enter anything new. See [ADR-0011](docs/adr/0011-networked-quota-exception.md).
+
+### Usage analytics
+
+<p align="center">
+  <img src="docs/screenshots/heatmap.png" width="900" alt="Mesh usage dashboard with a year-long activity heatmap, token composition, and usage by model and by project">
+</p>
+
+- **Token usage over time.** Switch between a trend chart (by day, week, or month) and a year-long **Activity Heatmap**.
+- **Breakdowns** by token type (input, output, cache read and write), by model, and by project. A Recent sessions table lists each Session's model, tokens, cost, and duration, with a **Jump** link.
+- **Filters.** Scope the dashboard to one project and to a timeframe: This Month, the last 7, 30, or 90 days, or all time.
+- **Notional Cost:** usage priced at published API rates, to measure intensity. *It is not money spent.*
+- **Metric cards** for Today, Last 7 days, This month, and **Subscription Utilization** (your notional usage as a multiple of your plan fee).
+
+### Analysis
+
 - Click **Analyze** on a Project to get a three-part LLM update: *Summary of Recent Sessions*, *Next Steps*, and *Suggested Improvements*.
 - Works with Claude or OpenAI models. API keys are encrypted with a key held in the macOS Keychain (Electron `safeStorage`). Mesh won't store a key in plaintext.
 
-**Usage analytics**
-- Token usage by day, project, and model, with a trend chart, activity heatmap, and token composition (input, output, cache read and write).
-- **Notional Cost:** usage priced at published API rates, to measure intensity. *It is not money spent.*
-- Metric cards for Today, Last 7 days, This month, and **Subscription Utilization** (your notional usage as a multiple of your plan fee).
-- An optional live **Quota** gauge for Claude's 5-hour and weekly windows.
+### Worktree runs
 
-**Worktree runs**
 - `no-mistakes` gate runs and other git worktrees nest under their Parent Project, with pass/fail status, branch, intent, and a PR link. Their usage counts toward the parent's totals.
 
 ## Requirements
